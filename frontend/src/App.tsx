@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
-import { Link, NavLink, Route, Routes, useNavigate } from 'react-router-dom'
+import { Link, NavLink, Route, Routes, useNavigate, useLocation } from 'react-router-dom'
 import { login as loginService, logout as logoutService, register as registerService, getStoredUser } from './services/auth'
 import type { Role } from './types'
 import Landing from './pages/Landing'
@@ -26,6 +26,8 @@ const navItems = [
 
 function App() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const isLanding = location.pathname === '/'
   const [user, setUser] = useState(() => getStoredUser())
   const [cursor, setCursor] = useState({ x: 0.5, y: 0.5 })
   const [scrollShift, setScrollShift] = useState(0)
@@ -98,43 +100,45 @@ function App() {
   }
 
   return (
-    <div className="page-shell" style={shellStyle}>
-      <div className="page-glow" />
-      <header className="site-header">
-        <div className="container header-grid">
-          <div className="brand-block">
-            <div className="brand-sigil">E</div>
-            <div>
-              <p className="brand-title">eSKala</p>
-              <small className="brand-subtitle">Santa Rosa City SK transparency portal</small>
+    <div className={isLanding ? 'landing-shell' : 'page-shell'} style={shellStyle}>
+      {!isLanding && <div className="page-glow" />}
+      {!isLanding && (
+        <header className="site-header">
+          <div className="container header-grid">
+            <div className="brand-block">
+              <div className="brand-sigil">E</div>
+              <div>
+                <p className="brand-title">eSKala</p>
+                <small className="brand-subtitle">Santa Rosa City SK transparency portal</small>
+              </div>
+            </div>
+
+            <div className="main-nav">
+              {navItems.map((item) => (
+                <NavLink key={item.path} to={item.path} className={({ isActive }) => (isActive ? 'nav-link active-link' : 'nav-link')}>
+                  {item.title}
+                </NavLink>
+              ))}
+            </div>
+
+            <div className="nav-actions">
+              {!user ? (
+                <>
+                  <Link to="/login" className="btn btn-pill btn-primary">Login</Link>
+                  <Link to="/register" className="btn btn-pill btn-secondary">Sign up</Link>
+                </>
+              ) : (
+                <>
+                  <span className="user-chip">{user.name}</span>
+                  <button className="btn btn-pill btn-secondary" type="button" onClick={handleLogout}>
+                    Logout
+                  </button>
+                </>
+              )}
             </div>
           </div>
-
-          <div className="main-nav">
-            {navItems.map((item) => (
-              <NavLink key={item.path} to={item.path} className={({ isActive }) => (isActive ? 'nav-link active-link' : 'nav-link')}>
-                {item.title}
-              </NavLink>
-            ))}
-          </div>
-
-          <div className="nav-actions">
-            {!user ? (
-              <>
-                <Link to="/login" className="btn btn-pill btn-primary">Login</Link>
-                <Link to="/register" className="btn btn-pill btn-secondary">Sign up</Link>
-              </>
-            ) : (
-              <>
-                <span className="user-chip">{user.name}</span>
-                <button className="btn btn-pill btn-secondary" type="button" onClick={handleLogout}>
-                  Logout
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      </header>
+        </header>
+      )}
 
       <main>
         <Routes>
@@ -156,26 +160,28 @@ function App() {
         </Routes>
       </main>
 
-      <footer className="footer">
-        <div className="container footer-content">
-          <div className="footer-section">
-            <p className="footer-title">About eSKala</p>
-            <small>A government-facing public portal for Santa Rosa City barangay SK projects, budgets, and civic participation.</small>
-          </div>
-          <div className="footer-section">
-            <p className="footer-title">Contact</p>
-            <small>SK Oversight Office<br />Email: skoversight@rosacity.gov.ph<br />Phone: (049) 508-1234</small>
-          </div>
-          <div className="footer-section">
-            <p className="footer-title">Policies</p>
-            <div className="footer-links">
-              <NavLink to="/about">About us</NavLink>
-              <a href="mailto:skoversight@rosacity.gov.ph">Contact</a>
-              <a href="/login">Terms and conditions</a>
+      {!isLanding && (
+        <footer className="footer">
+          <div className="container footer-content">
+            <div className="footer-section">
+              <p className="footer-title">About eSKala</p>
+              <small>A government-facing public portal for Santa Rosa City barangay SK projects, budgets, and civic participation.</small>
+            </div>
+            <div className="footer-section">
+              <p className="footer-title">Contact</p>
+              <small>SK Oversight Office<br />Email: skoversight@rosacity.gov.ph<br />Phone: (049) 508-1234</small>
+            </div>
+            <div className="footer-section">
+              <p className="footer-title">Policies</p>
+              <div className="footer-links">
+                <NavLink to="/about">About us</NavLink>
+                <a href="mailto:skoversight@rosacity.gov.ph">Contact</a>
+                <a href="/login">Terms and conditions</a>
+              </div>
             </div>
           </div>
-        </div>
-      </footer>
+        </footer>
+      )}
     </div>
   )
 }
