@@ -27,7 +27,7 @@ const navItems = [
 function App() {
   const navigate = useNavigate()
   const location = useLocation()
-  const isLanding = location.pathname === '/'
+  const isGraphPage = location.pathname === '/' || location.pathname === '/login'
   const [user, setUser] = useState(() => getStoredUser())
   const [cursor, setCursor] = useState({ x: 0.5, y: 0.5 })
   const [scrollShift, setScrollShift] = useState(0)
@@ -100,9 +100,9 @@ function App() {
   }
 
   return (
-    <div className={isLanding ? 'landing-shell' : 'page-shell'} style={shellStyle}>
-      {!isLanding && <div className="page-glow" />}
-      {!isLanding && (
+    <div className={isGraphPage ? 'landing-shell' : 'page-shell'} style={shellStyle}>
+      {!isGraphPage && <div className="page-glow" />}
+      {!isGraphPage && (
         <header className="site-header">
           <div className="container header-grid">
             <div className="brand-block">
@@ -160,7 +160,7 @@ function App() {
         </Routes>
       </main>
 
-      {!isLanding && (
+      {!isGraphPage && (
         <footer className="footer">
           <div className="container footer-content">
             <div className="footer-section">

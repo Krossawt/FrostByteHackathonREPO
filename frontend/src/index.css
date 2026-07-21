@@ -1182,3 +1182,148 @@ input:focus, select:focus, textarea:focus {
   text-decoration: underline;
 }
 
+/* --- LOGIN CARD STYLES --- */
+.login-card-container {
+  background-color: #ffffff;
+  border-radius: 20px;
+  padding: 2.5rem 2.2rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+.login-card-title {
+  font-family: 'Poppins', sans-serif;
+  font-weight: 800;
+  font-size: 1.65rem;
+  color: #111111;
+  margin: 0 0 0.25rem 0;
+  letter-spacing: -0.01em;
+}
+
+.login-card-subtitle {
+  font-family: 'Poppins', sans-serif;
+  font-weight: 400;
+  font-size: 0.9rem;
+  color: #555555;
+  margin: 0;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+
+.login-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.login-field-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.login-label {
+  font-family: 'Poppins', sans-serif;
+  font-weight: 600;
+  font-size: 0.88rem;
+  color: #222222;
+}
+
+.login-reset-link {
+  font-family: 'Poppins', sans-serif;
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: #C53030;
+  text-decoration: none;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.login-reset-link:hover {
+  text-decoration: underline;
+}
+
+.login-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.login-input-icon-left {
+  position: absolute;
+  left: 1rem;
+  color: #888888;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+}
+
+.login-input-icon-right {
+  position: absolute;
+  right: 1rem;
+  color: #888888;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+.login-input {
+  width: 100%;
+  padding: 0.75rem 2.8rem 0.75rem 2.8rem;
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.9rem;
+  color: #111111;
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  box-sizing: border-box;
+}
+
+.login-input.no-right-icon {
+  padding-right: 1rem;
+}
+
+.login-input:focus {
+  border-color: #7A0C2E;
+  box-shadow: 0 0 0 3px rgba(122, 12, 46, 0.1);
+}
+
+.btn-login-submit {
+  width: 100%;
+  padding: 0.85rem;
+  background-color: #7D7D7D;
+  color: #ffffff;
+  font-family: 'Poppins', sans-serif;
+  font-weight: 700;
+  font-size: 0.95rem;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+  transition: background-color 0.2s ease, transform 0.15s ease;
+}
+
+.btn-login-submit:hover {
+  background-color: #666666;
+  transform: translateY(-1px);
+}
+
+
