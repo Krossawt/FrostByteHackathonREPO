@@ -2,49 +2,58 @@ function About() {
   return (
     <section className="section">
       <div className="container">
-        <div className="section-title">About eSKala</div>
-        <p className="subtitle">
-          eSKala is a transparency-first portal for the Sanggunian ng Kabataan in Santa Rosa City, Laguna. It unifies barangay SK project reporting,
-          citizen suggestions, and public budget tracking in a clean, modern design inspired by official legislative portals.
-        </p>
+        <div className="page-intro">
+          <p className="hero-kicker">About the platform</p>
+          <h1 className="section-title">A public accountability system for the people and their local youth leaders.</h1>
+          <p className="subtitle">
+            eSKala is designed as a government-grade transparency portal for the Sanggunian ng Kabataan in Santa Rosa City, Laguna. It brings barangay project reporting, citizen voices, and financial visibility into a single, structured public experience.
+          </p>
+        </div>
 
-        <div className="grid grid-3 section-surface" style={{ marginTop: '2rem' }}>
-          <div className="card">
-            <strong>System Vision</strong>
-            <h3>Build trust through clear reporting.</h3>
-            <p>Public officials and citizens see project progress, budgets, and activity logs in one polished interface.</p>
+        <div className="section-surface" style={{ marginTop: '1rem' }}>
+          <div className="panel-header">
+            <div>
+              <h3>What this system is built to do</h3>
+              <p>Institutional clarity, public access, and role-based oversight.</p>
+            </div>
+            <span className="status-pill">Civic service model</span>
           </div>
-          <div className="card">
-            <strong>Design direction</strong>
-            <h3>Professional, authoritative, approachable.</h3>
-            <p>Using a maroon and gold palette, the interface avoids unnecessary curves and keeps readability sharp.</p>
-          </div>
-          <div className="card">
-            <strong>Future-ready</strong>
-            <h3>React front end with FastAPI backend scope.</h3>
-            <p>All content is mocked for now and ready to switch to Supabase-authenticated data once the API is available.</p>
+
+          <div className="service-grid">
+            <div className="card">
+              <strong>Public trust</strong>
+              <h3>Clear project tracking and open reporting.</h3>
+              <p>Citizens can review active initiatives, understand budgets, and follow where public funds go.</p>
+            </div>
+            <div className="card">
+              <strong>Operational clarity</strong>
+              <h3>Role-aware dashboards for officers and administrators.</h3>
+              <p>Super admin, SK officers, and citizens each receive a view tailored to their responsibilities.</p>
+            </div>
+            <div className="card">
+              <strong>Future-ready foundation</strong>
+              <h3>Prepared for FastAPI, Supabase, and real document workflows.</h3>
+              <p>The experience is intentionally structured for a clean handoff to a live backend later.</p>
+            </div>
           </div>
         </div>
 
-        <div className="section-surface" style={{ marginTop: '2.5rem' }}>
-          <h3>What makes this portal work?</h3>
-          <div className="grid grid-2" style={{ gap: '2rem' }}>
-            <div>
-              <p className="overline">Feature set</p>
-              <ul style={{ margin: 0, paddingLeft: '1.25rem', color: '#4e3f46' }}>
-                <li>Role-based dashboards for super admin, SK officers, and citizens</li>
-                <li>Barangay project management and progress tracking</li>
-                <li>Citizen news feed, comment board, and suggestion pipeline</li>
-                <li>Financial transparency tools, receipt upload workflows, and budget status</li>
-              </ul>
-            </div>
-            <div>
-              <p className="overline">Why Santa Rosa City?</p>
-              <p>
-                The portal is intentionally scoped for Santa Rosa City, Laguna. It supports barangay-level management and local SK accountability,
-                making it easy to expand beyond the pilot barangays once the backend is connected.
-              </p>
-            </div>
+        <div className="section-grid" style={{ marginTop: '1.5rem' }}>
+          <div className="section-surface">
+            <p className="overline">Why this matters</p>
+            <ul style={{ margin: 0, paddingLeft: '1.25rem', color: 'var(--muted)', lineHeight: 1.8 }}>
+              <li>Barangay-level accountability for local youth governance</li>
+              <li>Accessible summaries of projects, funds, and progress</li>
+              <li>Citizen feedback loops that keep public participation visible</li>
+              <li>Support for future receipt scanning, document uploads, and intelligent reporting</li>
+            </ul>
+          </div>
+
+          <div className="section-surface">
+            <p className="overline">For Santa Rosa City</p>
+            <p style={{ margin: 0, color: 'var(--muted)', lineHeight: 1.8 }}>
+              The design and structure are shaped for a municipality-level deployment where public trust, local transparency, and professional communication matter just as much as the data itself.
+            </p>
           </div>
         </div>
       </div>

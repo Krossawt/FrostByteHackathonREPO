@@ -4,12 +4,21 @@ function SuperAdminHome() {
   return (
     <section className="section">
       <div className="container">
-        <div className="section-title">Super admin dashboard</div>
-        <p className="subtitle">Review citywide SK project progress and publish official news for the portal.</p>
+        <div className="page-intro">
+          <p className="hero-kicker">Super admin operations</p>
+          <h1 className="section-title">Citywide oversight for projects, accounts, and public announcements.</h1>
+          <p className="subtitle">This workspace is structured to support municipal-level governance and a broader rollout of official SK administration.</p>
+        </div>
 
-        <div className="grid grid-2" style={{ gap: '1.5rem', marginTop: '2rem' }}>
+        <div className="section-grid">
           <div className="section-surface">
-            <h3>Current & upcoming projects</h3>
+            <div className="panel-header">
+              <div>
+                <h3>Current and upcoming SK projects</h3>
+                <p>Priority initiatives across the city in a consolidated management view.</p>
+              </div>
+              <span className="status-pill">Program control</span>
+            </div>
             <div className="news-list">
               {projects.filter((project) => project.status !== 'completed').map((project) => (
                 <div key={project.id} className="project-card">
@@ -18,14 +27,20 @@ function SuperAdminHome() {
                     <span>{project.barangay}</span>
                   </div>
                   <h4>{project.title}</h4>
-                  <small>Progress: {project.progress}%</small>
+                  <p>Progress: {project.progress}% complete</p>
                 </div>
               ))}
             </div>
           </div>
 
           <div className="section-surface">
-            <h3>Latest news</h3>
+            <div className="panel-header">
+              <div>
+                <h3>Latest public announcements</h3>
+                <p>Editorial content prepared for public release.</p>
+              </div>
+              <span className="status-pill">Editorial</span>
+            </div>
             <div className="news-list">
               {news.map((item) => (
                 <div key={item.id} className="news-item">

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
-import { NavLink, Route, Routes, useNavigate } from 'react-router-dom'
+import { Link, NavLink, Route, Routes, useNavigate } from 'react-router-dom'
 import { login as loginService, logout as logoutService, register as registerService, getStoredUser } from './services/auth'
 import type { Role } from './types'
 import Landing from './pages/Landing'
@@ -74,13 +74,15 @@ function App() {
     ]
   }, [user])
 
-  const handleLogin = (email: string, password: string, role: Role) => {
-    const result = loginService(email, password, role)
+  const handleLogin = (email: string, password: string, rememberMe: boolean) => {
+    const result = loginService(email, password, rememberMe)
     if (result) {
       setUser(result)
-      const next = role === 'superadmin' ? '/superadmin/home' : role === 'sk' ? '/sk/home' : '/citizen/home'
+      const next = result.role === 'superadmin' ? '/superadmin/home' : result.role === 'sk' ? '/sk/home' : '/citizen/home'
       navigate(next)
+      return true
     }
+    return false
   }
 
   const handleRegister = (name: string, email: string, password: string, barangay: string, isStaRosa: boolean) => {
@@ -99,45 +101,38 @@ function App() {
     <div className="page-shell" style={shellStyle}>
       <div className="page-glow" />
       <header className="site-header">
-        <div className="container">
-          <nav>
-            <div className="brand-row">
-              <div className="brand-sigil">E</div>
-              <div>
-                <p className="brand-title">eSKala</p>
-                <small className="brand-subtitle">Santa Rosa City SK transparency portal</small>
-              </div>
+        <div className="container header-grid">
+          <div className="brand-block">
+            <div className="brand-sigil">E</div>
+            <div>
+              <p className="brand-title">eSKala</p>
+              <small className="brand-subtitle">Santa Rosa City SK transparency portal</small>
             </div>
+          </div>
 
-            <div className="nav-links">
-              {navItems.map((item) => (
-                <NavLink key={item.path} to={item.path} className={({ isActive }) => (isActive ? 'nav-link active-link' : 'nav-link')}>
-                  {item.title}
-                </NavLink>
-              ))}
-              {user && roleMenu.map((item) => (
-                <NavLink key={item.path} to={item.path} className={({ isActive }) => (isActive ? 'nav-link active-link' : 'nav-link')}>
-                  {item.title}
-                </NavLink>
-              ))}
-            </div>
+          <div className="main-nav">
+            {navItems.map((item) => (
+              <NavLink key={item.path} to={item.path} className={({ isActive }) => (isActive ? 'nav-link active-link' : 'nav-link')}>
+                {item.title}
+              </NavLink>
+            ))}
+          </div>
 
-            <div className="nav-links nav-actions">
-              {!user ? (
-                <>
-                  <NavLink to="/login" className="nav-link">Login</NavLink>
-                  <NavLink to="/register" className="nav-link">Create account</NavLink>
-                </>
-              ) : (
-                <>
-                  <span className="user-chip">{user.name}</span>
-                  <button className="btn btn-secondary" type="button" onClick={handleLogout}>
-                    Logout
-                  </button>
-                </>
-              )}
-            </div>
-          </nav>
+          <div className="nav-actions">
+            {!user ? (
+              <>
+                <Link to="/login" className="btn btn-pill btn-primary">Login</Link>
+                <Link to="/register" className="btn btn-pill btn-secondary">Sign up</Link>
+              </>
+            ) : (
+              <>
+                <span className="user-chip">{user.name}</span>
+                <button className="btn btn-pill btn-secondary" type="button" onClick={handleLogout}>
+                  Logout
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </header>
 
@@ -163,13 +158,21 @@ function App() {
 
       <footer className="footer">
         <div className="container footer-content">
-          <div>
-            <p className="footer-title">eSKala</p>
-            <small>Officially structured for Santa Rosa City, Laguna public engagement and SK accountability.</small>
+          <div className="footer-section">
+            <p className="footer-title">About eSKala</p>
+            <small>A government-facing public portal for Santa Rosa City barangay SK projects, budgets, and civic participation.</small>
           </div>
-          <div>
-            <p className="footer-title">Prepared for FastAPI + Supabase</p>
-            <small>Frontend mockup ready for backend handoff, with role-aware views already in place.</small>
+          <div className="footer-section">
+            <p className="footer-title">Contact</p>
+            <small>SK Oversight Office<br />Email: skoversight@rosacity.gov.ph<br />Phone: (049) 508-1234</small>
+          </div>
+          <div className="footer-section">
+            <p className="footer-title">Policies</p>
+            <div className="footer-links">
+              <NavLink to="/about">About us</NavLink>
+              <a href="mailto:skoversight@rosacity.gov.ph">Contact</a>
+              <a href="/login">Terms and conditions</a>
+            </div>
           </div>
         </div>
       </footer>

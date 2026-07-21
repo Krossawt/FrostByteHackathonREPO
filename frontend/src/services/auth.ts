@@ -1,6 +1,7 @@
-import type { Role, UserAccount } from '../types'
+import type { UserAccount } from '../types'
 
 const STORAGE_KEY = 'eskala-user'
+const SESSION_KEY = 'eskala-user-session'
 
 const initialUsers: UserAccount[] = [
   { id: 'u-admin', name: 'SCC Super Admin', email: 'superadmin@eskala.ph', password: 'Admin2026!', role: 'superadmin', isStaRosa: true },
@@ -8,8 +9,8 @@ const initialUsers: UserAccount[] = [
   { id: 'u-user', name: 'Citizen User', email: 'citizen@eskala.ph', password: 'Citizen2026!', role: 'citizen', barangay: 'Balibago', isStaRosa: true }
 ]
 
-export function getStoredUser(): UserAccount | null {
-  const raw = window.localStorage.getItem(STORAGE_KEY)
+function readStoredUser(key: string): UserAccount | null {
+  const raw = window.localStorage.getItem(key) || window.sessionStorage.getItem(key)
   if (!raw) return null
   try {
     return JSON.parse(raw) as UserAccount
@@ -18,18 +19,32 @@ export function getStoredUser(): UserAccount | null {
   }
 }
 
-export function storeUser(user: UserAccount | null) {
-  if (!user) {
-    window.localStorage.removeItem(STORAGE_KEY)
-    return
-  }
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(user))
+export function getStoredUser(): UserAccount | null {
+  return readStoredUser(STORAGE_KEY) || readStoredUser(SESSION_KEY)
 }
 
-export function login(email: string, password: string, role: Role): UserAccount | null {
-  const match = initialUsers.find((user) => user.email === email && user.password === password && user.role === role)
+function storeUser(user: UserAccount | null, rememberMe: boolean) {
+  if (!user) {
+    window.localStorage.removeItem(STORAGE_KEY)
+    window.sessionStorage.removeItem(SESSION_KEY)
+    return
+  }
+
+  const payload = JSON.stringify(user)
+  if (rememberMe) {
+    window.localStorage.setItem(STORAGE_KEY, payload)
+    window.sessionStorage.removeItem(SESSION_KEY)
+    return
+  }
+
+  window.sessionStorage.setItem(SESSION_KEY, payload)
+  window.localStorage.removeItem(STORAGE_KEY)
+}
+
+export function login(email: string, password: string, rememberMe = false): UserAccount | null {
+  const match = initialUsers.find((user) => user.email.toLowerCase() === email.trim().toLowerCase() && user.password === password)
   if (match) {
-    storeUser(match)
+    storeUser(match, rememberMe)
     return match
   }
   return null
@@ -45,10 +60,10 @@ export function register(name: string, email: string, password: string, barangay
     barangay,
     isStaRosa,
   }
-  storeUser(user)
+  storeUser(user, true)
   return user
 }
 
 export function logout() {
-  storeUser(null)
+  storeUser(null, false)
 }
