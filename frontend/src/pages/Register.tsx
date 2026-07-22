@@ -1,12 +1,14 @@
 import { FormEvent, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { BARANGAYS } from '../data/mockData'
+import type { UserAccount } from '../types'
 
 interface RegisterPageProps {
-  onRegister: (name: string, email: string, password: string, barangay: string, isStaRosa: boolean, username?: string) => void
+  onRegister: (name: string, email: string, password: string, barangay: string, isStaRosa: boolean, username?: string) => UserAccount | void
 }
 
 export default function RegisterPage({ onRegister }: RegisterPageProps) {
+  const navigate = useNavigate()
   const [name, setName]           = useState('')
   const [username, setUsername]   = useState('')
   const [email, setEmail]         = useState('')
@@ -17,6 +19,8 @@ export default function RegisterPage({ onRegister }: RegisterPageProps) {
   const [agreed, setAgreed]       = useState(false)
   const [showPw, setShowPw]       = useState(false)
   const [error, setError]         = useState('')
+  const [showSuccessModal, setShowSuccessModal] = useState(false)
+  const [createdUser, setCreatedUser]           = useState<UserAccount | null>(null)
 
   const pwStrength = password.length >= 12 ? 'Strong' : password.length >= 8 ? 'Good' : password.length >= 4 ? 'Weak' : ''
   const pwColor    = pwStrength === 'Strong' ? '#166534' : pwStrength === 'Good' ? '#b45309' : '#b91c1c'
@@ -27,7 +31,21 @@ export default function RegisterPage({ onRegister }: RegisterPageProps) {
     if (password !== confirmPw) { setError('Passwords do not match.'); return }
     if (password.length < 6)   { setError('Password must be at least 6 characters.'); return }
     if (!agreed) { setError('You must agree to the Terms & Conditions and Privacy Policy.'); return }
-    onRegister(name.trim(), email.trim(), password, barangay, isStaRosa, username.trim() || undefined)
+    
+    const result = onRegister(name.trim(), email.trim(), password, barangay, isStaRosa, username.trim() || undefined)
+    const storedUser: UserAccount = (result as UserAccount) || {
+      id: `u-${Math.random().toString(36).slice(2, 10)}`,
+      name: name.trim(),
+      email: email.trim(),
+      username: username.trim() || email.trim().split('@')[0],
+      password,
+      role: 'citizen',
+      barangay,
+      isStaRosa,
+      isActive: true,
+    }
+    setCreatedUser(storedUser)
+    setShowSuccessModal(true)
   }
 
   return (
@@ -222,6 +240,77 @@ export default function RegisterPage({ onRegister }: RegisterPageProps) {
         </div>
       </main>
 
+      {/* ── Account Created Successfully Modal ── */}
+      {showSuccessModal && createdUser && (
+        <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowSuccessModal(false) }}>
+          <div className="modal" style={{ maxWidth: '520px', borderRadius: '4px' }}>
+            <div className="modal-header" style={{ background: 'rgba(22, 101, 52, 0.06)', borderColor: 'rgba(22, 101, 52, 0.18)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                <span style={{ fontSize: '1.4rem' }}>🎉</span>
+                <div>
+                  <h3 className="modal-title" style={{ color: '#166534', fontSize: '1.1rem', margin: 0 }}>Account Created Successfully!</h3>
+                  <p style={{ fontSize: '0.8rem', color: '#15803d', margin: 0 }}>Your Citizen Account has been saved to the user database.</p>
+                </div>
+              </div>
+              <button className="modal-close" onClick={() => setShowSuccessModal(false)} title="Close">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+              </button>
+            </div>
+
+            <div className="modal-body" style={{ padding: '1.5rem' }}>
+              <div className="notice success" style={{ background: 'rgba(22, 101, 52, 0.08)', borderColor: 'rgba(22, 101, 52, 0.2)', color: '#166534', padding: '0.85rem 1rem', borderRadius: '4px' }}>
+                ✅ <strong>Registration Complete!</strong> You can now access your barangay's SK transparency portal and submit citizen feedback.
+              </div>
+
+              <div style={{ background: 'rgba(255, 255, 255, 0.85)', border: '1.5px solid rgba(118,0,49,0.1)', padding: '1rem', display: 'grid', gap: '0.65rem' }}>
+                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.82rem', color: 'var(--maroon)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.2rem' }}>
+                  Saved Citizen Account Details
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', fontSize: '0.85rem', gap: '0.35rem' }}>
+                  <span style={{ color: 'var(--muted)', fontWeight: 600 }}>Full Name:</span>
+                  <span style={{ fontWeight: 700, color: 'var(--ink)' }}>{createdUser.name}</span>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', fontSize: '0.85rem', gap: '0.35rem' }}>
+                  <span style={{ color: 'var(--muted)', fontWeight: 600 }}>Username:</span>
+                  <span style={{ fontWeight: 600, color: 'var(--ink)' }}>@{createdUser.username}</span>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', fontSize: '0.85rem', gap: '0.35rem' }}>
+                  <span style={{ color: 'var(--muted)', fontWeight: 600 }}>Email Address:</span>
+                  <span style={{ fontWeight: 600, color: 'var(--ink)' }}>{createdUser.email}</span>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', fontSize: '0.85rem', gap: '0.35rem' }}>
+                  <span style={{ color: 'var(--muted)', fontWeight: 600 }}>Barangay:</span>
+                  <span style={{ fontWeight: 600, color: 'var(--ink)' }}>{createdUser.barangay}</span>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', fontSize: '0.85rem', gap: '0.35rem' }}>
+                  <span style={{ color: 'var(--muted)', fontWeight: 600 }}>Santa Rosa Resident:</span>
+                  <span style={{ fontWeight: 600, color: 'var(--ink)' }}>{createdUser.isStaRosa ? 'Yes (Santa Rosa City)' : 'No'}</span>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', fontSize: '0.85rem', gap: '0.35rem' }}>
+                  <span style={{ color: 'var(--muted)', fontWeight: 600 }}>Account Status:</span>
+                  <span className="badge badge-active" style={{ width: 'fit-content' }}>Active Citizen</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="modal-footer" style={{ background: '#F0EEE6' }}>
+              <button className="btn btn-secondary" onClick={() => navigate('/login')}>
+                Go to Login Page
+              </button>
+              <button className="btn btn-primary" onClick={() => navigate('/citizen/home')}>
+                Proceed to Dashboard &rarr;
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Footer ── */}
       <footer className="landing-footer">
         <div className="landing-footer-version">eSKala v1.0 · City of Santa Rosa, Laguna · CYDO</div>
@@ -233,3 +322,4 @@ export default function RegisterPage({ onRegister }: RegisterPageProps) {
     </div>
   )
 }
+
