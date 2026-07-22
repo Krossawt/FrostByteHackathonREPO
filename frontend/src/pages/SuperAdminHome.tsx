@@ -9,19 +9,84 @@ interface SuperAdminHomeProps {
 export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }: SuperAdminHomeProps) {
   const [view, setView] = useState<'city' | 'barangay'>(selectedBarangay ? 'barangay' : 'city')
 
-  const totalBudget  = barangaySummary.reduce((s, b) => s + b.annualBudget, 0)
-  const totalSpent   = barangaySummary.reduce((s, b) => s + b.spent, 0)
+  // Dynamic States for data updates
+  const [barangayList, setBarangayList] = useState(barangaySummary)
+  const [logs, setLogs] = useState(activityLogs)
+
+  // Budget modal and form states
+  const [showBudgetModal, setShowBudgetModal] = useState(false)
+  const [cityBudgetOverride, setCityBudgetOverride] = useState<number | null>(null)
+  const [annualYear, setAnnualYear] = useState('2025')
+  const [approvedBudget, setApprovedBudget] = useState('')
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [successMessage, setSuccessMessage] = useState('')
+  const [errorMessage, setErrorMessage] = useState('')
+
+  const openBudgetModal = () => {
+    setShowBudgetModal(true)
+  }
+
+  const handleCloseBudgetModal = () => {
+    setShowBudgetModal(false)
+    setAnnualYear('2025')
+    setApprovedBudget('')
+    setSelectedFile(null)
+    setSuccessMessage('')
+    setErrorMessage('')
+  }
+
+  const handleSubmitBudget = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!approvedBudget || parseFloat(approvedBudget) <= 0) {
+      setErrorMessage('Please enter a valid approved budget.')
+      return
+    }
+    if (!selectedFile) {
+      setErrorMessage('Please upload a supporting document.')
+      return
+    }
+
+    setIsSubmitting(true)
+    setErrorMessage('')
+
+    // Simulate API submission delay
+    setTimeout(() => {
+      const budgetVal = parseFloat(approvedBudget)
+
+      // Set city-wide budget override
+      setCityBudgetOverride(budgetVal)
+
+      // Create new activity log
+      const newLog = {
+        id: `log-${Date.now()}`,
+        user: 'SCC Super Admin',
+        actor: 'SCC Super Admin',
+        barangay: 'City-Wide',
+        action: `Approved Overall City SK Budget (FY ${annualYear}) - ₱${budgetVal.toLocaleString()}`,
+        date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+        when: 'Just now'
+      }
+      setLogs(prev => [newLog, ...prev])
+
+      setIsSubmitting(false)
+      setSuccessMessage(`Overall SK Annual Budget (FY ${annualYear}) has been successfully submitted!`)
+    }, 1000)
+  }
+
+  const totalBudget  = cityBudgetOverride !== null ? cityBudgetOverride : barangayList.reduce((s, b) => s + b.annualBudget, 0)
+  const totalSpent   = barangayList.reduce((s, b) => s + b.spent, 0)
   const totalProj    = projects.length
   const usagePct     = Math.round((totalSpent / totalBudget) * 100)
 
   const bSummary = selectedBarangay
-    ? barangaySummary.find(b => b.barangay === selectedBarangay)
+    ? barangayList.find(b => b.barangay === selectedBarangay)
     : null
   const bProjects = selectedBarangay
     ? projects.filter(p => p.barangay === selectedBarangay)
     : []
 
-  const recentLogs = activityLogs.slice(0, 10)
+  const recentLogs = logs.slice(0, 10)
 
   return (
     <section className="section">
@@ -37,7 +102,8 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
             </p>
           </div>
           <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignSelf: 'flex-start', marginTop: '0.4rem' }}>
-            <button className="btn btn-primary btn-sm">Export Report (PDF)</button>
+            <button className="btn btn-primary btn-sm" onClick={openBudgetModal}>Submit Annual Budget</button>
+            <button className="btn btn-secondary btn-sm">Export Report (PDF)</button>
             <button className="btn btn-secondary btn-sm">+ Add News</button>
           </div>
         </div>
@@ -98,7 +164,7 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
                 <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1rem', color: 'var(--ink)', marginTop: '0.2rem' }}>Budget Utilization by Barangay</h2>
               </div>
               <div className="card-grid card-grid-2">
-                {barangaySummary.map(b => {
+                {barangayList.map(b => {
                   const pct = Math.round((b.spent / b.annualBudget) * 100)
                   return (
                     <div key={b.barangay} className="card" style={{ padding: '1rem 1.1rem', cursor: 'pointer' }}
@@ -238,6 +304,127 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
                 <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700 }}>Select a barangay to view details</div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── Submit Budget Modal ── */}
+        {showBudgetModal && (
+          <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) handleCloseBudgetModal() }}>
+            <div className="modal" style={{ maxWidth: '500px' }}>
+              <div className="modal-header">
+                <span className="modal-title">Submit Annual Budget</span>
+                <button className="modal-close" onClick={handleCloseBudgetModal}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                </button>
+              </div>
+              <form onSubmit={handleSubmitBudget}>
+                <div className="modal-body">
+                  {successMessage && (
+                    <div className="notice success" style={{ marginBottom: '0.5rem' }}>
+                      {successMessage}
+                    </div>
+                  )}
+                  {errorMessage && (
+                    <div className="notice error" style={{ marginBottom: '0.5rem' }}>
+                      {errorMessage}
+                    </div>
+                  )}
+                  
+                  {!successMessage && (
+                    <>
+                      <div className="field-group">
+                        <label className="field-label">Annual Year *</label>
+                        <select 
+                          className="input" 
+                          value={annualYear} 
+                          onChange={e => setAnnualYear(e.target.value)}
+                          required
+                        >
+                          <option value="2023">2023</option>
+                          <option value="2024">2024</option>
+                          <option value="2025">2025</option>
+                          <option value="2026">2026</option>
+                        </select>
+                      </div>
+
+                      <div className="field-group">
+                        <label className="field-label">Approved SK Budget (₱) *</label>
+                        <input 
+                          type="number" 
+                          className="input" 
+                          placeholder="e.g. 2500000"
+                          value={approvedBudget}
+                          onChange={e => setApprovedBudget(e.target.value)}
+                          min="1"
+                          required
+                        />
+                      </div>
+
+                      <div className="field-group">
+                        <label className="field-label">Supporting Documents (Attachment Upload) *</label>
+                        {selectedFile ? (
+                          <div style={{
+                            border: '1.5px dashed var(--maroon)',
+                            background: 'rgba(118, 0, 49, 0.03)',
+                            padding: '1rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '1rem'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--maroon)" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                              <div style={{ textAlign: 'left' }}>
+                                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.85rem', color: 'var(--ink)' }}>{selectedFile.name}</div>
+                                <div style={{ fontSize: '0.74rem', color: 'var(--muted)' }}>{(selectedFile.size / 1024).toFixed(1)} KB</div>
+                              </div>
+                            </div>
+                            <button type="button" className="btn btn-secondary btn-sm" style={{ padding: '0.3rem 0.6rem' }} onClick={() => setSelectedFile(null)}>
+                              Remove
+                            </button>
+                          </div>
+                        ) : (
+                          <label className="upload-zone">
+                            <input
+                              type="file"
+                              style={{ display: 'none' }}
+                              accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+                              onChange={e => {
+                                if (e.target.files && e.target.files[0]) {
+                                  setSelectedFile(e.target.files[0])
+                                }
+                              }}
+                              required
+                            />
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--maroon)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                            <div>
+                              <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.85rem', color: 'var(--maroon)' }}>Click to upload</span> or drag and drop
+                            </div>
+                            <span style={{ fontSize: '0.72rem', color: 'var(--muted)' }}>PDF, DOCX, XLSX, or Images up to 10MB</span>
+                          </label>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+                <div className="modal-footer">
+                  {successMessage ? (
+                    <button type="button" className="btn btn-primary" onClick={handleCloseBudgetModal}>
+                      Close
+                    </button>
+                  ) : (
+                    <>
+                      <button type="button" className="btn btn-secondary" onClick={handleCloseBudgetModal} disabled={isSubmitting}>
+                        Cancel
+                      </button>
+                      <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+                        {isSubmitting ? 'Submitting...' : 'Submit Budget'}
+                      </button>
+                    </>
+                  )}
+                </div>
+              </form>
+            </div>
           </div>
         )}
 
