@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import { initialUsers } from '../services/auth'
+import { getUsersDB } from '../services/auth'
 import { BARANGAYS } from '../data/mockData'
 import type { Role } from '../types'
 
 const ROLE_OPTIONS: (Role | 'all')[] = ['all', 'superadmin', 'sk', 'citizen']
 
 export default function SuperAdminAccounts() {
-  const [users, setUsers] = useState(initialUsers)
+  const [users, setUsers] = useState(() => getUsersDB())
   const [filterRole, setFilterRole] = useState<Role | 'all'>('all')
   const [filterBrgy, setFilterBrgy] = useState('All')
   const [search, setSearch] = useState('')

@@ -92,10 +92,10 @@ function App() {
     return false
   }
 
-  const handleRegister = (name: string, email: string, password: string, barangay: string, isStaRosa: boolean, username?: string) => {
+  const handleRegister = (name: string, email: string, password: string, barangay: string, isStaRosa: boolean, username?: string): UserAccount => {
     const result = registerService(name, email, password, barangay, isStaRosa, username)
     setUser(result)
-    navigate('/citizen/home')
+    return result
   }
 
   const handleLogout = () => { logoutService(); setUser(null); navigate('/') }

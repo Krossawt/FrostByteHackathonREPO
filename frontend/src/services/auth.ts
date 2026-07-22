@@ -75,6 +75,25 @@ const initialUsers: UserAccount[] = [
   },
 ]
 
+const USERS_DB_KEY = 'eskala-users-db'
+
+export function getUsersDB(): UserAccount[] {
+  const raw = window.localStorage.getItem(USERS_DB_KEY)
+  if (!raw) {
+    window.localStorage.setItem(USERS_DB_KEY, JSON.stringify(initialUsers))
+    return initialUsers
+  }
+  try {
+    return JSON.parse(raw) as UserAccount[]
+  } catch {
+    return initialUsers
+  }
+}
+
+function saveUsersDB(users: UserAccount[]) {
+  window.localStorage.setItem(USERS_DB_KEY, JSON.stringify(users))
+}
+
 function readStoredUser(key: string): UserAccount | null {
   const raw = window.localStorage.getItem(key) || window.sessionStorage.getItem(key)
   if (!raw) return null
@@ -103,7 +122,8 @@ function storeUser(user: UserAccount | null, rememberMe: boolean) {
 
 export function login(emailOrUsername: string, password: string, rememberMe = false): UserAccount | null {
   const key = emailOrUsername.trim().toLowerCase()
-  const match = initialUsers.find(
+  const users = getUsersDB()
+  const match = users.find(
     (u) => (u.email.toLowerCase() === key || u.username?.toLowerCase() === key) && u.password === password
   )
   if (match) { storeUser(match, rememberMe); return match }
@@ -111,11 +131,20 @@ export function login(emailOrUsername: string, password: string, rememberMe = fa
 }
 
 export function register(name: string, email: string, password: string, barangay: string, isStaRosa: boolean, username?: string): UserAccount {
+  const users = getUsersDB()
   const user: UserAccount = {
     id: `u-${Math.random().toString(36).slice(2, 10)}`,
-    name, email, username: username || email.split('@')[0],
-    password, role: 'citizen', barangay, isStaRosa, isActive: true,
+    name,
+    email,
+    username: username || email.split('@')[0],
+    password,
+    role: 'citizen',
+    barangay,
+    isStaRosa,
+    isActive: true,
   }
+  users.push(user)
+  saveUsersDB(users)
   storeUser(user, true)
   return user
 }
@@ -123,3 +152,4 @@ export function register(name: string, email: string, password: string, barangay
 export function logout() { storeUser(null, false) }
 
 export { initialUsers }
+
