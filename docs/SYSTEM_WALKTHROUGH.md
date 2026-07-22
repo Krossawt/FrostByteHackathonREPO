@@ -1,153 +1,125 @@
-# eSKala — System Walkthrough & Architecture Specification
+# eSKala — System Walkthrough & Comprehensive Specification
 **Santa Rosa City, Laguna · Sangguniang Kabataan Financial Transparency & Governance Portal**
 
 ---
 
-## 1. Executive Summary & Vision
+## 1. Executive Summary & Meeting Specification Alignment
 
-**eSKala** is a web-based financial transparency, project tracking, and citizen engagement portal built for the **Sangguniang Kabataan (SK) Federation of the City of Santa Rosa, Laguna**.
+**eSKala** is the official web-based Sangguniang Kabataan (SK) financial transparency, project reporting, and citizen engagement system for the **City Government of Santa Rosa, Laguna**.
 
-Governed by **Republic Act 10742** (*SK Reform Act of 2015*) as amended by **Republic Act 11768**, the platform provides:
-1. **Public Financial Transparency**: Citizens across all 18 barangays can track youth fund utilization, project budgets, and disbursements in real time.
-2. **Operational Tools for SK Officials**: Specialized, position-gated dashboards for SK Chairpersons, Secretaries, and Treasurers to manage projects, upload payment receipts, track progress, and log audit trails.
-3. **City-Wide Administration**: Centralized command for the City Youth Development Office (CYDO) and Super Admins to monitor all 18 barangay units, manage accounts, audit activity logs, and publish official announcements.
-4. **Civic Feedback & Engagement**: Citizen channels to submit suggestions, comment on active projects, and vote on community initiatives.
+Governed by **Republic Act 10742** (*SK Reform Act of 2015*) as amended by **Republic Act 11768**, this specification reflects the **Final Meeting Agreement** for system modules, 6 user roles, 5-stage project approval workflows, finance MIS, OCR automation, audit trail, suggestion module, and database relationships.
 
 ---
 
-## 2. Technology Stack & System Architecture
+## 2. Overall Design Concept & Visual Language
 
-```mermaid
-graph TD
-    subgraph Client ["Frontend (Browser)"]
-        UI["React 18 + TypeScript + Vite"]
-        CSS["Custom Unified Design System (Poppins + Maroon & Gold)"]
-        Router["React Router v6"]
-        AuthContext["Auth State (JWT Token / Session)"]
-    end
+### 2.1 Design DNA (Inspired by Landing & Login Pages)
+- **Sharp Geometry**: Professional, legal-grade aesthetics with sharp-cornered cards (`border-radius: 0`), clean panels, and structured borders (`var(--border)`).
+- **Color Palette**:
+  - **Primary Maroon**: `#760031` (Authority, governance, and brand core)
+  - **Dark Maroon**: `#520022` & **Mid Maroon**: `#9a0040`
+  - **Yellow Gold**: `#FEEC41` (Youth dynamism and highlights)
+  - **Parchment Canvas**: `#F8F6F0` (Clean graph-paper background)
+- **Interactive Ambient Effects**:
+  - **Cursor-Reactive Background Glow**: Real-time radial gradient tracking cursor movements (`--cursor-x`, `--cursor-y`).
+  - **Scroll-Reactive Parallax Layer**: Subtle movement of background gridlines as the user scrolls.
 
-    subgraph API ["API & Application Gateway"]
-        Gateway["REST API / FastAPI / Express"]
-        AuthMiddleware["RBAC & JWT Middleware"]
-    end
+### 2.2 Global Navigation Header
+- **4 Official Brand Logos**: `eSKalaLogo.svg` (Main Logo), `SantaRosa.svg` (City Seal), `CYDOlogo.svg` (City Youth Development Office), and `bagongPilipinasLogo.svg` (Bagong Pilipinas).
+- **User Chip & Role Badge**: Displays active user name, barangay, and position (e.g., `Patricia · SK Chairperson`).
+- **Super Admin Barangay Selector**: Top header dropdown for Super Admins to switch between managing specific barangay units or viewing the All-Barangay City Overview.
+- **Log Out Button**: Instant session termination.
 
-    subgraph Storage ["Backend Infrastructure"]
-        DB[(PostgreSQL / Supabase Database)]
-        OCR["OCR Processing Engine (Tesseract/Vision API)"]
-        S3["Cloud Storage (Receipt Images / Documents)"]
-    end
-
-    UI --> Gateway
-    Gateway --> AuthMiddleware
-    AuthMiddleware --> DB
-    Gateway --> OCR
-    Gateway --> S3
-```
-
-### 2.1 Technology Matrix
-- **Frontend Framework**: React 18 with TypeScript (`tsc`), Vite 5 build toolchain
-- **Styling**: Pure CSS design tokens (`index.css`), sharp geometry, graph-paper grid background, cursor & scroll reactive ambient lighting, responsive CSS grid/flexbox
-- **Typography**: Poppins (Primary display font) & Inter (Data tables and body copy)
-- **Design System Color Tokens**:
-  - `Primary Maroon`: `#760031` (Government authority & brand core)
-  - `Dark Maroon`: `#520022`
-  - `Accent Gold`: `#FEEC41` (Youth dynamism)
-  - `Canvas Background`: `#F8F6F0` (Parchment grid layout)
-- **Target Database**: PostgreSQL 15+ / Supabase
-- **Target Backend API**: Python FastAPI / Node.js Express
+### 2.3 Global Footer
+- Brand descriptor, legal version tag (`eSKala v1.0`), Santa Rosa CYDO contact address/phone/email, legal links (Terms & Conditions, Privacy Policy, RA 10742, Full Disclosure Policy), and compliance badges.
 
 ---
 
-## 3. Role-Based Access Control (RBAC) Matrix
+## 3. System Modules & 6 User Roles
 
-| Feature / Module | Guest (Unauthenticated) | Citizen | SK Kagawad | SK Secretary | SK Treasurer | SK Chairperson | Super Admin (CYDO) |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Landing & Login / Register** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **City-Wide Financial Overview** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **SK Officials Directory** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **City News & Announcements** | ✅ (Read) | ✅ (Read) | ✅ (Read) | ✅ (Read) | ✅ (Read) | ✅ (Read) | 🛠 (CRUD) |
-| **Barangay Budget Utilization** | ✅ (View) | ✅ (View) | ✅ (View) | ✅ (View) | ✅ (View) | ✅ (View) | ✅ (All 18) |
-| **Submit Comments / Suggestions** | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Create / Edit Projects** | ❌ | ❌ | ❌ | ✅ | ❌ | ✅ | ✅ |
-| **Upload / OCR Scan Receipts** | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ | ✅ |
-| **View Audit Trail / Activity Logs** | ❌ | ❌ | ❌ | 🔒 (Own Brgy) | 🔒 (Own Brgy) | 🔒 (Own Brgy) | ✅ (City-Wide) |
-| **Manage User Accounts** | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ (Full) |
+### 3.1 The 6 System Roles
+1. **Super Admin**: System administrator with full account creation, newsletter CRUD, and city-wide audit log oversight.
+2. **SK Chairperson**: Creates projects, approves/rejects purchase orders, approves final projects for publication, and replies to comments.
+3. **SK Secretary**: Creates projects, updates project details, submits projects to Treasurer, and replies to comments.
+4. **SK Treasurer**: Adds financial breakdowns, purchase orders, uploads purchase order receipts, submits financial updates to Chairperson, and replies to comments.
+5. **Guest (Citizen)**: Self-registered citizen of Santa Rosa City who views dashboards, submits project comments/suggestions, and replies to comments.
+6. **System (Internal Automation)**: Automated background service handling OCR receipt scanning, annual budget report scanning, audit log generation, and newsletter publication upon project posting.
 
 ---
 
-## 4. Complete Page-by-Page Walkthrough
+## 4. Module Specifications
 
-### 4.1 Landing Page (`/`)
-- **Top News Ticker**: Smooth infinite marquee displaying live city headlines, announcements, and policy updates.
-- **Header Navigation**: Quick links (`HOME`, `CITY OVERVIEW`, `ABOUT`, `SKs`), brand logo strip (eSKala, Santa Rosa City Seal, CYDO, Bagong Pilipinas), and CTA buttons (`LOGIN`, `SIGN UP`).
-- **Hero Grid (Two-Column)**:
-  - *Left*: Brand title `eSKala`, mission summary, and live statistics (18 Barangays, ₱39M+ SK Funds Released, 141 Active Projects).
-  - *Right*: Interactive Kickoff News Card with fallback image handler, title, summary, and internal mini-stats.
-- **Footer**: Legal version tags, terms link, privacy link, and RA 10742 reference.
+### Module 1 — System Administrator & Account Management
+- **Super Admin Permissions**:
+  - Create SK Treasurer, Chairperson, Secretary, and Guest/Citizen accounts.
+  - View all user accounts with barangay filtering.
+  - Soft-delete or suspend user accounts (`userIsActive`, `userIsDeleted`).
+  - Create, Read, Update, Archive Newsletter entries.
 
-### 4.2 Login Page (`/login`)
-- **Layout**: Two-column landing shell matching the exact landing page design language.
-- **Left Hero Panel**: SK role breakdown legend (Super Admin, SK Officer, Citizen) and recent news teaser cards.
-- **Right Login Card**:
-  - Credential input (accepts either `username` or `email`).
-  - Password input with show/hide toggle.
-  - Interactive "Show Sample Accounts (Demo)" drawer for instant testing across 4 roles (Super Admin, Chairperson, Treasurer, Citizen).
+### Module 2 — Reports Module
+- **Public & Universal Access**:
+  - View Landing Page, Overall Dashboard, Selected Barangay Data, Project Details, Budget Breakdown, SK Officials (Current & Past), Santa Rosa History, eSKala History.
+  - Export Project Financial Documents as ZIP archives.
+- **Role Dashboards**:
+  - Super Admin Dashboard (Citywide command).
+  - Treasurer Dashboard (Finance & purchase orders).
+  - Chairperson Dashboard (Approval queue & project overview).
+  - Secretary Dashboard (Project drafting & submission queue).
 
-### 4.3 Register Page (`/register`)
-- **Layout**: Matching two-column landing shell format.
-- **Left Panel**: Citizen benefit cards (View Reports, Comment & Suggest, Know Officials, Stay Informed) + RA 10173 Data Privacy Notice panel.
-- **Right Form Card**:
-  - Full Name, optional `@username`, Email address.
-  - Barangay selector (dropdown with all 18 Santa Rosa City barangays).
-  - Santa Rosa Resident toggle (`Yes` / `No`).
-  - Password with real-time strength meter (`Weak`, `Good`, `Strong`).
-  - Terms & Conditions checkbox agreement.
+### Module 3 — Finance MIS (Management Information System)
+- **SK Treasurer**:
+  - Upload Purchase Order Receipts (scanned via OCR).
+  - Add Purchase Orders (Quantity, Unit Price, Total Amount, Order Name, Physical vs. Service order type).
+  - Update Purchase Order Values.
+- **SK Chairperson**:
+  - Review purchase orders submitted by Treasurer.
+  - Approve or Reject Purchase Orders.
 
-### 4.4 Public City Overview (`/home`)
-- **Summary Stat Cards**: Total City SK Budget (₱43.08M), Disbursed Funds, Remaining Budget, and Active Projects.
-- **Project Status Cards**: Count of Ongoing, Upcoming, and Completed projects across the city.
-- **Main Grid**:
-  - *Left*: Active & upcoming project list with progress bars, proposed vs. spent budget breakdown, and status badges.
-  - *Right*: Latest city news sidebar + per-barangay budget utilization progress bars for all 18 barangays.
+### Module 4 — Automated OCR Module (System Role)
+- **Automated Processing**:
+  - System automatically scans uploaded Purchase Order Receipts to extract vendor, date, and price.
+  - System automatically scans uploaded Annual Budget Reports to extract budget year, value, and barangay.
+  - **Manual Override Capability**: Allows Treasurer/Chairperson to verify and correct machine OCR output.
 
-### 4.5 About Page (`/about`)
-- **Mission Statement**: Core mandate on transparency and accountability.
-- **Key Feature Grid**: 6 cards detailing Public Trust, SK Operational Clarity, City Oversight, Citizen Participation, Receipt Intelligence, and RBAC.
-- **Legal Framework & Contact**: Summary of RA 10742, RA 11768, Data Privacy Act of 2012, DILG Full Disclosure Policy, and CYDO contact info.
+### Module 5 — Audit Trail & System Activity
+- **Super Admin**: View Newsletter CRUD logs and Account CRUD logs.
+- **Universal Access**: View Account CRUD logs.
+- **Automatic Audit Trigger**: Uploading Annual Budget Reports or modifying projects automatically creates immutable audit log entries.
+- **Exporting**: Export audit logs to PDF/CSV for DILG/COA audit compliance.
 
-### 4.6 SK Officials Directory (`/sks`)
-- **Directory Controls**: Position filter tabs (`All`, `Chairperson`, `Secretary`, `Treasurer`, `Kagawad`), Barangay dropdown, and live text search.
-- **Official Cards**: Displays initials avatar colored by position, full name, barangay, position badge, contact number, email, and term (2023–2025).
+### Module 6 — Suggestion & Community Feedback Module
+- **Guest / Citizen**: Submit comments and project suggestions.
+- **Universal Access**: View all comments.
+- **Threaded Replies**: Chairperson, Secretary, Treasurer, and Citizens can reply to existing comments (using `parentCommentID`).
 
-### 4.7 Citizen Dashboard (`/citizen/home`)
-- **Barangay Context**: Scoped to the logged-in citizen's barangay (default: `Balibago`).
-- **Financial Header**: Annual budget, spent amount, remaining funds, and visual progress bar.
-- **Local Activity & Feedback**: Project cards for the barangay, citizen comment list, and interactive comment submission form.
-
-### 4.8 Citizen Projects (`/citizen/projects`) & My SKs (`/citizen/mysks`)
-- **Projects View**: Widescreen budget utilization summary, status filter tabs with counts (`All`, `Ongoing`, `Upcoming`, `Completed`), search bar, and 2-column project cards.
-- **My SKs View**: Barangay info banner, official roster grid, and community feedback list.
-
-### 4.9 SK Officer Portal (`/sk/home` & `/sk/projects`)
-- **Role-Gated Controls**:
-  - *Chairperson / Secretary*: Button to open "Add New Project" modal.
-  - *Chairperson / Treasurer*: Button to open "Upload Receipt (OCR)" zone.
-- **Dashboard**: Financial breakdown, project progress bars, SK council members, activity audit stream, and receipt verification list.
-
-### 4.10 Super Admin Portal (`/superadmin/home`, `accounts`, `activity`, `news`)
-- **Admin Dashboard**: Toggle between City Overview (18 barangays) and Barangay Detail deep-dive.
-- **Account Management**: Search users by name/email/username, filter by role/barangay, suspend/reactivate buttons, and Create SK Account modal.
-- **System Activity Audit**: Filterable log of all system events with action icons, actor names, dates, and descriptions.
-- **News Management**: Publish and edit city-wide news articles via modal form with category tags.
+### Module 7 — Repository & Project 5-Stage Approval Workflow
+- **Stage 1 (Drafted)**: Created by Chairperson or Secretary (`projectBreakdown = NULL`, `status = Drafted`).
+- **Stage 2 (Finance Update)**: Chairperson or Secretary submits project to Treasurer (`status = Finance Update`).
+- **Stage 3 (Finance Update)**: Treasurer adds purchase orders & `projectBreakdown` (`status = Finance Update`).
+- **Stage 4 (For Approval)**: Treasurer submits project back to Chairperson (`status = For Approval`).
+- **Stage 5 (Posted)**: Chairperson approves project (`status = Posted`).
+  - **System Automation**: Automatically publishes project to public dashboard AND generates a Newsletter entry!
 
 ---
 
-## 5. Mock Data Architecture & File Map
+## 5. Mock Data Coverage (Santa Rosa City, Laguna)
 
-| File Path | Description | Key Exports |
-| :--- | :--- | :--- |
-| `frontend/src/types.ts` | Complete TypeScript interfaces | `Role`, `SKPosition`, `UserAccount`, `ReportProject`, `NewsItem`, `SKOfficial`, `CitizenComment`, `ActivityLog`, `Receipt`, `AccountRecord` |
-| `frontend/src/data/mockData.ts` | Factual mock dataset for 18 barangays | `BARANGAYS`, `barangaySummary`, `cityHighlights`, `skOfficials`, `projects`, `news`, `citizenComments`, `activityLogs`, `accounts`, `receipts` |
-| `frontend/src/services/auth.ts` | Mock authentication service | `getStoredUser()`, `login()`, `register()`, `logout()`, `initialUsers` |
-| `frontend/src/index.css` | Unified design system tokens & components | Design tokens, `.landing-shell`, `.app-shell`, `.card`, `.stat-card`, `.badge`, `.btn`, etc. |
-| `frontend/src/App.tsx` | Main router & cursor/scroll reactive shell | React Router routes, header, navbar, role gating |
+The mock dataset (`frontend/src/data/mockData.ts`) covers **all 18 official barangays**:
+1. Aplaya
+2. Balibago
+3. Caingin
+4. Dila
+5. Dita
+6. Don Jose
+7. Ibaba
+8. Kanluran
+9. Labas
+10. Macabling
+11. Malitlit
+12. Malusak
+13. Market Area
+14. Pooc
+15. Pulong Santa Cruz
+16. Santo Domingo
+17. Sinalhan
+18. Tagapo

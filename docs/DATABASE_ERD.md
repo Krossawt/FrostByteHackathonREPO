@@ -1,5 +1,5 @@
 # eSKala — Entity-Relationship Diagram (ERD) & Database Schema
-**Database Specification for PostgreSQL / Supabase Integration**
+**Reflected from Meeting Specification & Final Architecture Agreement**
 
 ---
 
@@ -7,133 +7,119 @@
 
 ```mermaid
 erDiagram
-    BARANGAYS ||--o{ USERS : "contains"
-    BARANGAYS ||--o{ SK_OFFICIALS : "has elected"
-    BARANGAYS ||--o{ PROJECTS : "allocates budget for"
-    BARANGAYS ||--o{ RECEIPTS : "issues for"
-    BARANGAYS ||--o{ CITIZEN_COMMENTS : "receives"
-    BARANGAYS ||--o{ ACTIVITY_LOGS : "logs events for"
+    users ||--o{ projects : "creates (createdBy)"
+    users ||--o{ annual_budget_reports : "uploads (uploadedBy)"
+    users ||--o{ audit_logs : "performs (actorID)"
+    users ||--o{ comments : "authors"
 
-    USERS ||--o{ SK_OFFICIALS : "links to profile"
-    USERS ||--o{ PROJECTS : "creates / manages"
-    USERS ||--o{ RECEIPTS : "uploads / verifies"
-    USERS ||--o{ CITIZEN_COMMENTS : "authors"
-    USERS ||--o{ NEWS_ARTICLES : "publishes"
-    USERS ||--o{ ACTIVITY_LOGS : "performs action"
+    projects ||--o{ attachments : "has (1:N)"
+    projects ||--o{ purchase_orders : "has (1:N)"
+    projects ||--o{ comments : "receives (1:N)"
+    projects ||--o| newsletter : "generates upon Posted (1:1)"
 
-    PROJECTS ||--o{ RECEIPTS : "has expense receipts"
-    PROJECTS ||--o{ CITIZEN_COMMENTS : "receives feedback"
+    comments ||--o{ comments : "reply to (parentCommentID)"
 
-    BARANGAYS {
-        uuid id PK
-        string name UK "e.g. Balibago, Caingin"
-        string code UK "e.g. BRGY-BAL"
-        numeric annual_budget "FY 2025 Allocation"
-        numeric spent_amount "Total disbursed"
-        numeric remaining_budget "Calculated remainder"
-        timestamp created_at
-        timestamp updated_at
+    users {
+        int userID PK
+        string userName
+        string userEmail UK
+        string userPassword
+        string userHashedPassword
+        boolean userIsStaRosa
+        string userLocation "Barangay Name"
+        timestamp userDateCreated
+        timestamp userUpdatedAt
+        string userProfilePicture
+        enum userRole "Super Admin, SK Treasurer, SK Chairperson, SK Secretary, Guest"
+        boolean userIsSK
+        date userSKTermStart
+        date userSKTermEnd
+        boolean userIsActive
+        boolean userIsDeleted
     }
 
-    USERS {
-        uuid id PK
-        string full_name
-        string email UK
-        string username UK
-        string password_hash
-        enum role "superadmin, sk, citizen, guest"
-        uuid barangay_id FK
-        enum sk_position "Chairperson, Secretary, Treasurer, Kagawad"
-        boolean is_sta_rosa_resident
-        boolean is_active
-        timestamp last_login
-        timestamp created_at
-        timestamp updated_at
+    projects {
+        int projectID PK
+        string projectName
+        text projectDescription
+        datetime projectStartTime
+        datetime projectEndTime
+        string projectLocation "Barangay"
+        int projectCreatedBy FK
+        decimal projectBreakdown "Filled by Treasurer"
+        enum projectStatus "Drafted, Finance Update, For Approval, Posted"
+        boolean isDeleted
+        timestamp createdAt
+        timestamp updatedAt
     }
 
-    SK_OFFICIALS {
-        uuid id PK
-        uuid user_id FK
-        uuid barangay_id FK
-        string full_name
-        enum position "Chairperson, Secretary, Treasurer, Kagawad"
-        string phone_number
-        string email
-        string term_period "e.g. 2023-2025"
-        boolean is_current_term
-        timestamp created_at
+    attachments {
+        int attachfile_ID PK
+        int attachfile_for FK "projects.projectID"
+        string attachFileLink
+        boolean hasOrderID
+        string orderID FK "purchase_orders.orderID"
     }
 
-    PROJECTS {
-        uuid id PK
-        uuid barangay_id FK
-        string title
-        text description
-        enum category "Health, Education, Sports, Environment, etc."
-        enum status "upcoming, ongoing, completed, cancelled"
-        integer progress_percentage "0 to 100"
-        numeric proposed_budget
-        numeric spent_budget
-        date start_date
-        date end_date
-        uuid created_by FK
-        boolean is_deleted
-        timestamp created_at
-        timestamp updated_at
+    purchase_orders {
+        string orderID PK
+        int projectID FK "projects.projectID"
+        string orderName
+        enum orderType "Physical, Service"
+        decimal orderQty
+        decimal orderPrice
+        decimal orderTotalPrice "Calculated"
+        string receiptImageURL
+        boolean isOCRScanned
+        boolean isManuallyOverridden
+        timestamp createdAt
     }
 
-    RECEIPTS {
-        uuid id PK
-        uuid project_id FK
-        uuid barangay_id FK
-        string vendor_name
-        numeric total_amount
-        numeric ocr_extracted_amount
-        date receipt_date
-        text description
-        string image_url
-        enum status "pending, verified, rejected"
-        boolean is_ocr_extracted
-        uuid uploaded_by FK
-        timestamp created_at
+    comments {
+        int commentID PK
+        int commentFor FK "projects.projectID"
+        int parentCommentID FK "comments.commentID for replies"
+        int authorID FK "users.userID"
+        string commentName
+        text commentDetails
+        enum commentType "comment, suggestion"
+        int votesCount
+        timestamp commentTimestamp
     }
 
-    CITIZEN_COMMENTS {
-        uuid id PK
-        uuid project_id FK
-        uuid barangay_id FK
-        uuid author_id FK
-        string author_name
-        text comment_text
-        enum comment_type "comment, suggestion"
-        integer votes_count
-        boolean is_approved
-        timestamp created_at
+    newsletter {
+        int newsletterID PK
+        int projectID FK "projects.projectID"
+        string projectName
+        text projectDescription
+        datetime projectStartTime
+        datetime projectEndTime
+        string projectLocation
+        int projectCreatedBy FK
+        decimal projectBreakdown
+        enum projectStatus "Posted"
+        timestamp publishedAt
     }
 
-    NEWS_ARTICLES {
-        uuid id PK
-        string title
-        enum category "Transparency, Youth Programs, City News, etc."
-        text summary
-        text full_content
-        string image_url
-        uuid author_id FK
-        boolean is_published
-        timestamp published_at
-        timestamp created_at
-        timestamp updated_at
+    annual_budget_reports {
+        int budgetID PK
+        string budgetBarangay "Santa Rosa Barangays"
+        int budgetUploadedBy FK "users.userID"
+        int budgetYear
+        decimal budgetValue
+        datetime budgetUploadedOn
+        boolean isOCRScanned
+        boolean isManuallyOverridden
     }
 
-    ACTIVITY_LOGS {
-        uuid id PK
-        uuid actor_id FK
-        string actor_name
-        uuid barangay_id FK
-        string action_type "Project Created, Receipt Uploaded, etc."
-        text description
-        jsonb metadata
-        timestamp created_at
+    audit_logs {
+        int logID PK
+        int actorID FK "users.userID"
+        string actorName
+        string actionType
+        string targetModule
+        text details
+        timestamp timestamp
     }
 ```
 
@@ -144,7 +130,7 @@ erDiagram
 ```sql
 -- =============================================================================
 -- eSKala PostgreSQL Database Schema
--- Compatible with PostgreSQL 14+, Supabase, and Neon
+-- Aligned with Final Meeting Specification
 -- =============================================================================
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -152,159 +138,147 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- -----------------------------------------------------------------------------
 -- ENUM TYPES
 -- -----------------------------------------------------------------------------
-CREATE TYPE user_role AS ENUM ('superadmin', 'sk', 'citizen', 'guest');
-CREATE TYPE sk_position AS ENUM ('Chairperson', 'Secretary', 'Treasurer', 'Kagawad', 'Auditor', 'Peace Officer', 'Federation President');
-CREATE TYPE project_status AS ENUM ('upcoming', 'ongoing', 'completed', 'cancelled');
-CREATE TYPE project_category AS ENUM ('Health & Wellness', 'Education', 'Sports & Recreation', 'Infrastructure', 'Environment', 'Livelihood', 'Capacity Building', 'Peace & Order', 'Culture & Arts', 'Other');
-CREATE TYPE receipt_status AS ENUM ('pending', 'verified', 'rejected');
-CREATE TYPE comment_type AS ENUM ('comment', 'suggestion');
-
--- -----------------------------------------------------------------------------
--- TABLE: BARANGAYS
--- -----------------------------------------------------------------------------
-CREATE TABLE barangays (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    name VARCHAR(100) NOT NULL UNIQUE,
-    code VARCHAR(20) NOT NULL UNIQUE,
-    annual_budget NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
-    spent_amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
+CREATE TYPE user_role_enum AS ENUM ('Super Admin', 'SK Treasurer', 'SK Chairperson', 'SK Secretary', 'Guest');
+CREATE TYPE project_status_enum AS ENUM ('Drafted', 'Finance Update', 'For Approval', 'Posted');
+CREATE TYPE order_type_enum AS ENUM ('Physical', 'Service');
+CREATE TYPE comment_type_enum AS ENUM ('comment', 'suggestion');
 
 -- -----------------------------------------------------------------------------
 -- TABLE: USERS
 -- -----------------------------------------------------------------------------
 CREATE TABLE users (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    full_name VARCHAR(150) NOT NULL,
-    email VARCHAR(150) NOT NULL UNIQUE,
-    username VARCHAR(80) UNIQUE,
-    password_hash VARCHAR(255) NOT NULL,
-    role user_role NOT NULL DEFAULT 'citizen',
-    barangay_id UUID REFERENCES barangays(id) ON DELETE SET NULL,
-    sk_position sk_position NULL,
-    is_sta_rosa_resident BOOLEAN NOT NULL DEFAULT TRUE,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    last_login TIMESTAMP WITH TIME ZONE NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
--- -----------------------------------------------------------------------------
--- TABLE: SK_OFFICIALS
--- -----------------------------------------------------------------------------
-CREATE TABLE sk_officials (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
-    barangay_id UUID NOT NULL REFERENCES barangays(id) ON DELETE CASCADE,
-    full_name VARCHAR(150) NOT NULL,
-    position sk_position NOT NULL,
-    phone_number VARCHAR(30) NULL,
-    email VARCHAR(150) NULL,
-    term_period VARCHAR(50) NOT NULL DEFAULT '2023–2025',
-    is_current_term BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    userID SERIAL PRIMARY KEY,
+    userName VARCHAR(100) NOT NULL,
+    userEmail VARCHAR(150) UNIQUE NOT NULL,
+    userPassword VARCHAR(255) NULL,
+    userHashedPassword VARCHAR(255) NOT NULL,
+    userIsStaRosa BOOLEAN DEFAULT TRUE,
+    userLocation VARCHAR(100) NOT NULL, -- Official Santa Rosa Barangay
+    userDateCreated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    userUpdatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    userProfilePicture VARCHAR(500) DEFAULT 'profile_picture.png',
+    userRole user_role_enum NOT NULL DEFAULT 'Guest',
+    userIsSK BOOLEAN DEFAULT FALSE,
+    userSKTermStart DATE NULL,
+    userSKTermEnd DATE NULL,
+    userIsActive BOOLEAN DEFAULT TRUE,
+    userIsDeleted BOOLEAN DEFAULT FALSE
 );
 
 -- -----------------------------------------------------------------------------
 -- TABLE: PROJECTS
 -- -----------------------------------------------------------------------------
 CREATE TABLE projects (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    barangay_id UUID NOT NULL REFERENCES barangays(id) ON DELETE CASCADE,
-    title VARCHAR(255) NOT NULL,
-    description TEXT NULL,
-    category project_category NOT NULL DEFAULT 'Education',
-    status project_status NOT NULL DEFAULT 'upcoming',
-    progress_percentage INT NOT NULL DEFAULT 0 CHECK (progress_percentage BETWEEN 0 AND 100),
-    proposed_budget NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
-    spent_budget NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
-    start_date DATE NOT NULL,
-    end_date DATE NOT NULL,
-    created_by UUID REFERENCES users(id) ON DELETE SET NULL,
-    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    projectID SERIAL PRIMARY KEY,
+    projectName VARCHAR(255) NOT NULL,
+    projectDescription TEXT NULL,
+    projectStartTime TIMESTAMP NOT NULL,
+    projectEndTime TIMESTAMP NOT NULL,
+    projectLocation VARCHAR(100) NOT NULL,
+    projectCreatedBy INT NOT NULL REFERENCES users(userID) ON DELETE CASCADE,
+    projectBreakdown DECIMAL(12, 2) NULL, -- Required when Treasurer updates
+    projectStatus project_status_enum NOT NULL DEFAULT 'Drafted',
+    isDeleted BOOLEAN DEFAULT FALSE,
+    createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- -----------------------------------------------------------------------------
--- TABLE: RECEIPTS
+-- TABLE: PURCHASE_ORDERS
 -- -----------------------------------------------------------------------------
-CREATE TABLE receipts (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
-    barangay_id UUID NOT NULL REFERENCES barangays(id) ON DELETE CASCADE,
-    vendor_name VARCHAR(200) NOT NULL,
-    total_amount NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
-    ocr_extracted_amount NUMERIC(12, 2) NULL,
-    receipt_date DATE NOT NULL,
-    description TEXT NULL,
-    image_url VARCHAR(500) NULL,
-    status receipt_status NOT NULL DEFAULT 'pending',
-    is_ocr_extracted BOOLEAN NOT NULL DEFAULT FALSE,
-    uploaded_by UUID REFERENCES users(id) ON DELETE SET NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE purchase_orders (
+    orderID VARCHAR(100) PRIMARY KEY,
+    projectID INT NOT NULL REFERENCES projects(projectID) ON DELETE CASCADE,
+    orderName VARCHAR(255) NOT NULL,
+    orderType order_type_enum NOT NULL DEFAULT 'Physical',
+    orderQty DECIMAL(10, 2) NOT NULL DEFAULT 1.0,
+    orderPrice DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
+    orderTotalPrice DECIMAL(12, 2) GENERATED ALWAYS AS (orderQty * orderPrice) STORED,
+    receiptImageURL VARCHAR(500) NULL,
+    isOCRScanned BOOLEAN DEFAULT FALSE,
+    isManuallyOverridden BOOLEAN DEFAULT FALSE,
+    createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- -----------------------------------------------------------------------------
--- TABLE: CITIZEN_COMMENTS
+-- TABLE: ATTACHMENTS
 -- -----------------------------------------------------------------------------
-CREATE TABLE citizen_comments (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
-    barangay_id UUID NOT NULL REFERENCES barangays(id) ON DELETE CASCADE,
-    author_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    author_name VARCHAR(150) NOT NULL,
-    comment_text TEXT NOT NULL,
-    comment_type comment_type NOT NULL DEFAULT 'comment',
-    votes_count INT NOT NULL DEFAULT 0,
-    is_approved BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE attachments (
+    attachfile_ID SERIAL PRIMARY KEY,
+    attachfile_for INT NOT NULL REFERENCES projects(projectID) ON DELETE CASCADE,
+    attachFileLink VARCHAR(500) NOT NULL,
+    hasOrderID BOOLEAN DEFAULT FALSE,
+    orderID VARCHAR(100) NULL REFERENCES purchase_orders(orderID) ON DELETE SET NULL,
+    createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- -----------------------------------------------------------------------------
--- TABLE: NEWS_ARTICLES
+-- TABLE: COMMENTS (Includes Parent Comment ID for Threaded Replies)
 -- -----------------------------------------------------------------------------
-CREATE TABLE news_articles (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    title VARCHAR(255) NOT NULL,
-    category VARCHAR(80) NOT NULL DEFAULT 'City News',
-    summary TEXT NULL,
-    full_content TEXT NULL,
-    image_url VARCHAR(500) NULL,
-    author_id UUID REFERENCES users(id) ON DELETE SET NULL,
-    is_published BOOLEAN NOT NULL DEFAULT TRUE,
-    published_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE comments (
+    commentID SERIAL PRIMARY KEY,
+    commentFor INT NOT NULL REFERENCES projects(projectID) ON DELETE CASCADE,
+    parentCommentID INT NULL REFERENCES comments(commentID) ON DELETE CASCADE, -- NULL = Root Comment, INT = Reply
+    authorID INT NOT NULL REFERENCES users(userID) ON DELETE CASCADE,
+    commentName VARCHAR(150) NOT NULL,
+    commentDetails TEXT NOT NULL,
+    commentType comment_type_enum DEFAULT 'comment',
+    votesCount INT DEFAULT 0,
+    commentTimestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- -----------------------------------------------------------------------------
--- TABLE: ACTIVITY_LOGS
+-- TABLE: NEWSLETTER (Automatically populated when projectStatus = 'Posted')
 -- -----------------------------------------------------------------------------
-CREATE TABLE activity_logs (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    actor_id UUID REFERENCES users(id) ON DELETE SET NULL,
-    actor_name VARCHAR(150) NOT NULL,
-    barangay_id UUID REFERENCES barangays(id) ON DELETE SET NULL,
-    action_type VARCHAR(150) NOT NULL,
-    description TEXT NULL,
-    metadata JSONB NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE newsletter (
+    newsletterID SERIAL PRIMARY KEY,
+    projectID INT NOT NULL REFERENCES projects(projectID) ON DELETE CASCADE,
+    projectName VARCHAR(255) NOT NULL,
+    projectDescription TEXT NULL,
+    projectStartTime TIMESTAMP NOT NULL,
+    projectEndTime TIMESTAMP NOT NULL,
+    projectLocation VARCHAR(100) NOT NULL,
+    projectCreatedBy INT NOT NULL REFERENCES users(userID),
+    projectBreakdown DECIMAL(12, 2) NOT NULL,
+    projectStatus project_status_enum NOT NULL DEFAULT 'Posted',
+    publishedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- -----------------------------------------------------------------------------
--- INDEXES FOR PERFORMANCE
+-- TABLE: ANNUAL_BUDGET_REPORTS
 -- -----------------------------------------------------------------------------
-CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_users_role ON users(role);
-CREATE INDEX idx_users_barangay ON users(barangay_id);
-CREATE INDEX idx_projects_barangay ON projects(barangay_id);
-CREATE INDEX idx_projects_status ON projects(status);
-CREATE INDEX idx_receipts_project ON receipts(project_id);
-CREATE INDEX idx_receipts_barangay ON receipts(barangay_id);
-CREATE INDEX idx_comments_project ON citizen_comments(project_id);
-CREATE INDEX idx_activity_actor ON activity_logs(actor_id);
-CREATE INDEX idx_activity_barangay ON activity_logs(barangay_id);
+CREATE TABLE annual_budget_reports (
+    budgetID SERIAL PRIMARY KEY,
+    budgetBarangay VARCHAR(100) NOT NULL,
+    budgetUploadedBy INT NOT NULL REFERENCES users(userID) ON DELETE CASCADE,
+    budgetYear INT NOT NULL,
+    budgetValue DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
+    budgetUploadedOn TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    isOCRScanned BOOLEAN DEFAULT FALSE,
+    isManuallyOverridden BOOLEAN DEFAULT FALSE
+);
+
+-- -----------------------------------------------------------------------------
+-- TABLE: AUDIT_LOGS
+-- -----------------------------------------------------------------------------
+CREATE TABLE audit_logs (
+    logID SERIAL PRIMARY KEY,
+    actorID INT REFERENCES users(userID) ON DELETE SET NULL,
+    actorName VARCHAR(150) NOT NULL,
+    actionType VARCHAR(100) NOT NULL,
+    targetModule VARCHAR(100) NOT NULL,
+    details TEXT NULL,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- -----------------------------------------------------------------------------
+-- INDEXES
+-- -----------------------------------------------------------------------------
+CREATE INDEX idx_users_email ON users(userEmail);
+CREATE INDEX idx_users_role ON users(userRole);
+CREATE INDEX idx_projects_status ON projects(projectStatus);
+CREATE INDEX idx_projects_location ON projects(projectLocation);
+CREATE INDEX idx_orders_project ON purchase_orders(projectID);
+CREATE INDEX idx_comments_project ON comments(commentFor);
+CREATE INDEX idx_comments_parent ON comments(parentCommentID);
 ```
