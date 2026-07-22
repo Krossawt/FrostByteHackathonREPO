@@ -1,12 +1,14 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import './App.css'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Link, NavLink, Route, Routes, useNavigate, useLocation } from 'react-router-dom'
 import { login as loginService, logout as logoutService, register as registerService, getStoredUser } from './services/auth'
-import type { Role } from './types'
+import type { Role, UserAccount } from './types'
 import Landing from './pages/Landing'
 import LoginPage from './pages/Login'
 import RegisterPage from './pages/Register'
+import PublicHome from './pages/PublicHome'
 import About from './pages/About'
-import SKs from './pages/SKs'
+import SKsPage from './pages/SKs'
 import CitizenHome from './pages/CitizenHome'
 import CitizenProjects from './pages/CitizenProjects'
 import CitizenMySKs from './pages/CitizenMySKs'
@@ -16,68 +18,71 @@ import SuperAdminActivity from './pages/SuperAdminActivity'
 import SuperAdminNews from './pages/SuperAdminNews'
 import SKHome from './pages/SKHome'
 import SKProjects from './pages/SKProjects'
-import './App.css'
+import { BARANGAYS } from './data/mockData'
 
-const navItems = [
-  { title: 'Home', path: '/' },
+const PUBLIC_NAV = [
+  { title: 'Home', path: '/home' },
   { title: 'About', path: '/about' },
-  { title: 'SKs', path: '/sks' }
+  { title: 'SKs', path: '/sks' },
 ]
+
+function getRoleNav(user: UserAccount | null) {
+  if (!user) return PUBLIC_NAV
+  if (user.role === 'superadmin') return [
+    { title: 'Dashboard', path: '/superadmin/home' },
+    { title: 'Accounts', path: '/superadmin/accounts' },
+    { title: 'Activity Logs', path: '/superadmin/activity' },
+    { title: 'News', path: '/superadmin/news' },
+  ]
+  if (user.role === 'sk') return [
+    { title: 'Dashboard', path: '/sk/home' },
+    { title: 'Projects', path: '/sk/projects' },
+  ]
+  return [
+    { title: 'Dashboard', path: '/citizen/home' },
+    { title: 'Projects', path: '/citizen/projects' },
+    { title: 'My SKs', path: '/citizen/mysks' },
+  ]
+}
+
+const LANDING_PATHS = ['/', '/login', '/register']
+const isLandingPath = (p: string) => LANDING_PATHS.includes(p)
+
+const positionColors: Record<string, string> = {
+  Chairperson: '#760031',
+  Treasurer:   '#b45309',
+  Secretary:   '#1d4ed8',
+  Kagawad:     '#374151',
+}
 
 function App() {
   const navigate = useNavigate()
   const location = useLocation()
-  const isGraphPage = location.pathname === '/' || location.pathname === '/login'
-  const [user, setUser] = useState(() => getStoredUser())
+  const [user, setUser] = useState<UserAccount | null>(() => getStoredUser())
   const [cursor, setCursor] = useState({ x: 0.5, y: 0.5 })
-  const [scrollShift, setScrollShift] = useState(0)
+  const [scrollY, setScrollY] = useState(0)
+  const [selectedBarangay, setSelectedBarangay] = useState<string>('Balibago')
+  const isLanding = isLandingPath(location.pathname)
 
   useEffect(() => {
-    const handleMove = (event: MouseEvent) => {
-      setCursor({ x: event.clientX / window.innerWidth, y: event.clientY / window.innerHeight })
-    }
-    const handleScroll = () => setScrollShift(window.scrollY)
-
-    handleScroll()
-    window.addEventListener('mousemove', handleMove)
-    window.addEventListener('scroll', handleScroll, { passive: true })
-    return () => {
-      window.removeEventListener('mousemove', handleMove)
-      window.removeEventListener('scroll', handleScroll)
-    }
+    const onMove = (e: MouseEvent) => setCursor({ x: e.clientX / window.innerWidth, y: e.clientY / window.innerHeight })
+    const onScroll = () => setScrollY(window.scrollY)
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('scroll', onScroll) }
   }, [])
 
   const shellStyle = useMemo<CSSProperties>(() => ({
-    ['--cursor-x' as string]: `${cursor.x * 100}%`,
-    ['--cursor-y' as string]: `${cursor.y * 100}%`,
-    ['--scroll-y' as string]: `${scrollShift * 0.04}px`
-  }), [cursor, scrollShift])
+    '--cursor-x': `${cursor.x * 100}%`,
+    '--cursor-y': `${cursor.y * 100}%`,
+    '--cursor-x-raw': cursor.x,
+    '--scroll-y': scrollY,
+  } as CSSProperties), [cursor, scrollY])
 
-  const roleMenu = useMemo(() => {
-    if (!user) return []
-    if (user.role === 'superadmin') {
-      return [
-        { title: 'Home', path: '/superadmin/home' },
-        { title: 'Accounts', path: '/superadmin/accounts' },
-        { title: 'Activity Logs', path: '/superadmin/activity' },
-        { title: 'News', path: '/superadmin/news' }
-      ]
-    }
-    if (user.role === 'sk') {
-      return [
-        { title: 'Home', path: '/sk/home' },
-        { title: 'Projects', path: '/sk/projects' }
-      ]
-    }
-    return [
-      { title: 'Home', path: '/citizen/home' },
-      { title: 'Projects', path: '/citizen/projects' },
-      { title: 'My SKs', path: '/citizen/mysks' }
-    ]
-  }, [user])
+  const nav = useMemo(() => getRoleNav(user), [user])
 
-  const handleLogin = (email: string, password: string, rememberMe: boolean) => {
-    const result = loginService(email, password, rememberMe)
+  const handleLogin = (emailOrUsername: string, password: string, rememberMe: boolean) => {
+    const result = loginService(emailOrUsername, password, rememberMe)
     if (result) {
       setUser(result)
       const next = result.role === 'superadmin' ? '/superadmin/home' : result.role === 'sk' ? '/sk/home' : '/citizen/home'
@@ -87,52 +92,80 @@ function App() {
     return false
   }
 
-  const handleRegister = (name: string, email: string, password: string, barangay: string, isStaRosa: boolean) => {
-    const result = registerService(name, email, password, barangay, isStaRosa)
+  const handleRegister = (name: string, email: string, password: string, barangay: string, isStaRosa: boolean, username?: string) => {
+    const result = registerService(name, email, password, barangay, isStaRosa, username)
     setUser(result)
     navigate('/citizen/home')
   }
 
-  const handleLogout = () => {
-    logoutService()
-    setUser(null)
-    navigate('/')
-  }
+  const handleLogout = () => { logoutService(); setUser(null); navigate('/') }
+
+  const posColor = user?.skPosition ? (positionColors[user.skPosition] ?? '#760031') : '#760031'
 
   return (
-    <div className={isGraphPage ? 'landing-shell' : 'page-shell'} style={shellStyle}>
-      {!isGraphPage && <div className="page-glow" />}
-      {!isGraphPage && (
+    <div className={isLanding ? 'landing-shell' : 'app-shell'} style={shellStyle}>
+      {!isLanding && <div className="scroll-layer" />}
+
+      {!isLanding && (
         <header className="site-header">
-          <div className="container header-grid">
+          <div className="container header-inner">
+            {/* Brand */}
             <div className="brand-block">
-              <div className="brand-sigil">E</div>
-              <div>
-                <p className="brand-title">eSKala</p>
-                <small className="brand-subtitle">Santa Rosa City SK transparency portal</small>
+              <div className="brand-logos">
+                <img src="/eSKalaLogo.svg" alt="eSKala" className="brand-logo-img logo-main"
+                  onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                <div className="brand-divider" />
+                <img src="/SantaRosa.svg" alt="Santa Rosa City" className="brand-logo-img"
+                  onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                <img src="/CYDOlogo.svg" alt="CYDO" className="brand-logo-img"
+                  onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                <img src="/bagongPilipinasLogo.svg" alt="Bagong Pilipinas" className="brand-logo-img"
+                  onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+              </div>
+              <div className="brand-text">
+                <span className="brand-name">e<span>SK</span>ala</span>
+                <span className="brand-tagline">Santa Rosa City · SK Transparency Portal</span>
               </div>
             </div>
 
-            <div className="main-nav">
-              {navItems.map((item) => (
-                <NavLink key={item.path} to={item.path} className={({ isActive }) => (isActive ? 'nav-link active-link' : 'nav-link')}>
+            {/* Nav */}
+            <nav className="main-nav">
+              {nav.map(item => (
+                <NavLink key={item.path} to={item.path}
+                  className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
                   {item.title}
                 </NavLink>
               ))}
-            </div>
+            </nav>
 
-            <div className="nav-actions">
+            {/* Actions */}
+            <div className="header-actions">
+              {user?.role === 'superadmin' && (
+                <select
+                  className="barangay-select-header"
+                  value={selectedBarangay}
+                  onChange={e => setSelectedBarangay(e.target.value)}
+                  title="Select barangay to manage"
+                >
+                  <option value="">All Barangays</option>
+                  {BARANGAYS.map(b => <option key={b} value={b}>{b}</option>)}
+                </select>
+              )}
               {!user ? (
                 <>
-                  <Link to="/login" className="btn btn-pill btn-primary">Login</Link>
-                  <Link to="/register" className="btn btn-pill btn-secondary">Sign up</Link>
+                  <Link to="/login" className="btn btn-primary btn-sm">Log In</Link>
+                  <Link to="/register" className="btn btn-secondary btn-sm">Sign Up</Link>
                 </>
               ) : (
                 <>
-                  <span className="user-chip">{user.name}</span>
-                  <button className="btn btn-pill btn-secondary" type="button" onClick={handleLogout}>
-                    Logout
-                  </button>
+                  <div className="user-chip">
+                    <span className="user-chip-dot" style={{ background: posColor }} />
+                    <span>{user.name.split(' ')[0]}</span>
+                    {user.skPosition && (
+                      <span style={{ fontSize: '0.72rem', opacity: 0.75, fontWeight: 500 }}>· {user.skPosition}</span>
+                    )}
+                  </div>
+                  <button className="btn btn-secondary btn-sm" onClick={handleLogout}>Log Out</button>
                 </>
               )}
             </div>
@@ -140,43 +173,72 @@ function App() {
         </header>
       )}
 
-      <main>
+      <main style={{ position: 'relative', zIndex: 1, minHeight: isLanding ? undefined : 'calc(100vh - 140px)' }}>
         <Routes>
-          <Route path="/" element={<Landing />} />
-          <Route path="/about" element={<About />} />
-          <Route path="/sks" element={<SKs />} />
-          <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
-          <Route path="/register" element={<RegisterPage onRegister={handleRegister} />} />
-          <Route path="/citizen/home" element={<CitizenHome user={user} />} />
-          <Route path="/citizen/projects" element={<CitizenProjects />} />
-          <Route path="/citizen/mysks" element={<CitizenMySKs />} />
-          <Route path="/sk/home" element={<SKHome user={user} />} />
-          <Route path="/sk/projects" element={<SKProjects />} />
-          <Route path="/superadmin/home" element={<SuperAdminHome />} />
+          <Route path="/"                    element={<Landing />} />
+          <Route path="/login"               element={<LoginPage onLogin={handleLogin} />} />
+          <Route path="/register"            element={<RegisterPage onRegister={handleRegister} />} />
+          <Route path="/home"                element={<PublicHome />} />
+          <Route path="/about"               element={<About />} />
+          <Route path="/sks"                 element={<SKsPage />} />
+          <Route path="/citizen/home"        element={<CitizenHome user={user} />} />
+          <Route path="/citizen/projects"    element={<CitizenProjects user={user} />} />
+          <Route path="/citizen/mysks"       element={<CitizenMySKs user={user} />} />
+          <Route path="/sk/home"             element={<SKHome user={user} />} />
+          <Route path="/sk/projects"         element={<SKProjects user={user} />} />
+          <Route path="/superadmin/home"     element={<SuperAdminHome selectedBarangay={selectedBarangay} setSelectedBarangay={setSelectedBarangay} />} />
           <Route path="/superadmin/accounts" element={<SuperAdminAccounts />} />
           <Route path="/superadmin/activity" element={<SuperAdminActivity />} />
-          <Route path="/superadmin/news" element={<SuperAdminNews />} />
-          <Route path="*" element={<Landing />} />
+          <Route path="/superadmin/news"     element={<SuperAdminNews />} />
+          <Route path="*"                    element={<Landing />} />
         </Routes>
       </main>
 
-      {!isGraphPage && (
+      {!isLanding && (
         <footer className="footer">
-          <div className="container footer-content">
-            <div className="footer-section">
-              <p className="footer-title">About eSKala</p>
-              <small>A government-facing public portal for Santa Rosa City barangay SK projects, budgets, and civic participation.</small>
+          <div className="container">
+            <div className="footer-grid">
+              <div>
+                <div className="footer-brand-name">e<span>SK</span>ala</div>
+                <p className="footer-brand-desc">
+                  The official Sangguniang Kabataan financial transparency portal for the City of Santa Rosa, Laguna.
+                  Powered by RA 10742 (SK Reform Act) as amended by RA 11768.
+                </p>
+              </div>
+              <div>
+                <div className="footer-col-title">Navigation</div>
+                <div className="footer-links">
+                  <Link to="/home">City Overview</Link>
+                  <Link to="/about">About eSKala</Link>
+                  <Link to="/sks">SK Officials</Link>
+                  <Link to="/login">Citizen Login</Link>
+                </div>
+              </div>
+              <div>
+                <div className="footer-col-title">Contact</div>
+                <div className="footer-contact-item">
+                  City Youth Development Office (CYDO)<br />
+                  Santa Rosa City, Laguna<br />
+                  Tel: (049) 530-0015 loc. 5011<br />
+                  Email: cydo@santarosacity.gov.ph
+                </div>
+              </div>
+              <div>
+                <div className="footer-col-title">Legal</div>
+                <div className="footer-links">
+                  <a href="#">Terms & Conditions</a>
+                  <a href="#">Privacy Policy</a>
+                  <a href="#">RA 10742 Full Text</a>
+                  <a href="#">Full Disclosure Policy</a>
+                </div>
+              </div>
             </div>
-            <div className="footer-section">
-              <p className="footer-title">Contact</p>
-              <small>SK Oversight Office<br />Email: skoversight@rosacity.gov.ph<br />Phone: (049) 508-1234</small>
-            </div>
-            <div className="footer-section">
-              <p className="footer-title">Policies</p>
-              <div className="footer-links">
-                <NavLink to="/about">About us</NavLink>
-                <a href="mailto:skoversight@rosacity.gov.ph">Contact</a>
-                <a href="/login">Terms and conditions</a>
+            <div className="footer-bottom">
+              <span className="footer-copyright">© 2025 City Government of Santa Rosa, Laguna. All rights reserved.</span>
+              <div className="footer-badges">
+                <span className="footer-badge">RA 10742</span>
+                <span className="footer-badge">BSKE 2023</span>
+                <span className="footer-badge">DILG Compliant</span>
               </div>
             </div>
           </div>
