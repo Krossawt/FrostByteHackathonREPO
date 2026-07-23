@@ -78,7 +78,7 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
   const totalBudget  = cityBudgetOverride !== null ? cityBudgetOverride : barangayList.reduce((s, b) => s + b.annualBudget, 0)
   const totalSpent   = barangayList.reduce((s, b) => s + b.spent, 0)
   const totalProj    = projects.length
-  const usagePct     = Math.round((totalSpent / totalBudget) * 100)
+  const usagePct     = totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0
 
   const bSummary = selectedBarangay
     ? barangayList.find(b => b.barangay === selectedBarangay)
@@ -90,7 +90,7 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
   const displayBudget = selectedBarangay && bSummary ? bSummary.annualBudget : totalBudget
   const displaySpent  = selectedBarangay && bSummary ? bSummary.spent : totalSpent
   const displayProj   = selectedBarangay ? bProjects.length : totalProj
-  const displayUsage  = Math.min(Math.round((displaySpent / (displayBudget || 1)) * 100), 100)
+  const displayUsage  = displayBudget > 0 ? Math.min(Math.round((displaySpent / displayBudget) * 100), 100) : 0
 
   const recentLogs = logs.slice(0, 10)
 
@@ -126,12 +126,12 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
         {/* ── Stat Cards ── */}
         <div className="card-grid card-grid-4 reveal" style={{ marginBottom: '1.5rem' }}>
           <div className="stat-card card-accent">
-            <div className="stat-value">₱{(displayBudget / 1_000_000).toFixed(2)}M</div>
+            <div className="stat-value">{displayBudget === 0 ? '₱0' : `₱${(displayBudget / 1_000_000).toFixed(2)}M`}</div>
             <div className="stat-label">{selectedBarangay ? `Barangay ${selectedBarangay} Budget` : 'Total SK Budget FY 2025'}</div>
             <div className="stat-sub">{selectedBarangay ? 'FY 2025 Allocation' : '18 Barangays combined'}</div>
           </div>
           <div className="stat-card" style={{ borderLeft: '3px solid #b45309' }}>
-            <div className="stat-value" style={{ color: '#b45309' }}>₱{(displaySpent / 1_000_000).toFixed(2)}M</div>
+            <div className="stat-value" style={{ color: '#b45309' }}>{displaySpent === 0 ? '₱0' : `₱${(displaySpent / 1_000_000).toFixed(2)}M`}</div>
             <div className="stat-label">Total Disbursed</div>
             <div className="stat-sub">{displayUsage}% utilization rate</div>
           </div>
@@ -154,9 +154,9 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
             <div style={{ flex: 1 }}>
               <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.88rem', marginBottom: '0.5rem' }}>City-Wide SK Fund Utilization</div>
               {[
-                { label: 'Total Budget', val: `₱${(totalBudget/1_000_000).toFixed(1)}M`, color: 'var(--maroon)' },
-                { label: 'Disbursed',    val: `₱${(totalSpent/1_000_000).toFixed(1)}M`,  color: '#b45309' },
-                { label: 'Remaining',   val: `₱${((totalBudget-totalSpent)/1_000_000).toFixed(1)}M`, color: '#166534' },
+                { label: 'Total Budget', val: totalBudget === 0 ? '₱0' : `₱${(totalBudget/1_000_000).toFixed(1)}M`, color: 'var(--maroon)' },
+                { label: 'Disbursed',    val: totalSpent === 0 ? '₱0' : `₱${(totalSpent/1_000_000).toFixed(1)}M`,  color: '#b45309' },
+                { label: 'Remaining',   val: (totalBudget-totalSpent) === 0 ? '₱0' : `₱${((totalBudget-totalSpent)/1_000_000).toFixed(1)}M`, color: '#166534' },
               ].map(item => (
                 <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontFamily: 'var(--font-display)', marginBottom: '0.25rem' }}>
                   <span style={{ color: 'var(--muted)' }}>{item.label}</span>
@@ -198,7 +198,7 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
               </div>
               <div className="card-grid card-grid-2">
                 {barangayList.map(b => {
-                  const pct = Math.round((b.spent / b.annualBudget) * 100)
+                  const pct = b.annualBudget > 0 ? Math.round((b.spent / b.annualBudget) * 100) : 0
                   return (
                     <div key={b.barangay} className="card" style={{ padding: '1rem 1.1rem', cursor: 'pointer' }}
                       onClick={() => { setSelectedBarangay(b.barangay); setView('barangay') }}>
@@ -215,8 +215,8 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
                         <div className="progress-fill" style={{ width: `${pct}%`, background: pct >= 70 ? 'linear-gradient(90deg, #b45309, #f59e0b)' : undefined }} />
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.4rem', fontSize: '0.72rem', color: 'var(--muted)', fontFamily: 'var(--font-display)' }}>
-                        <span>₱{(b.spent / 1_000_000).toFixed(2)}M</span>
-                        <span>₱{(b.annualBudget / 1_000_000).toFixed(2)}M</span>
+                        <span>{b.spent === 0 ? '₱0' : `₱${(b.spent / 1_000_000).toFixed(2)}M`}</span>
+                        <span>{b.annualBudget === 0 ? '₱0' : `₱${(b.annualBudget / 1_000_000).toFixed(2)}M`}</span>
                       </div>
                     </div>
                   )
@@ -267,22 +267,22 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
                 {/* Banner */}
                 <div style={{ marginBottom: '1rem', padding: '0.85rem 1rem', background: 'linear-gradient(135deg, var(--maroon), var(--maroon-dark))', color: '#fff' }}>
                   <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: '1.2rem', letterSpacing: '-0.02em' }}>Barangay {selectedBarangay}</div>
-                  <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.65)', marginTop: '0.1rem' }}>{bSummary.projects} projects · ₱{(bSummary.annualBudget/1_000_000).toFixed(2)}M allocated</div>
+                  <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.65)', marginTop: '0.1rem' }}>{bSummary.projects} projects · {bSummary.annualBudget === 0 ? '₱0' : `₱${(bSummary.annualBudget/1_000_000).toFixed(2)}M`} allocated</div>
                 </div>
 
                 {/* Barangay Stats */}
                 <div className="card-grid card-grid-4" style={{ marginBottom: '1.2rem' }}>
                   <div className="stat-card card-accent">
-                    <div className="stat-value">₱{(bSummary.annualBudget / 1_000_000).toFixed(2)}M</div>
+                    <div className="stat-value">{bSummary.annualBudget === 0 ? '₱0' : `₱${(bSummary.annualBudget / 1_000_000).toFixed(2)}M`}</div>
                     <div className="stat-label">Annual Budget</div>
                   </div>
                   <div className="stat-card" style={{ borderLeft: '3px solid #b45309' }}>
-                    <div className="stat-value" style={{ color: '#b45309' }}>₱{(bSummary.spent / 1_000_000).toFixed(2)}M</div>
+                    <div className="stat-value" style={{ color: '#b45309' }}>{bSummary.spent === 0 ? '₱0' : `₱${(bSummary.spent / 1_000_000).toFixed(2)}M`}</div>
                     <div className="stat-label">Disbursed</div>
-                    <div className="stat-sub">{Math.round((bSummary.spent / bSummary.annualBudget) * 100)}% utilized</div>
+                    <div className="stat-sub">{bSummary.annualBudget > 0 ? Math.round((bSummary.spent / bSummary.annualBudget) * 100) : 0}% utilized</div>
                   </div>
                   <div className="stat-card" style={{ borderLeft: '3px solid #166534' }}>
-                    <div className="stat-value" style={{ color: '#166534' }}>₱{(bSummary.remaining / 1_000_000).toFixed(2)}M</div>
+                    <div className="stat-value" style={{ color: '#166534' }}>{bSummary.remaining === 0 ? '₱0' : `₱${(bSummary.remaining / 1_000_000).toFixed(2)}M`}</div>
                     <div className="stat-label">Remaining</div>
                   </div>
                   <div className="stat-card">
