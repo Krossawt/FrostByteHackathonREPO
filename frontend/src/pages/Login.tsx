@@ -8,8 +8,9 @@ interface LoginPageProps {
 
 const DEMO_ACCOUNTS = [
   { role: 'Super Admin',    sub: 'City-wide oversight', email: 'superadmin@eskala.ph', password: 'Admin2026!', color: '#760031' },
-  { role: 'SK Chairperson', sub: 'Balibago · Add Projects & Receipts', email: 'padizon.balibago@sk.gov.ph', password: 'Sk2026!', color: '#b45309' },
-  { role: 'SK Treasurer',   sub: 'Balibago · Add Receipts', email: 'klim.balibago@sk.gov.ph', password: 'Sk2026!', color: '#1d4ed8' },
+  { role: 'SK Chairperson', sub: 'Balibago · Manage & Approve', email: 'padizon.balibago@sk.gov.ph', password: 'Sk2026!', color: '#b45309' },
+  { role: 'SK Secretary',   sub: 'Balibago · Add Projects (Proposal Upload & OCR)', email: 'mvillanueva.balibago@sk.gov.ph', password: 'Sk2026!', color: '#7c3aed' },
+  { role: 'SK Treasurer',   sub: 'Balibago · Add Receipts (Upload & OCR)', email: 'klim.balibago@sk.gov.ph', password: 'Sk2026!', color: '#1d4ed8' },
   { role: 'Citizen',        sub: 'Balibago resident', email: 'citizen@eskala.ph', password: 'Citizen2026!', color: '#166534' },
 ]
 

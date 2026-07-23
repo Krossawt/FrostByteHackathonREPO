@@ -8,18 +8,18 @@ interface CitizenProjectsProps { user?: UserAccount | null }
 
 // Unsplash images by category
 const CATEGORY_IMAGES: Record<string, string> = {
-  'Education':            'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=640&q=75',
-  'Health':               'https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=640&q=75',
-  'Sports':               'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=640&q=75',
-  'Environment':          'https://images.unsplash.com/photo-1588880331179-bc9b93a8cb5e?w=640&q=75',
-  'Infrastructure':       'https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=640&q=75',
-  'Livelihood':           'https://images.unsplash.com/photo-1556761175-b413da4baf72?w=640&q=75',
-  'Capacity Building':    'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=640&q=75',
-  'Peace & Order':        'https://images.unsplash.com/photo-1589994160839-163cd867cfe8?w=640&q=75',
-  'Arts & Culture':       'https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=640&q=75',
-  'Disaster Preparedness':'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=640&q=75',
-  'Governance':           'https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?w=640&q=75',
-  'Other':                'https://images.unsplash.com/photo-1532629345422-7515f3d16bb6?w=640&q=75',
+  'Education': 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=640&q=75',
+  'Health': 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=640&q=75',
+  'Sports': 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=640&q=75',
+  'Environment': 'https://images.unsplash.com/photo-1588880331179-bc9b93a8cb5e?w=640&q=75',
+  'Infrastructure': 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=640&q=75',
+  'Livelihood': 'https://images.unsplash.com/photo-1556761175-b413da4baf72?w=640&q=75',
+  'Capacity Building': 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=640&q=75',
+  'Peace & Order': 'https://images.unsplash.com/photo-1589994160839-163cd867cfe8?w=640&q=75',
+  'Arts & Culture': 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=640&q=75',
+  'Disaster Preparedness': 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=640&q=75',
+  'Governance': 'https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?w=640&q=75',
+  'Other': 'https://images.unsplash.com/photo-1532629345422-7515f3d16bb6?w=640&q=75',
 }
 
 const CATEGORY_GRAD: Record<string, string> = {
@@ -41,9 +41,9 @@ function getGrad(category?: string) {
 }
 
 const FILTER_OPTIONS = [
-  { key: 'all',       label: 'All'       },
-  { key: 'ongoing',   label: 'Ongoing'   },
-  { key: 'upcoming',  label: 'Upcoming'  },
+  { key: 'all', label: 'All' },
+  { key: 'ongoing', label: 'Ongoing' },
+  { key: 'upcoming', label: 'Upcoming' },
   { key: 'completed', label: 'Completed' },
 ]
 
@@ -94,7 +94,7 @@ export default function CitizenProjects({ user }: CitizenProjectsProps) {
           <div className="toolbar-left">
             <div className="search-wrap">
               <svg className="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
               </svg>
               <input className="search-input" type="text" placeholder="Search by title, barangay, or category…"
                 value={search} onChange={e => setSearch(e.target.value)} />

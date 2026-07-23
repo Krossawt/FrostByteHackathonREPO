@@ -6,6 +6,7 @@
 import { useState, FormEvent } from 'react'
 import { receipts as allReceipts, citizenComments as allComments } from '../data/mockData'
 import type { ReportProject, Receipt, UserAccount } from '../types'
+import CameraCaptureModal from './CameraCaptureModal'
 
 const CATEGORY_IMAGES: Record<string, string> = {
   'Education':            'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=800&q=80',
@@ -55,6 +56,12 @@ export default function ProjectDetailModal({ project, user, onClose }: ProjectDe
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [scanningOcr, setScanningOcr]   = useState(false)
   const [ocrMsg, setOcrMsg]             = useState('')
+  const [showCameraModal, setShowCameraModal] = useState(false)
+
+  const handleCameraSnap = () => {
+    setShowCameraModal(false)
+    handleScanOcr()
+  }
 
   const [localReceipts, setLocalReceipts] = useState(
     allReceipts.filter(r => r.projectId === project?.id)
@@ -244,9 +251,9 @@ export default function ProjectDetailModal({ project, user, onClose }: ProjectDe
                   {ocrMsg && <div className="alert-info" style={{ marginBottom: '0.75rem' }}>{ocrMsg}</div>}
 
                   {/* Upload Zone & OCR Trigger */}
-                  <div style={{ marginBottom: '1rem', border: '1.5px dashed var(--maroon)', padding: '1rem', textAlign: 'center', background: 'rgba(118,0,49,0.02)' }}>
+                  <div style={{ marginBottom: '1rem', border: '1.5px dashed var(--maroon)', padding: '1rem', textAlign: 'center', background: 'rgba(118,0,49,0.02)', borderRadius: '8px' }}>
                     {uploadedFile ? (
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', textAlign: 'left' }}>
                           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--maroon)" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                           <div>
@@ -254,32 +261,52 @@ export default function ProjectDetailModal({ project, user, onClose }: ProjectDe
                             <div style={{ fontSize: '0.74rem', color: 'var(--muted)' }}>{(uploadedFile.size / 1024).toFixed(1)} KB · File Attached</div>
                           </div>
                         </div>
-                        <button type="button" className="btn btn-gold btn-sm" onClick={handleScanOcr} disabled={scanningOcr}>
-                          {scanningOcr ? 'Scanning OCR…' : '⚡ Auto-Scan with OCR'}
-                        </button>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowCameraModal(true)}>
+                            📷 Open Camera
+                          </button>
+                          <button type="button" className="btn btn-gold btn-sm" onClick={handleScanOcr} disabled={scanningOcr}>
+                            {scanningOcr ? 'Scanning OCR…' : '⚡ Auto-Scan with OCR'}
+                          </button>
+                        </div>
                       </div>
                     ) : (
-                      <label style={{ cursor: 'pointer', display: 'block' }}>
-                        <input
-                          type="file"
-                          accept=".pdf,.png,.jpg,.jpeg"
-                          style={{ display: 'none' }}
-                          onChange={e => {
-                            if (e.target.files && e.target.files[0]) {
-                              setUploadedFile(e.target.files[0])
-                            }
-                          }}
-                        />
-                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--maroon)" strokeWidth="2" style={{ marginBottom: '0.3rem' }}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.88rem', color: 'var(--maroon)' }}>
-                          Click to Upload Receipt File or Drag &amp; Drop
-                        </div>
-                        <div style={{ fontSize: '0.74rem', color: 'var(--muted)', marginTop: '0.15rem' }}>
-                          Upload JPG, PNG, or PDF receipts (Max 10MB)
-                        </div>
-                      </label>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.6rem' }}>
+                        <label style={{ cursor: 'pointer', textAlign: 'center', display: 'block', width: '100%' }}>
+                          <input
+                            type="file"
+                            accept=".pdf,.png,.jpg,.jpeg"
+                            style={{ display: 'none' }}
+                            onChange={e => {
+                              if (e.target.files && e.target.files[0]) {
+                                setUploadedFile(e.target.files[0])
+                              }
+                            }}
+                          />
+                          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--maroon)" strokeWidth="2" style={{ marginBottom: '0.3rem' }}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.88rem', color: 'var(--maroon)' }}>
+                            Click to Upload Receipt File or Drag &amp; Drop
+                          </div>
+                          <div style={{ fontSize: '0.74rem', color: 'var(--muted)', marginTop: '0.15rem' }}>
+                            Upload JPG, PNG, or PDF receipts (Max 10MB)
+                          </div>
+                        </label>
+                        <div style={{ fontSize: '0.74rem', color: 'var(--muted)', fontWeight: 700 }}>— OR —</div>
+                        <button type="button" className="btn btn-gold btn-sm" onClick={() => setShowCameraModal(true)}>
+                          📷 Open Camera / Snap Receipt Photo
+                        </button>
+                      </div>
                     )}
                   </div>
+
+                  {showCameraModal && (
+                    <CameraCaptureModal
+                      title="Capture Official Receipt Photo"
+                      subtitle="Align official receipt document within frame and snap photo"
+                      onCapture={handleCameraSnap}
+                      onClose={() => setShowCameraModal(false)}
+                    />
+                  )}
 
                   <div className="form-row-2">
                     <div className="form-group">
