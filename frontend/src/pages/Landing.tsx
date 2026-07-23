@@ -54,7 +54,7 @@ function useScrollReveal() {
 
 const totalBudget   = barangaySummary.reduce((s, b) => s + b.annualBudget, 0)
 const totalSpent    = barangaySummary.reduce((s, b) => s + b.spent, 0)
-const utilizationPct= Math.round((totalSpent / totalBudget) * 100)
+const utilizationPct= totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0
 const totalProjects = projects.length
 const totalBarangays= 18
 
@@ -73,7 +73,7 @@ const STAT_CARDS = [
         <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
       </svg>
     ),
-    val: `₱${(totalBudget / 1_000_000).toFixed(1)}M`, lbl: 'Total SK Budget FY 2025',
+    val: totalBudget === 0 ? '₱0' : `₱${(totalBudget / 1_000_000).toFixed(1)}M`, lbl: 'Total SK Budget FY 2025',
   },
   {
     icon: (
@@ -297,17 +297,17 @@ export default function Landing() {
           {/* Barangay Stats Grid */}
           <div className="card-grid card-grid-4" style={{ marginBottom: '1.5rem' }}>
             <div className="stat-card card-accent">
-              <div className="stat-value">₱{((brgyData?.annualBudget ?? 0) / 1_000_000).toFixed(2)}M</div>
+              <div className="stat-value">{(brgyData?.annualBudget ?? 0) === 0 ? '₱0' : `₱${((brgyData?.annualBudget ?? 0) / 1_000_000).toFixed(2)}M`}</div>
               <div className="stat-label">Annual Allocation</div>
               <div className="stat-sub">FY 2025 SK Fund</div>
             </div>
             <div className="stat-card" style={{ borderLeft: '3px solid #b45309' }}>
-              <div className="stat-value" style={{ color: '#b45309' }}>₱{((brgyData?.spent ?? 0) / 1_000_000).toFixed(2)}M</div>
+              <div className="stat-value" style={{ color: '#b45309' }}>{(brgyData?.spent ?? 0) === 0 ? '₱0' : `₱${((brgyData?.spent ?? 0) / 1_000_000).toFixed(2)}M`}</div>
               <div className="stat-label">Disbursed</div>
               <div className="stat-sub">{brgyUsage}% utilization</div>
             </div>
             <div className="stat-card" style={{ borderLeft: '3px solid #166534' }}>
-              <div className="stat-value" style={{ color: '#166534' }}>₱{((brgyData?.remaining ?? 0) / 1_000_000).toFixed(2)}M</div>
+              <div className="stat-value" style={{ color: '#166534' }}>{(brgyData?.remaining ?? 0) === 0 ? '₱0' : `₱${((brgyData?.remaining ?? 0) / 1_000_000).toFixed(2)}M`}</div>
               <div className="stat-label">Remaining Balance</div>
               <div className="stat-sub">Available for programs</div>
             </div>
@@ -472,8 +472,8 @@ export default function Landing() {
                   label={`${utilizationPct}%`} sublabel="used" />
                 <div className="donut-legend">
                   {[
-                    { dot: '#760031', label: 'Disbursed', val: `₱${(totalSpent/1_000_000).toFixed(1)}M` },
-                    { dot: 'rgba(118,0,49,0.12)', label: 'Remaining', val: `₱${((totalBudget-totalSpent)/1_000_000).toFixed(1)}M` },
+                    { dot: '#760031', label: 'Disbursed', val: totalSpent === 0 ? '₱0' : `₱${(totalSpent/1_000_000).toFixed(1)}M` },
+                    { dot: 'rgba(118,0,49,0.12)', label: 'Remaining', val: (totalBudget-totalSpent) === 0 ? '₱0' : `₱${((totalBudget-totalSpent)/1_000_000).toFixed(1)}M` },
                     { dot: '#b45309', label: 'Utilization Rate', val: `${utilizationPct}%` },
                   ].map(item => (
                     <div key={item.label} className="donut-legend-item">

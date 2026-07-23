@@ -129,17 +129,17 @@ export default function SKHome({ user }: SKHomeProps) {
         {/* ── Financial Stat Cards ── */}
         <div className="card-grid card-grid-4" style={{ marginBottom: '1.5rem' }}>
           <div className="stat-card card-accent">
-            <div className="stat-value">₱{(budget / 1_000_000).toFixed(2)}M</div>
+            <div className="stat-value">{budget === 0 ? '₱0' : `₱${(budget / 1_000_000).toFixed(2)}M`}</div>
             <div className="stat-label">Annual Budget</div>
             <div className="stat-sub">FY 2025 allocation</div>
           </div>
           <div className="stat-card" style={{ borderLeft: '3px solid #b45309' }}>
-            <div className="stat-value" style={{ color: '#b45309' }}>₱{(spent / 1_000_000).toFixed(2)}M</div>
+            <div className="stat-value" style={{ color: '#b45309' }}>{spent === 0 ? '₱0' : `₱${(spent / 1_000_000).toFixed(2)}M`}</div>
             <div className="stat-label">Amount Disbursed</div>
             <div className="stat-sub">{usePct}% of budget used</div>
           </div>
           <div className="stat-card" style={{ borderLeft: '3px solid #166534' }}>
-            <div className="stat-value" style={{ color: '#166534' }}>₱{(remain / 1_000_000).toFixed(2)}M</div>
+            <div className="stat-value" style={{ color: '#166534' }}>{remain === 0 ? '₱0' : `₱${(remain / 1_000_000).toFixed(2)}M`}</div>
             <div className="stat-label">Remaining</div>
             <div className="stat-sub">Available for projects</div>
           </div>
