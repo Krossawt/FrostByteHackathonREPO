@@ -1,12 +1,11 @@
 import './App.css'
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import { Link, NavLink, Route, Routes, useNavigate, useLocation } from 'react-router-dom'
+import { Link, NavLink, Navigate, Route, Routes, useNavigate, useLocation } from 'react-router-dom'
 import { login as loginService, logout as logoutService, register as registerService, getStoredUser } from './services/auth'
 import type { Role, UserAccount } from './types'
 import Landing from './pages/Landing'
 import LoginPage from './pages/Login'
 import RegisterPage from './pages/Register'
-import PublicHome from './pages/PublicHome'
 import About from './pages/About'
 import SKsPage from './pages/SKs'
 import CitizenHome from './pages/CitizenHome'
@@ -19,12 +18,21 @@ import SuperAdminNews from './pages/SuperAdminNews'
 import SKHome from './pages/SKHome'
 import SKProjects from './pages/SKProjects'
 import { BARANGAYS } from './data/mockData'
+import ConfirmDialog from './components/ConfirmDialog'
 
 const PUBLIC_NAV = [
-  { title: 'Home', path: '/home' },
+  { title: 'Home', path: '/' },
   { title: 'About', path: '/about' },
-  { title: 'SKs', path: '/sks' },
+  { title: 'SK Officials', path: '/sks' },
 ]
+
+function userHomePath(user: UserAccount | null): string {
+  if (!user) return '/'
+  if (user.role === 'superadmin') return '/superadmin/home'
+  if (user.role === 'sk') return '/sk/home'
+  if (user.role === 'citizen') return '/citizen/home'
+  return '/'
+}
 
 function getRoleNav(user: UserAccount | null) {
   if (!user) return PUBLIC_NAV
@@ -62,6 +70,7 @@ function App() {
   const [cursor, setCursor] = useState({ x: 0.5, y: 0.5 })
   const [scrollY, setScrollY] = useState(0)
   const [selectedBarangay, setSelectedBarangay] = useState<string>('Balibago')
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const isLanding = isLandingPath(location.pathname)
 
   useEffect(() => {
@@ -71,6 +80,25 @@ function App() {
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('scroll', onScroll) }
   }, [])
+
+  // Global repeating scroll reveal: fades in on enter, resets on exit so scrolling up/down re-animates smoothly
+  useEffect(() => {
+    const obs = new IntersectionObserver(
+      entries => {
+        entries.forEach(e => {
+          if (e.isIntersecting) {
+            e.target.classList.add('revealed')
+          } else {
+            e.target.classList.remove('revealed')
+          }
+        })
+      },
+      { threshold: 0.12, rootMargin: '0px 0px -40px 0px' }
+    )
+    const els = document.querySelectorAll('.reveal')
+    els.forEach(el => obs.observe(el))
+    return () => obs.disconnect()
+  }, [location.pathname])
 
   const shellStyle = useMemo<CSSProperties>(() => ({
     '--cursor-x': `${cursor.x * 100}%`,
@@ -99,6 +127,7 @@ function App() {
   }
 
   const handleLogout = () => { logoutService(); setUser(null); navigate('/') }
+  const confirmLogout = () => setShowLogoutConfirm(true)
 
   const posColor = user?.skPosition ? (positionColors[user.skPosition] ?? '#760031') : '#760031'
 
@@ -109,8 +138,8 @@ function App() {
       {!isLanding && (
         <header className="site-header">
           <div className="container header-inner">
-            {/* Brand */}
-            <div className="brand-block">
+            {/* Brand (Clicking logo redirects to active session home) */}
+            <Link to={userHomePath(user)} className="brand-block" style={{ textDecoration: 'none', cursor: 'pointer' }}>
               <div className="brand-logos">
                 <img src="/eSKalaLogo.svg" alt="eSKala" className="brand-logo-img logo-main"
                   onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
@@ -126,7 +155,7 @@ function App() {
                 <span className="brand-name">e<span>SK</span>ala</span>
                 <span className="brand-tagline">Santa Rosa City · SK Transparency Portal</span>
               </div>
-            </div>
+            </Link>
 
             {/* Nav */}
             <nav className="main-nav">
@@ -165,7 +194,7 @@ function App() {
                       <span style={{ fontSize: '0.72rem', opacity: 0.75, fontWeight: 500 }}>· {user.skPosition}</span>
                     )}
                   </div>
-                  <button className="btn btn-secondary btn-sm" onClick={handleLogout}>Log Out</button>
+                  <button className="btn btn-secondary btn-sm" onClick={confirmLogout}>Log Out</button>
                 </>
               )}
             </div>
@@ -178,7 +207,7 @@ function App() {
           <Route path="/"                    element={<Landing />} />
           <Route path="/login"               element={<LoginPage onLogin={handleLogin} />} />
           <Route path="/register"            element={<RegisterPage onRegister={handleRegister} />} />
-          <Route path="/home"                element={<PublicHome />} />
+          <Route path="/home"                element={<Navigate to="/" replace />} />
           <Route path="/about"               element={<About />} />
           <Route path="/sks"                 element={<SKsPage />} />
           <Route path="/citizen/home"        element={<CitizenHome user={user} />} />
@@ -187,12 +216,24 @@ function App() {
           <Route path="/sk/home"             element={<SKHome user={user} />} />
           <Route path="/sk/projects"         element={<SKProjects user={user} />} />
           <Route path="/superadmin/home"     element={<SuperAdminHome selectedBarangay={selectedBarangay} setSelectedBarangay={setSelectedBarangay} />} />
-          <Route path="/superadmin/accounts" element={<SuperAdminAccounts />} />
-          <Route path="/superadmin/activity" element={<SuperAdminActivity />} />
+          <Route path="/superadmin/accounts" element={<SuperAdminAccounts selectedBarangay={selectedBarangay} />} />
+          <Route path="/superadmin/activity" element={<SuperAdminActivity selectedBarangay={selectedBarangay} />} />
           <Route path="/superadmin/news"     element={<SuperAdminNews />} />
           <Route path="*"                    element={<Landing />} />
         </Routes>
       </main>
+
+      {/* Logout confirmation */}
+      <ConfirmDialog
+        isOpen={showLogoutConfirm}
+        title="Log Out"
+        message="Are you sure you want to log out of eSKala?"
+        confirmLabel="Log Out"
+        cancelLabel="Stay"
+        danger={false}
+        onConfirm={() => { setShowLogoutConfirm(false); handleLogout() }}
+        onCancel={() => setShowLogoutConfirm(false)}
+      />
 
       {!isLanding && (
         <footer className="footer">
@@ -208,7 +249,7 @@ function App() {
               <div>
                 <div className="footer-col-title">Navigation</div>
                 <div className="footer-links">
-                  <Link to="/home">City Overview</Link>
+                  <Link to="/about">About eSKala</Link>
                   <Link to="/about">About eSKala</Link>
                   <Link to="/sks">SK Officials</Link>
                   <Link to="/login">Citizen Login</Link>

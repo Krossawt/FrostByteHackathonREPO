@@ -1,20 +1,28 @@
 import { useState } from 'react'
 import { getUsersDB } from '../services/auth'
 import { BARANGAYS } from '../data/mockData'
-import type { Role } from '../types'
+import type { Role, UserAccount } from '../types'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 const ROLE_OPTIONS: (Role | 'all')[] = ['all', 'superadmin', 'sk', 'citizen']
 
-export default function SuperAdminAccounts() {
+interface SuperAdminAccountsProps {
+  selectedBarangay?: string
+}
+
+export default function SuperAdminAccounts({ selectedBarangay }: SuperAdminAccountsProps) {
   const [users, setUsers] = useState(() => getUsersDB())
   const [filterRole, setFilterRole] = useState<Role | 'all'>('all')
   const [filterBrgy, setFilterBrgy] = useState('All')
   const [search, setSearch] = useState('')
   const [showModal, setShowModal] = useState(false)
+  const [suspendTarget, setSuspendTarget] = useState<UserAccount | null>(null)
+
+  const activeBrgy = selectedBarangay && selectedBarangay !== '' ? selectedBarangay : filterBrgy
 
   const filtered = users.filter(u => {
     const matchRole = filterRole === 'all' || u.role === filterRole
-    const matchBrgy = filterBrgy === 'All' || u.barangay === filterBrgy
+    const matchBrgy = activeBrgy === 'All' || u.barangay === activeBrgy
     const q = search.toLowerCase()
     const matchQ = !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || (u.username?.toLowerCase() ?? '').includes(q)
     return matchRole && matchBrgy && matchQ
@@ -31,25 +39,34 @@ export default function SuperAdminAccounts() {
   const roleColor: Record<string, string> = { superadmin: '#760031', sk: '#b45309', citizen: '#7a6200' }
 
   return (
-    <section className="section">
+    <section className="section section-accent-flow" style={{ paddingTop: '2.5rem', paddingBottom: '3.5rem' }}>
       <div className="container">
 
-        {/* ── Page Intro ── */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.8rem' }}>
-          <div>
-            <span className="page-kicker">Account Management · Super Admin</span>
-            <h1 className="page-title" style={{ marginTop: '0.3rem' }}>User Accounts</h1>
-            <p className="page-subtitle" style={{ marginTop: '0.4rem' }}>
-              Manage all Super Admin, SK Officer, and Citizen accounts across all 18 barangays.
-            </p>
+        {/* ── Page Intro Banner ── */}
+        <div className="page-intro reveal section-glass-grid" style={{ padding: '1.5rem 1.8rem', borderRadius: '12px', marginBottom: '1.8rem', background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(250,244,235,0.9) 100%)' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+            <div>
+              <span className="page-kicker">Account Management · Super Admin</span>
+              <h1 className="page-title" style={{ marginTop: '0.3rem' }}>
+                User Accounts Directory
+                {selectedBarangay && selectedBarangay !== '' && (
+                  <span style={{ fontSize: '0.9rem', color: 'var(--maroon)', fontWeight: 700, marginLeft: '0.6rem' }}>
+                    · Barangay {selectedBarangay} Filter Active
+                  </span>
+                )}
+              </h1>
+              <p className="page-subtitle" style={{ marginTop: '0.4rem' }}>
+                Manage all Super Admin, SK Officer, and Citizen accounts across Santa Rosa City's 18 barangays.
+              </p>
+            </div>
+            <button className="btn btn-primary" style={{ alignSelf: 'flex-start', marginTop: '0.4rem' }} onClick={() => setShowModal(true)}>
+              + Create SK Account
+            </button>
           </div>
-          <button className="btn btn-primary" style={{ alignSelf: 'flex-start', marginTop: '0.4rem' }} onClick={() => setShowModal(true)}>
-            + Create SK Account
-          </button>
         </div>
 
         {/* ── Stat Cards ── */}
-        <div className="card-grid card-grid-4" style={{ marginBottom: '1.5rem' }}>
+        <div className="card-grid card-grid-4 reveal" style={{ marginBottom: '1.5rem' }}>
           <div className="stat-card card-accent">
             <div className="stat-value">{counts.all}</div>
             <div className="stat-label">Total Accounts</div>
@@ -125,13 +142,19 @@ export default function SuperAdminAccounts() {
                 </div>
                 <div style={{ display: 'grid', gap: '0.28rem', fontSize: '0.8rem', color: 'var(--muted)', fontFamily: 'var(--font-display)', marginBottom: '0.75rem' }}>
                   {u.username && <div>@{u.username}</div>}
-                  <div>📧 {u.email}</div>
-                  {u.barangay && <div>📍 Brgy. {u.barangay}</div>}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                    {u.email}
+                  </div>
+                  {u.barangay && <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                    Brgy. {u.barangay}
+                  </div>}
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem', borderTop: '1px solid rgba(118,0,49,0.08)', paddingTop: '0.65rem' }}>
                   <button className="btn btn-secondary btn-sm" style={{ flex: 1 }}>Edit</button>
                   <button className={`btn btn-sm ${u.isActive ? 'btn-danger' : 'btn-secondary'}`} style={{ flex: 1 }}
-                    onClick={() => setUsers(prev => prev.map(uu => uu.id === u.id ? { ...uu, isActive: !uu.isActive } : uu))}>
+                    onClick={() => setSuspendTarget(u)}>
                     {u.isActive ? 'Suspend' : 'Reactivate'}
                   </button>
                 </div>
@@ -140,7 +163,6 @@ export default function SuperAdminAccounts() {
           </div>
         ) : (
           <div className="card" style={{ textAlign: 'center', padding: '3rem', color: 'var(--muted)' }}>
-            <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>👤</div>
             <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700 }}>No accounts match your filter</div>
           </div>
         )}
@@ -187,6 +209,24 @@ export default function SuperAdminAccounts() {
             </div>
           </div>
         )}
+
+        {/* ── Suspend/Reactivate Confirmation ── */}
+        <ConfirmDialog
+          isOpen={!!suspendTarget}
+          title={suspendTarget?.isActive ? 'Suspend Account' : 'Reactivate Account'}
+          message={suspendTarget?.isActive
+            ? `Are you sure you want to suspend ${suspendTarget?.name}? They will not be able to log in.`
+            : `Reactivate ${suspendTarget?.name}'s account? They will regain access to eSKala.`}
+          confirmLabel={suspendTarget?.isActive ? 'Suspend' : 'Reactivate'}
+          cancelLabel="Cancel"
+          danger={!!suspendTarget?.isActive}
+          onConfirm={() => {
+            if (!suspendTarget) return
+            setUsers(prev => prev.map(u => u.id === suspendTarget.id ? { ...u, isActive: !u.isActive } : u))
+            setSuspendTarget(null)
+          }}
+          onCancel={() => setSuspendTarget(null)}
+        />
 
       </div>
     </section>

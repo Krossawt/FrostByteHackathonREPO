@@ -1,5 +1,6 @@
 import { FormEvent, useState } from 'react'
 import { Link } from 'react-router-dom'
+import NewsTicker from '../components/NewsTicker'
 
 interface LoginPageProps {
   onLogin: (emailOrUsername: string, password: string, rememberMe: boolean) => boolean
@@ -31,14 +32,15 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
 
   return (
     <div className="landing-container">
+      {/* Full-width continuous News Ticker */}
+      <NewsTicker />
 
       {/* ── Header ── */}
       <header className="landing-header">
         <nav className="landing-nav-left">
           <Link to="/" className="landing-nav-link">HOME</Link>
-          <Link to="/home" className="landing-nav-link">CITY OVERVIEW</Link>
           <Link to="/about" className="landing-nav-link">ABOUT</Link>
-          <Link to="/sks" className="landing-nav-link">SKs</Link>
+          <Link to="/sks" className="landing-nav-link">SK OFFICIALS</Link>
         </nav>
         <div className="landing-nav-right">
           <Link to="/login" className="btn-landing-login">LOGIN</Link>
@@ -51,7 +53,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
 
         {/* LEFT — same hero as landing */}
         <div className="landing-hero-left">
-          <div className="landing-logos-strip">
+          <Link to="/" className="landing-logos-strip" style={{ cursor: 'pointer', textDecoration: 'none' }}>
             <img src="/eSKalaLogo.svg" alt="eSKala SK Logo" className="landing-logo-img logo-sk"
               onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
             <img src="/SantaRosa.svg" alt="Santa Rosa City Seal" className="landing-logo-img"
@@ -60,7 +62,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
               onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
             <img src="/bagongPilipinasLogo.svg" alt="Bagong Pilipinas Logo" className="landing-logo-img"
               onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
-          </div>
+          </Link>
 
           <h1 className="landing-brand-title">
             e<span className="maroon">SK</span>ala

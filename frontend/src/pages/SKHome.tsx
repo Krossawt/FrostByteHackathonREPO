@@ -1,29 +1,51 @@
-import { useState, FormEvent } from 'react'
-import { barangaySummary, projects, receipts, citizenComments, activityLogs, skOfficials } from '../data/mockData'
-import type { UserAccount } from '../types'
+import { useState } from 'react'
+import { barangaySummary, projects, citizenComments, activityLogs } from '../data/mockData'
+import type { UserAccount, ReportProject } from '../types'
+import ProjectDetailModal from '../components/ProjectDetailModal'
+import { DonutChart } from '../components/MiniChart'
+import SingleNewsCarousel from '../components/SingleNewsCarousel'
 
 interface SKHomeProps { user?: UserAccount | null }
+
+const CATEGORY_IMAGES: Record<string, string> = {
+  'Education':            'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=640&q=75',
+  'Health':               'https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=640&q=75',
+  'Sports':               'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=640&q=75',
+  'Environment':          'https://images.unsplash.com/photo-1588880331179-bc9b93a8cb5e?w=640&q=75',
+  'Livelihood':           'https://images.unsplash.com/photo-1556761175-b413da4baf72?w=640&q=75',
+  'Arts & Culture':       'https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=640&q=75',
+  'Governance':           'https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?w=640&q=75',
+  'Other':                'https://images.unsplash.com/photo-1532629345422-7515f3d16bb6?w=640&q=75',
+}
+const CATEGORY_GRAD: Record<string, string> = {
+  'Education': 'linear-gradient(135deg,#1d4ed8,#1e40af)',
+  'Health': 'linear-gradient(135deg,#166534,#15803d)',
+  'Sports': 'linear-gradient(135deg,#b45309,#d97706)',
+  'Environment': 'linear-gradient(135deg,#166534,#4ade80)',
+  'Livelihood': 'linear-gradient(135deg,#6d28d9,#7c3aed)',
+  'Arts & Culture': 'linear-gradient(135deg,#be185d,#e11d48)',
+  'default': 'linear-gradient(135deg,#760031,#9a0040)',
+}
+const getCover = (cat?: string) => CATEGORY_IMAGES[cat ?? 'Other'] ?? CATEGORY_IMAGES['Other']
+const getGrad  = (cat?: string) => CATEGORY_GRAD[cat ?? 'default']  ?? CATEGORY_GRAD['default']
 
 export default function SKHome({ user }: SKHomeProps) {
   const barangay = user?.barangay || 'Balibago'
   const position = user?.skPosition || 'Chairperson'
   const canAddProject = position === 'Chairperson' || position === 'Secretary'
-  const canAddReceipt = position === 'Chairperson' || position === 'Treasurer'
 
   const summary    = barangaySummary.find(b => b.barangay === barangay)
   const myProjects = projects.filter(p => p.barangay === barangay)
-  const myReceipts = receipts.filter(r => r.barangay === barangay)
   const myComments = citizenComments.filter(c => c.barangay === barangay)
-  const myLogs     = activityLogs.filter(l => l.barangay === barangay).slice(0, 8)
-  const myOfficials= skOfficials.filter(o => o.barangay === barangay)
+  const myLogs     = activityLogs.filter(l => l.barangay === barangay).slice(0, 6)
 
-  const spent   = summary?.spent ?? 0
-  const budget  = summary?.annualBudget ?? 1
-  const remain  = summary?.remaining ?? 0
-  const usePct  = Math.round((spent / budget) * 100)
-  const totalReceipts = myReceipts.reduce((s, r) => s + r.amount, 0)
+  const spent  = summary?.spent ?? 0
+  const budget = summary?.annualBudget ?? 1
+  const remain = summary?.remaining ?? 0
+  const usePct = Math.min(Math.round((spent / budget) * 100), 100)
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'receipts' | 'comments'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'comments'>('overview')
+  const [selectedProject, setSelectedProject] = useState<ReportProject | null>(null)
 
   return (
     <section className="section">
@@ -32,16 +54,17 @@ export default function SKHome({ user }: SKHomeProps) {
         {/* ── Page Intro ── */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.8rem' }}>
           <div>
-            <span className="page-kicker">SK Dashboard · {barangay}</span>
+            <span className="page-kicker">SK Dashboard · Barangay {barangay}</span>
             <h1 className="page-title" style={{ marginTop: '0.3rem' }}>Welcome, {user?.name?.split(' ')[0] ?? 'SK Officer'}</h1>
             <p className="page-subtitle" style={{ marginTop: '0.4rem' }}>
               {position} · Barangay {barangay}, Santa Rosa City, Laguna
             </p>
           </div>
-          <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignSelf: 'flex-start', marginTop: '0.4rem' }}>
-            {canAddProject && <button className="btn btn-primary btn-sm">+ Add Project</button>}
-            {canAddReceipt && <button className="btn btn-secondary btn-sm">+ Upload Receipt</button>}
-          </div>
+          {canAddProject && (
+            <button className="btn btn-primary btn-sm" style={{ alignSelf: 'flex-start', marginTop: '0.4rem' }}>
+              + Add Project
+            </button>
+          )}
         </div>
 
         {/* ── Financial Stat Cards ── */}
@@ -68,28 +91,35 @@ export default function SKHome({ user }: SKHomeProps) {
           </div>
         </div>
 
-        {/* ── Budget utilization bar ── */}
-        <div className="card" style={{ marginBottom: '1.5rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-            <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.92rem' }}>Budget Utilization — Brgy. {barangay}</span>
-            <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, color: 'var(--maroon)', fontSize: '1.05rem' }}>{usePct}%</span>
-          </div>
-          <div className="progress-bar progress-thick">
-            <div className="progress-fill" style={{ width: `${usePct}%` }} />
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.45rem', fontSize: '0.76rem', color: 'var(--muted)', fontFamily: 'var(--font-display)' }}>
-            <span>₱{spent.toLocaleString()} spent</span>
-            <span>of ₱{budget.toLocaleString()} total budget</span>
+        {/* ── Budget Utilization Chart ── */}
+        <div className="chart-card" style={{ marginBottom: '1.5rem', flexDirection: 'row', alignItems: 'center', gap: '2rem', flexWrap: 'wrap' }}>
+          <DonutChart
+            value={usePct} size={110} stroke={14}
+            label={`${usePct}%`} sublabel="used"
+          />
+          <div style={{ flex: 1, minWidth: '160px' }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.9rem', marginBottom: '0.5rem' }}>
+              Budget Utilization — Brgy. {barangay}
+            </div>
+            <div style={{ display: 'grid', gap: '0.4rem' }}>
+              {[
+                { label: 'Total Budget', val: `₱${budget.toLocaleString()}`, color: 'var(--maroon)' },
+                { label: 'Disbursed', val: `₱${spent.toLocaleString()}`, color: '#b45309' },
+                { label: 'Remaining', val: `₱${remain.toLocaleString()}`, color: '#166534' },
+              ].map(item => (
+                <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', fontFamily: 'var(--font-display)' }}>
+                  <span style={{ color: 'var(--muted)' }}>{item.label}</span>
+                  <span style={{ fontWeight: 700, color: item.color }}>{item.val}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
         {/* ── Tabs ── */}
         <div className="filter-tabs">
           <button className={`filter-tab${activeTab === 'overview' ? ' active' : ''}`} onClick={() => setActiveTab('overview')}>
-            Projects & Council
-          </button>
-          <button className={`filter-tab${activeTab === 'receipts' ? ' active' : ''}`} onClick={() => setActiveTab('receipts')}>
-            Receipts ({myReceipts.length})
+            Projects &amp; Activity
           </button>
           <button className={`filter-tab${activeTab === 'comments' ? ' active' : ''}`} onClick={() => setActiveTab('comments')}>
             Citizen Feedback ({myComments.length})
@@ -99,74 +129,78 @@ export default function SKHome({ user }: SKHomeProps) {
         {/* ── Tab: Overview ── */}
         {activeTab === 'overview' && (
           <div className="page-cols page-cols-sidebar">
-            {/* Projects */}
+
+            {/* Projects — vertical cards */}
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                <div>
-                  <div className="page-kicker">Project Management</div>
-                  <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1rem', color: 'var(--ink)', marginTop: '0.2rem' }}>
-                    {barangay} SK Projects
-                  </h2>
-                </div>
-                {canAddProject && <button className="btn btn-primary btn-sm">+ New Project</button>}
+              <div style={{ marginBottom: '1rem' }}>
+                <div className="page-kicker">Project Management</div>
+                <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1rem', color: 'var(--ink)', marginTop: '0.2rem' }}>
+                  {barangay} SK Projects
+                  <span style={{ fontSize: '0.8rem', color: 'var(--muted)', fontWeight: 500, marginLeft: '0.5rem' }}>
+                    (Click any card to view details &amp; manage receipts)
+                  </span>
+                </h2>
               </div>
 
-              <div style={{ display: 'grid', gap: '0.9rem' }}>
-                {myProjects.length > 0 ? myProjects.map(p => (
-                  <div key={p.id} className="project-card">
-                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.75rem', marginBottom: '0.45rem', flexWrap: 'wrap' }}>
-                      <div style={{ flex: 1 }}>
-                        <span className={`badge badge-${p.status}`} style={{ marginBottom: '0.35rem', display: 'inline-flex' }}>{p.status}</span>
-                        <div className="project-title">{p.title}</div>
-                        <div className="project-meta">
-                          <span className="project-meta-item">🏷 {p.category}</span>
-                          <span className="project-meta-item">📅 {p.startDate}</span>
+              {myProjects.length > 0 ? (
+                <div className="card-grid card-grid-2" style={{ gap: '1.1rem' }}>
+                  {myProjects.map(p => (
+                    <div key={p.id} className="v-card" onClick={() => setSelectedProject(p)}>
+                      <div className="v-card-img-wrap" style={{ height: 140 }}>
+                        <img
+                          src={getCover(p.category)} alt={p.category} className="v-card-img"
+                          onError={e => {
+                            (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1577495508048-b635879837f1?w=640&q=75'
+                          }}
+                        />
+                        <div className="v-card-img-overlay" />
+                        <div className="v-card-badge-pin">
+                          <span className={`badge badge-${p.status}`}>{p.status}</span>
                         </div>
                       </div>
-                      <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0, flexWrap: 'wrap' }}>
-                        {canAddProject && <button className="btn btn-secondary btn-sm">Edit</button>}
-                      </div>
-                    </div>
-                    <div className="progress-bar">
-                      <div className="progress-fill" style={{ width: `${p.progress}%` }} />
-                    </div>
-                    <div className="project-budget-row">
-                      <span>Budget: <span className="project-budget-val">₱{p.proposedBudget.toLocaleString()}</span></span>
-                      <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.9rem', color: 'var(--maroon)' }}>{p.progress}%</span>
-                    </div>
-                  </div>
-                )) : (
-                  <div className="card" style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--muted)' }}>
-                    <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📋</div>
-                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700 }}>No projects yet</div>
-                    {canAddProject && <div style={{ fontSize: '0.85rem', marginTop: '0.3rem' }}>Add your first SK project.</div>}
-                  </div>
-                )}
-              </div>
-            </div>
 
-            {/* Right: Council + Activity Log */}
-            <div style={{ display: 'grid', gap: '1.2rem', alignContent: 'start' }}>
+                      <div className="v-card-body" style={{ padding: '0.9rem 1rem 1rem' }}>
+                        <div className="v-card-kicker">{p.category}</div>
+                        <div className="v-card-title" style={{ fontSize: '0.9rem' }}>{p.title}</div>
+                        <div className="v-card-date">{p.startDate} — {p.endDate}</div>
 
-              {/* Council */}
-              <div>
-                <div className="page-kicker" style={{ marginBottom: '0.75rem' }}>SK Council — {barangay}</div>
-                <div style={{ display: 'grid', gap: '0.6rem' }}>
-                  {myOfficials.map(o => (
-                    <div key={o.id} className="card" style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', padding: '0.85rem 1rem' }}>
-                      <div className="sk-avatar" style={{ width: '38px', height: '38px', fontSize: '0.9rem' }}>
-                        {o.name.split(' ').filter(w => w.length > 1 && !/^(Jr|Sr)$/i.test(w)).slice(0, 2).map(w => w[0]).join('').toUpperCase()}
+                        <div style={{ marginTop: '0.35rem' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.2rem' }}>
+                            <span style={{ fontSize: '0.7rem', color: 'var(--muted)', fontFamily: 'var(--font-display)', fontWeight: 600 }}>Progress</span>
+                            <span style={{ fontSize: '0.7rem', fontFamily: 'var(--font-display)', fontWeight: 800, color: 'var(--maroon)' }}>{p.progress}%</span>
+                          </div>
+                          <div className="progress-bar">
+                            <div className="progress-fill" style={{ width: `${p.progress}%` }} />
+                          </div>
+                        </div>
+
+                        <div className="v-card-footer" style={{ paddingTop: '0.6rem' }}>
+                          <div>
+                            <div className="v-card-budget" style={{ fontSize: '0.95rem' }}>₱{(p.proposedBudget / 1000).toFixed(0)}K</div>
+                            <div className="v-card-budget-label">Budget</div>
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--maroon)', fontFamily: 'var(--font-display)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 18l6-6-6-6"/></svg>
+                            View &amp; Finances
+                          </div>
+                        </div>
                       </div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.88rem' }}>{o.name}</div>
-                      </div>
-                      <span className={`badge ${o.position === 'Chairperson' ? 'badge-chairperson' : o.position === 'Treasurer' ? 'badge-treasurer' : o.position === 'Secretary' ? 'badge-secretary' : 'badge-kagawad'}`}>
-                        {o.position}
-                      </span>
                     </div>
                   ))}
                 </div>
-              </div>
+              ) : (
+                <div className="card" style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--muted)' }}>
+                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700 }}>No projects yet</div>
+                  {canAddProject && <div style={{ fontSize: '0.85rem', marginTop: '0.3rem' }}>Add your first SK project.</div>}
+                </div>
+              )}
+            </div>
+
+            {/* Right: Single Featured News Carousel + Activity Log */}
+            <div style={{ display: 'grid', gap: '1.4rem', alignContent: 'start' }}>
+
+              {/* Single News Carousel (Replaces vertical news list & SK Council list) */}
+              <SingleNewsCarousel />
 
               {/* Activity log */}
               <div>
@@ -183,68 +217,6 @@ export default function SKHome({ user }: SKHomeProps) {
                   ))}
                 </div>
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* ── Tab: Receipts ── */}
-        {activeTab === 'receipts' && (
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-              <div>
-                <div className="page-kicker">Financial Records</div>
-                <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1rem', color: 'var(--ink)', marginTop: '0.2rem' }}>
-                  Official Receipts & Disbursements
-                </h2>
-              </div>
-              <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.1rem', color: 'var(--maroon)' }}>
-                  Total: ₱{totalReceipts.toLocaleString()}
-                </div>
-                {canAddReceipt && <button className="btn btn-primary btn-sm">+ Upload Receipt (OCR)</button>}
-              </div>
-            </div>
-
-            {/* Upload zone (for eligible SK roles) */}
-            {canAddReceipt && (
-              <div className="upload-zone" style={{ marginBottom: '1.2rem' }}>
-                <div className="upload-zone-icon">
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="12" x2="12" y2="18"/><line x1="9" y1="15" x2="15" y2="15"/>
-                  </svg>
-                </div>
-                <div className="upload-zone-text">Upload Receipt Image or PDF</div>
-                <div className="upload-zone-hint">Supports JPG, PNG, PDF · OCR auto-extracts amount, vendor, and date</div>
-              </div>
-            )}
-
-            <div className="card-grid card-grid-2">
-              {myReceipts.length > 0 ? myReceipts.map(r => (
-                <div key={r.id} className="receipt-row">
-                  <div style={{ flex: 1 }}>
-                    <div className="receipt-vendor">{r.vendor}</div>
-                    <div className="receipt-meta">
-                      📅 {r.date} · {r.projectTitle || 'General Disbursement'}
-                    </div>
-                    <div style={{ marginTop: '0.3rem' }}>
-                      <span className={`badge ${r.status === 'verified' ? 'badge-completed' : r.status === 'pending' ? 'badge-upcoming' : 'badge-cancelled'}`}>
-                        {r.status}
-                      </span>
-                      {r.ocrExtracted && <span style={{ marginLeft: '0.5rem', fontSize: '0.7rem', color: 'var(--muted)', fontFamily: 'var(--font-display)', fontWeight: 600 }}>OCR ✓</span>}
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <div className="receipt-amount">₱{r.amount.toLocaleString()}</div>
-                    {canAddReceipt && <button className="btn btn-secondary btn-sm" style={{ marginTop: '0.4rem' }}>View</button>}
-                  </div>
-                </div>
-              )) : (
-                <div className="card" style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--muted)', gridColumn: '1/-1' }}>
-                  <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🧾</div>
-                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700 }}>No receipts uploaded yet</div>
-                  {canAddReceipt && <div style={{ fontSize: '0.85rem', marginTop: '0.3rem' }}>Upload a receipt to get started.</div>}
-                </div>
-              )}
             </div>
           </div>
         )}
@@ -272,11 +244,15 @@ export default function SKHome({ user }: SKHomeProps) {
               </div>
             )) : (
               <div className="card" style={{ textAlign: 'center', padding: '3rem', color: 'var(--muted)' }}>
-                <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>💬</div>
                 <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700 }}>No citizen feedback yet</div>
               </div>
             )}
           </div>
+        )}
+
+        {/* ── Project Detail Modal ── */}
+        {selectedProject && (
+          <ProjectDetailModal project={selectedProject} user={user} onClose={() => setSelectedProject(null)} />
         )}
 
       </div>

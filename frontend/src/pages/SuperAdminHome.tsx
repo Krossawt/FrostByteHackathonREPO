@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { barangaySummary, projects, news, activityLogs, BARANGAYS } from '../data/mockData'
+import { barangaySummary, projects, news, activityLogs } from '../data/mockData'
+import { DonutChart } from '../components/MiniChart'
 
 interface SuperAdminHomeProps {
   selectedBarangay: string
@@ -86,64 +87,96 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
     ? projects.filter(p => p.barangay === selectedBarangay)
     : []
 
+  const displayBudget = selectedBarangay && bSummary ? bSummary.annualBudget : totalBudget
+  const displaySpent  = selectedBarangay && bSummary ? bSummary.spent : totalSpent
+  const displayProj   = selectedBarangay ? bProjects.length : totalProj
+  const displayUsage  = Math.min(Math.round((displaySpent / (displayBudget || 1)) * 100), 100)
+
   const recentLogs = logs.slice(0, 10)
 
   return (
-    <section className="section">
+    <section className="section section-accent-flow" style={{ paddingTop: '2.5rem', paddingBottom: '3.5rem' }}>
       <div className="container">
 
-        {/* ── Page Intro ── */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.8rem' }}>
-          <div>
-            <span className="page-kicker">Super Admin · City-Wide Command</span>
-            <h1 className="page-title" style={{ marginTop: '0.3rem' }}>eSKala Admin Dashboard</h1>
-            <p className="page-subtitle" style={{ marginTop: '0.4rem' }}>
-              City of Santa Rosa, Laguna · All 18 Barangay SK Units · BSKE 2023–2025 Term
-            </p>
-          </div>
-          <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignSelf: 'flex-start', marginTop: '0.4rem' }}>
-            <button className="btn btn-primary btn-sm" onClick={openBudgetModal}>Submit Annual Budget</button>
-            <button className="btn btn-secondary btn-sm">Export Report (PDF)</button>
-            <button className="btn btn-secondary btn-sm">+ Add News</button>
+        {/* ── Page Intro Banner ── */}
+        <div className="page-intro reveal section-glass-grid" style={{ padding: '1.5rem 1.8rem', borderRadius: '12px', marginBottom: '1.8rem', background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(250,244,235,0.9) 100%)' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+            <div>
+              <span className="page-kicker">City Executive Command · Super Admin</span>
+              <h1 className="page-title" style={{ marginTop: '0.3rem' }}>
+                Santa Rosa City SK Executive Dashboard
+                {selectedBarangay && (
+                  <span style={{ fontSize: '0.9rem', color: 'var(--maroon)', fontWeight: 700, marginLeft: '0.6rem' }}>
+                    · Barangay {selectedBarangay} Mode
+                  </span>
+                )}
+              </h1>
+              <p className="page-subtitle" style={{ marginTop: '0.4rem' }}>
+                {selectedBarangay
+                  ? `Viewing official financial breakdown, projects, and transactions for Barangay ${selectedBarangay}.`
+                  : 'Financial and operational oversight across all 18 barangays of Santa Rosa City, Laguna. Data updated for FY 2025.'}
+              </p>
+            </div>
+            <button className="btn btn-gold btn-sm" onClick={openBudgetModal} style={{ alignSelf: 'flex-start', marginTop: '0.4rem' }}>
+              + Post Approved Annual Budget
+            </button>
           </div>
         </div>
 
-        {/* ── City-Wide Stat Cards ── */}
-        <div className="card-grid card-grid-4" style={{ marginBottom: '1.5rem' }}>
+        {/* ── Stat Cards ── */}
+        <div className="card-grid card-grid-4 reveal" style={{ marginBottom: '1.5rem' }}>
           <div className="stat-card card-accent">
-            <div className="stat-value">₱{(totalBudget / 1_000_000).toFixed(1)}M</div>
-            <div className="stat-label">City-Wide SK Budget</div>
-            <div className="stat-sub">All 18 barangays · FY 2025</div>
+            <div className="stat-value">₱{(displayBudget / 1_000_000).toFixed(2)}M</div>
+            <div className="stat-label">{selectedBarangay ? `Barangay ${selectedBarangay} Budget` : 'Total SK Budget FY 2025'}</div>
+            <div className="stat-sub">{selectedBarangay ? 'FY 2025 Allocation' : '18 Barangays combined'}</div>
           </div>
           <div className="stat-card" style={{ borderLeft: '3px solid #b45309' }}>
-            <div className="stat-value" style={{ color: '#b45309' }}>₱{(totalSpent / 1_000_000).toFixed(1)}M</div>
+            <div className="stat-value" style={{ color: '#b45309' }}>₱{(displaySpent / 1_000_000).toFixed(2)}M</div>
             <div className="stat-label">Total Disbursed</div>
-            <div className="stat-sub">{usagePct}% utilization rate</div>
+            <div className="stat-sub">{displayUsage}% utilization rate</div>
           </div>
           <div className="stat-card">
-            <div className="stat-value">{totalProj}</div>
+            <div className="stat-value">{displayProj}</div>
             <div className="stat-label">Total Projects</div>
-            <div className="stat-sub">{projects.filter(p => p.status === 'ongoing').length} ongoing</div>
+            <div className="stat-sub">{(selectedBarangay ? bProjects : projects).filter(p => p.status === 'ongoing').length} ongoing</div>
           </div>
           <div className="stat-card" style={{ borderLeft: '3px solid #1d4ed8' }}>
-            <div className="stat-value" style={{ color: '#1d4ed8' }}>18</div>
-            <div className="stat-label">Active Barangays</div>
-            <div className="stat-sub">All units reporting</div>
+            <div className="stat-value" style={{ color: '#1d4ed8' }}>{selectedBarangay ? '1' : '18'}</div>
+            <div className="stat-label">{selectedBarangay ? 'Barangay Selected' : 'Active Barangays'}</div>
+            <div className="stat-sub">{selectedBarangay ? `Unit: ${selectedBarangay}` : 'All units reporting'}</div>
           </div>
         </div>
 
-        {/* ── City-wide utilization bar ── */}
-        <div className="card" style={{ marginBottom: '1.5rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-            <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.92rem' }}>City-Wide SK Fund Utilization</span>
-            <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, color: 'var(--maroon)', fontSize: '1.05rem' }}>{usagePct}%</span>
+        {/* ── City-wide utilization bar + chart ── */}
+        <div className="card-grid card-grid-2 reveal" style={{ marginBottom: '1.5rem' }}>
+          <div className="chart-card" style={{ flexDirection: 'row', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
+            <DonutChart value={usagePct} size={110} stroke={14} label={`${usagePct}%`} sublabel="used" />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.88rem', marginBottom: '0.5rem' }}>City-Wide SK Fund Utilization</div>
+              {[
+                { label: 'Total Budget', val: `₱${(totalBudget/1_000_000).toFixed(1)}M`, color: 'var(--maroon)' },
+                { label: 'Disbursed',    val: `₱${(totalSpent/1_000_000).toFixed(1)}M`,  color: '#b45309' },
+                { label: 'Remaining',   val: `₱${((totalBudget-totalSpent)/1_000_000).toFixed(1)}M`, color: '#166534' },
+              ].map(item => (
+                <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontFamily: 'var(--font-display)', marginBottom: '0.25rem' }}>
+                  <span style={{ color: 'var(--muted)' }}>{item.label}</span>
+                  <span style={{ fontWeight: 700, color: item.color }}>{item.val}</span>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="progress-bar progress-thick">
-            <div className="progress-fill" style={{ width: `${usagePct}%` }} />
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.45rem', fontSize: '0.76rem', color: 'var(--muted)', fontFamily: 'var(--font-display)' }}>
-            <span>₱{totalSpent.toLocaleString()} disbursed</span>
-            <span>of ₱{totalBudget.toLocaleString()} total city SK budget</span>
+          <div className="chart-card">
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.88rem', marginBottom: '0.75rem' }}>Project Status Breakdown</div>
+            {[
+              { label: 'Ongoing',   count: projects.filter(p => p.status === 'ongoing').length,   color: 'var(--maroon)' },
+              { label: 'Upcoming',  count: projects.filter(p => p.status === 'upcoming').length,  color: '#1d4ed8' },
+              { label: 'Completed', count: projects.filter(p => p.status === 'completed').length, color: '#166534' },
+            ].map(s => (
+              <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.6rem' }}>
+                <div style={{ fontSize: '1.6rem', fontFamily: 'var(--font-display)', fontWeight: 900, color: s.color, lineHeight: 1, minWidth: '2rem' }}>{s.count}</div>
+                <div style={{ fontSize: '0.82rem', color: 'var(--muted)', fontFamily: 'var(--font-display)' }}>{s.label} projects</div>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -229,18 +262,14 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
         {/* ── VIEW: Barangay Detail ── */}
         {view === 'barangay' && (
           <div>
-            {/* Barangay selector */}
-            <div className="card" style={{ marginBottom: '1.2rem', display: 'flex', gap: '1rem', alignItems: 'center', padding: '1rem 1.2rem', flexWrap: 'wrap' }}>
-              <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.88rem', color: 'var(--ink)', flexShrink: 0 }}>View Barangay:</span>
-              <select
-                className="search-input" style={{ width: 'auto', paddingLeft: '0.85rem', appearance: 'none', backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23760031' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E\")", backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0.6rem center', paddingRight: '1.8rem' }}
-                value={selectedBarangay} onChange={e => setSelectedBarangay(e.target.value)}>
-                {BARANGAYS.map(b => <option key={b} value={b}>{b}</option>)}
-              </select>
-            </div>
-
             {bSummary ? (
               <>
+                {/* Banner */}
+                <div style={{ marginBottom: '1rem', padding: '0.85rem 1rem', background: 'linear-gradient(135deg, var(--maroon), var(--maroon-dark))', color: '#fff' }}>
+                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: '1.2rem', letterSpacing: '-0.02em' }}>Barangay {selectedBarangay}</div>
+                  <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.65)', marginTop: '0.1rem' }}>{bSummary.projects} projects · ₱{(bSummary.annualBudget/1_000_000).toFixed(2)}M allocated</div>
+                </div>
+
                 {/* Barangay Stats */}
                 <div className="card-grid card-grid-4" style={{ marginBottom: '1.2rem' }}>
                   <div className="stat-card card-accent">
@@ -262,10 +291,8 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
                   </div>
                 </div>
 
-                {/* Barangay Projects Grid */}
-                <div style={{ marginBottom: '0.75rem' }}>
-                  <div className="page-kicker">Projects · {selectedBarangay}</div>
-                </div>
+                {/* Projects list */}
+                <div className="page-kicker" style={{ marginBottom: '0.75rem' }}>Projects · {selectedBarangay}</div>
                 {bProjects.length > 0 ? (
                   <div className="card-grid card-grid-2">
                     {bProjects.map(p => (
@@ -275,7 +302,7 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
                             <span className={`badge badge-${p.status}`} style={{ marginBottom: '0.3rem', display: 'inline-flex' }}>{p.status}</span>
                             <div className="project-title">{p.title}</div>
                             <div className="project-meta">
-                              <span className="project-meta-item">🏷 {p.category}</span>
+                              <span className="project-meta-item">{p.category}</span>
                             </div>
                           </div>
                           <div style={{ textAlign: 'right', flexShrink: 0 }}>
@@ -300,12 +327,12 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
               </>
             ) : (
               <div className="card" style={{ textAlign: 'center', padding: '3rem', color: 'var(--muted)' }}>
-                <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>🏘</div>
-                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700 }}>Select a barangay to view details</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700 }}>Select a barangay from the header dropdown to view its details</div>
               </div>
             )}
           </div>
         )}
+
 
         {/* ── Submit Budget Modal ── */}
         {showBudgetModal && (

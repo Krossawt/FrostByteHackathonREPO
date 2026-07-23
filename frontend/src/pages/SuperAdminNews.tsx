@@ -1,6 +1,7 @@
 import { useState, FormEvent } from 'react'
 import { news as initialNews } from '../data/mockData'
 import type { NewsItem } from '../types'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 const CATEGORIES = ['Transparency', 'Youth Programs', 'SK Update', 'Health', 'Education', 'Environment', 'Sports', 'City News', 'Emergency']
 
@@ -8,6 +9,7 @@ export default function SuperAdminNews() {
   const [articles, setArticles] = useState<NewsItem[]>(initialNews)
   const [showModal, setShowModal]   = useState(false)
   const [editTarget, setEditTarget] = useState<NewsItem | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<NewsItem | null>(null)
   const [search, setSearch]         = useState('')
   const [filterCat, setFilterCat]   = useState('All')
 
@@ -59,8 +61,10 @@ export default function SuperAdminNews() {
     setShowModal(false)
   }
 
-  const handleDelete = (id: string) => {
-    if (confirm('Delete this news article?')) setArticles(prev => prev.filter(a => a.id !== id))
+  const confirmDelete = () => {
+    if (!deleteTarget) return
+    setArticles(prev => prev.filter(a => a.id !== deleteTarget.id))
+    setDeleteTarget(null)
   }
 
   return (
@@ -68,10 +72,10 @@ export default function SuperAdminNews() {
       <div className="container">
 
         {/* ── Page Intro ── */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.8rem' }}>
+        <div className="page-intro reveal" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.8rem' }}>
           <div>
             <span className="page-kicker">News Management · Super Admin</span>
-            <h1 className="page-title" style={{ marginTop: '0.3rem' }}>City-Wide Announcements & News</h1>
+            <h1 className="page-title" style={{ marginTop: '0.3rem' }}>City-Wide Announcements &amp; News</h1>
             <p className="page-subtitle" style={{ marginTop: '0.4rem' }}>
               Publish and manage official news, announcements, and updates for all 18 barangay SK units and citizens of Santa Rosa City.
             </p>
@@ -82,7 +86,7 @@ export default function SuperAdminNews() {
         </div>
 
         {/* ── Stat Cards ── */}
-        <div className="card-grid card-grid-4" style={{ marginBottom: '1.5rem' }}>
+        <div className="card-grid card-grid-4 reveal" style={{ marginBottom: '1.5rem' }}>
           <div className="stat-card card-accent">
             <div className="stat-value">{articles.length}</div>
             <div className="stat-label">Total Articles</div>
@@ -132,14 +136,13 @@ export default function SuperAdminNews() {
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.85rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(118,0,49,0.08)' }}>
                   <button className="btn btn-secondary btn-sm" style={{ flex: 1 }} onClick={() => openModal(article)}>Edit</button>
-                  <button className="btn btn-danger btn-sm" onClick={() => handleDelete(article.id)}>Delete</button>
+                  <button className="btn btn-danger btn-sm" onClick={() => setDeleteTarget(article)}>Delete</button>
                 </div>
               </div>
             ))}
           </div>
         ) : (
           <div className="card" style={{ textAlign: 'center', padding: '3rem', color: 'var(--muted)' }}>
-            <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📰</div>
             <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700 }}>No articles found</div>
             <button className="btn btn-primary btn-sm" style={{ marginTop: '1rem' }} onClick={() => openModal()}>
               Publish First Article
@@ -159,31 +162,31 @@ export default function SuperAdminNews() {
               </div>
               <form onSubmit={handleSave}>
                 <div className="modal-body">
-                  {formError && <div className="notice error">{formError}</div>}
+                  {formError && <div className="alert-error">{formError}</div>}
 
-                  <div className="field-group">
-                    <label className="field-label">Article Title *</label>
-                    <input className="input" type="text" value={formTitle} onChange={e => setFormTitle(e.target.value)}
+                  <div className="form-group">
+                    <label className="form-label">Article Title *</label>
+                    <input className="form-input" type="text" value={formTitle} onChange={e => setFormTitle(e.target.value)}
                       placeholder="e.g., SK Federation General Assembly — Q3 2025" required />
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
-                    <div className="field-group">
-                      <label className="field-label">Category *</label>
-                      <select className="input" value={formCat} onChange={e => setFormCat(e.target.value)}>
+                  <div className="form-row-2">
+                    <div className="form-group">
+                      <label className="form-label">Category *</label>
+                      <select className="form-input" value={formCat} onChange={e => setFormCat(e.target.value)}>
                         {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                       </select>
                     </div>
-                    <div className="field-group">
-                      <label className="field-label">Date Published *</label>
-                      <input className="input" type="date" value={formDate} onChange={e => setFormDate(e.target.value)} required />
+                    <div className="form-group">
+                      <label className="form-label">Date Published *</label>
+                      <input className="form-input" type="date" value={formDate} onChange={e => setFormDate(e.target.value)} required />
                     </div>
                   </div>
 
-                  <div className="field-group">
-                    <label className="field-label">Summary / Body</label>
-                    <textarea className="input" value={formSummary} onChange={e => setFormSummary(e.target.value)}
-                      placeholder="Brief description of the announcement…" style={{ minHeight: '110px' }} />
+                  <div className="form-group">
+                    <label className="form-label">Summary / Body</label>
+                    <textarea className="form-input" value={formSummary} onChange={e => setFormSummary(e.target.value)}
+                      placeholder="Brief description of the announcement…" style={{ minHeight: '110px', resize: 'vertical' }} />
                   </div>
                 </div>
                 <div className="modal-footer">
@@ -194,6 +197,18 @@ export default function SuperAdminNews() {
             </div>
           </div>
         )}
+
+        {/* ── Delete Confirmation ── */}
+        <ConfirmDialog
+          isOpen={!!deleteTarget}
+          title="Delete News Article"
+          message={`Delete "${deleteTarget?.title}"? This cannot be undone.`}
+          confirmLabel="Delete Article"
+          cancelLabel="Cancel"
+          danger={true}
+          onConfirm={confirmDelete}
+          onCancel={() => setDeleteTarget(null)}
+        />
 
       </div>
     </section>

@@ -2,6 +2,7 @@ import { FormEvent, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { BARANGAYS } from '../data/mockData'
 import type { UserAccount } from '../types'
+import NewsTicker from '../components/NewsTicker'
 
 interface RegisterPageProps {
   onRegister: (name: string, email: string, password: string, barangay: string, isStaRosa: boolean, username?: string) => UserAccount | void
@@ -28,11 +29,12 @@ export default function RegisterPage({ onRegister }: RegisterPageProps) {
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault(); setError('')
     if (!name.trim() || !email.trim() || !password) { setError('Please complete all required fields.'); return }
+    if (!isStaRosa) { setError('Registration is strictly restricted to Santa Rosa City, Laguna residents.'); return }
     if (password !== confirmPw) { setError('Passwords do not match.'); return }
     if (password.length < 6)   { setError('Password must be at least 6 characters.'); return }
     if (!agreed) { setError('You must agree to the Terms & Conditions and Privacy Policy.'); return }
     
-    const result = onRegister(name.trim(), email.trim(), password, barangay, isStaRosa, username.trim() || undefined)
+    const result = onRegister(name.trim(), email.trim(), password, barangay, true, username.trim() || undefined)
     const storedUser: UserAccount = (result as UserAccount) || {
       id: `u-${Math.random().toString(36).slice(2, 10)}`,
       name: name.trim(),
@@ -41,7 +43,7 @@ export default function RegisterPage({ onRegister }: RegisterPageProps) {
       password,
       role: 'citizen',
       barangay,
-      isStaRosa,
+      isStaRosa: true,
       isActive: true,
     }
     setCreatedUser(storedUser)
@@ -50,14 +52,15 @@ export default function RegisterPage({ onRegister }: RegisterPageProps) {
 
   return (
     <div className="landing-container">
+      {/* Full-width continuous News Ticker */}
+      <NewsTicker />
 
       {/* ── Header ── same as Landing/Login ── */}
       <header className="landing-header">
         <nav className="landing-nav-left">
           <Link to="/" className="landing-nav-link">HOME</Link>
-          <Link to="/home" className="landing-nav-link">CITY OVERVIEW</Link>
           <Link to="/about" className="landing-nav-link">ABOUT</Link>
-          <Link to="/sks" className="landing-nav-link">SKs</Link>
+          <Link to="/sks" className="landing-nav-link">SK OFFICIALS</Link>
         </nav>
         <div className="landing-nav-right">
           <Link to="/login" className="btn-landing-login">LOGIN</Link>
@@ -70,12 +73,12 @@ export default function RegisterPage({ onRegister }: RegisterPageProps) {
 
         {/* LEFT — same hero panel */}
         <div className="landing-hero-left">
-          <div className="landing-logos-strip">
+          <Link to="/" className="landing-logos-strip" style={{ cursor: 'pointer', textDecoration: 'none' }}>
             <img src="/eSKalaLogo.svg"           alt="eSKala SK Logo"        className="landing-logo-img logo-sk"  onError={e => { (e.target as HTMLImageElement).style.display='none' }} />
             <img src="/SantaRosa.svg"            alt="Santa Rosa City Seal"  className="landing-logo-img"          onError={e => { (e.target as HTMLImageElement).style.display='none' }} />
             <img src="/CYDOlogo.svg"             alt="CYDO Office Seal"      className="landing-logo-img"          onError={e => { (e.target as HTMLImageElement).style.display='none' }} />
             <img src="/bagongPilipinasLogo.svg"  alt="Bagong Pilipinas Logo" className="landing-logo-img"          onError={e => { (e.target as HTMLImageElement).style.display='none' }} />
-          </div>
+          </Link>
 
           <h1 className="landing-brand-title">
             Join e<span className="maroon">SK</span>ala
@@ -90,13 +93,47 @@ export default function RegisterPage({ onRegister }: RegisterPageProps) {
             <p className="landing-stats-caption">What you can do as a citizen:</p>
             <div style={{ display: 'grid', gap: '0.65rem', marginTop: '0.3rem' }}>
               {[
-                { icon: '📊', t: 'View Financial Reports',    d: 'Track barangay SK budget, spending, and project progress.' },
-                { icon: '💬', t: 'Comment & Suggest',         d: 'Submit feedback directly to your barangay SK council.' },
-                { icon: '👥', t: 'Know Your SK Officials',    d: 'Access the full roster of elected SK officials.' },
-                { icon: '📰', t: 'Stay Informed',             d: 'Read city-wide news and CYDO announcements.' },
+                {
+                  icon: (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--maroon)" strokeWidth="2">
+                      <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+                    </svg>
+                  ),
+                  t: 'View Financial Reports',
+                  d: 'Track barangay SK budget, spending, and project progress.'
+                },
+                {
+                  icon: (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--maroon)" strokeWidth="2">
+                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                    </svg>
+                  ),
+                  t: 'Comment & Suggest',
+                  d: 'Submit feedback directly to your barangay SK council.'
+                },
+                {
+                  icon: (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--maroon)" strokeWidth="2">
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                    </svg>
+                  ),
+                  t: 'Know Your SK Officials',
+                  d: 'Access the full roster of elected SK officials.'
+                },
+                {
+                  icon: (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--maroon)" strokeWidth="2">
+                      <path d="M19 20H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h10l5 5v11a2 2 0 0 1-2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/>
+                    </svg>
+                  ),
+                  t: 'Stay Informed',
+                  d: 'Read city-wide news and CYDO announcements.'
+                },
               ].map(f => (
                 <div key={f.t} style={{ display: 'flex', gap: '0.85rem', padding: '0.8rem 0.9rem', background: 'rgba(255,255,255,0.85)', border: '1.5px solid rgba(118,0,49,0.09)' }}>
-                  <span style={{ fontSize: '1.3rem', lineHeight: 1.2, flexShrink: 0 }}>{f.icon}</span>
+                  <div style={{ width: '36px', height: '36px', background: 'rgba(118,0,49,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    {f.icon}
+                  </div>
                   <div>
                     <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.88rem', color: 'var(--ink)', marginBottom: '0.1rem' }}>{f.t}</div>
                     <div style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>{f.d}</div>
@@ -108,8 +145,9 @@ export default function RegisterPage({ onRegister }: RegisterPageProps) {
 
           {/* Data Privacy Notice */}
           <div style={{ padding: '0.9rem 1rem', background: 'rgba(254,236,65,0.12)', border: '1.5px solid rgba(254,236,65,0.3)' }}>
-            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.72rem', color: '#7a5200', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: '0.3rem' }}>
-              🔒 Data Privacy Notice · RA 10173
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.72rem', color: '#7a5200', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              Data Privacy Notice · RA 10173
             </div>
             <p style={{ fontSize: '0.8rem', color: '#7a5200', lineHeight: 1.65, margin: 0 }}>
               Your data is protected under the Data Privacy Act of 2012. Information is used solely for civic engagement and barangay transparency. You may request account deletion at any time.
@@ -169,14 +207,20 @@ export default function RegisterPage({ onRegister }: RegisterPageProps) {
               </select>
             </div>
 
-            {/* Is Sta. Rosa? */}
+            {/* Mandatory Santa Rosa Residency Verification */}
             <div className="login-field-group">
-              <label htmlFor="reg-starosa" className="login-label">Santa Rosa City Resident?</label>
-              <select id="reg-starosa" className="login-input no-right-icon" style={{ paddingLeft: '1rem', appearance: 'none', backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23760031' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E\")", backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0.85rem center', paddingRight: '2.2rem' }}
-                value={isStaRosa ? 'yes' : 'no'} onChange={e => setIsStaRosa(e.target.value === 'yes')}>
-                <option value="yes">Yes — I am a Santa Rosa City resident</option>
-                <option value="no">No — I am from another city/municipality</option>
-              </select>
+              <label className="login-label">City Residency Verification <span style={{ color: 'var(--maroon)' }}>*</span></label>
+              <div style={{ padding: '0.75rem 0.9rem', background: 'rgba(118,0,49,0.04)', border: '1.5px solid rgba(118,0,49,0.14)', display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--maroon)" strokeWidth="2.2" style={{ flexShrink: 0 }}><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                <div>
+                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.85rem', color: 'var(--ink)' }}>
+                    Santa Rosa City, Laguna Resident
+                  </div>
+                  <div style={{ fontSize: '0.76rem', color: 'var(--muted)', marginTop: '0.1rem' }}>
+                    Registration is strictly restricted to Santa Rosa City residents under RA 10742 (SK Reform Act).
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Password */}
@@ -245,12 +289,9 @@ export default function RegisterPage({ onRegister }: RegisterPageProps) {
         <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowSuccessModal(false) }}>
           <div className="modal" style={{ maxWidth: '520px', borderRadius: '4px' }}>
             <div className="modal-header" style={{ background: 'rgba(22, 101, 52, 0.06)', borderColor: 'rgba(22, 101, 52, 0.18)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                <span style={{ fontSize: '1.4rem' }}>🎉</span>
-                <div>
-                  <h3 className="modal-title" style={{ color: '#166534', fontSize: '1.1rem', margin: 0 }}>Account Created Successfully!</h3>
-                  <p style={{ fontSize: '0.8rem', color: '#15803d', margin: 0 }}>Your Citizen Account has been saved to the user database.</p>
-                </div>
+              <div>
+                <h3 className="modal-title" style={{ color: '#166534', fontSize: '1.1rem', margin: 0 }}>Account Created Successfully!</h3>
+                <p style={{ fontSize: '0.8rem', color: '#15803d', margin: 0 }}>Your Citizen Account has been saved to the user database.</p>
               </div>
               <button className="modal-close" onClick={() => setShowSuccessModal(false)} title="Close">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
@@ -258,8 +299,8 @@ export default function RegisterPage({ onRegister }: RegisterPageProps) {
             </div>
 
             <div className="modal-body" style={{ padding: '1.5rem' }}>
-              <div className="notice success" style={{ background: 'rgba(22, 101, 52, 0.08)', borderColor: 'rgba(22, 101, 52, 0.2)', color: '#166534', padding: '0.85rem 1rem', borderRadius: '4px' }}>
-                ✅ <strong>Registration Complete!</strong> You can now access your barangay's SK transparency portal and submit citizen feedback.
+              <div className="alert-success">
+                <strong>Registration Complete!</strong> You can now access your barangay's SK transparency portal and submit citizen feedback.
               </div>
 
               <div style={{ background: 'rgba(255, 255, 255, 0.85)', border: '1.5px solid rgba(118,0,49,0.1)', padding: '1rem', display: 'grid', gap: '0.65rem' }}>
