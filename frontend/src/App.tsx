@@ -1,6 +1,7 @@
 import './App.css'
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Link, NavLink, Navigate, Route, Routes, useNavigate, useLocation } from 'react-router-dom'
+import { Menu, X } from 'lucide-react'
 import { login as loginService, logout as logoutService, register as registerService, getStoredUser } from './services/auth'
 import type { Role, UserAccount } from './types'
 import Landing from './pages/Landing'
@@ -58,9 +59,9 @@ const isLandingPath = (p: string) => LANDING_PATHS.includes(p)
 
 const positionColors: Record<string, string> = {
   Chairperson: '#760031',
-  Treasurer:   '#b45309',
-  Secretary:   '#1d4ed8',
-  Kagawad:     '#374151',
+  Treasurer: '#b45309',
+  Secretary: '#1d4ed8',
+  Kagawad: '#374151',
 }
 
 function App() {
@@ -71,6 +72,7 @@ function App() {
   const [scrollY, setScrollY] = useState(0)
   const [selectedBarangay, setSelectedBarangay] = useState<string>('Balibago')
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+  const [navOpen, setNavOpen] = useState(false)
   const isLanding = isLandingPath(location.pathname)
 
   useEffect(() => {
@@ -99,6 +101,9 @@ function App() {
     els.forEach(el => obs.observe(el))
     return () => obs.disconnect()
   }, [location.pathname])
+
+  // Close mobile menu whenever the route changes
+  useEffect(() => { setNavOpen(false) }, [location.pathname])
 
   const shellStyle = useMemo<CSSProperties>(() => ({
     '--cursor-x': `${cursor.x * 100}%`,
@@ -157,8 +162,8 @@ function App() {
               </div>
             </Link>
 
-            {/* Nav */}
-            <nav className="main-nav">
+            {/* Desktop Nav */}
+            <nav className="main-nav desktop-only">
               {nav.map(item => (
                 <NavLink key={item.path} to={item.path}
                   className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
@@ -167,8 +172,8 @@ function App() {
               ))}
             </nav>
 
-            {/* Actions */}
-            <div className="header-actions">
+            {/* Desktop Actions */}
+            <div className="header-actions desktop-only">
               {user?.role === 'superadmin' && (
                 <select
                   className="barangay-select-header"
@@ -198,28 +203,82 @@ function App() {
                 </>
               )}
             </div>
+
+            {/* Mobile Actions + Hamburger */}
+            <div className="mobile-only" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              {user?.role === 'superadmin' && (
+                <select
+                  className="barangay-select-header"
+                  value={selectedBarangay}
+                  onChange={e => setSelectedBarangay(e.target.value)}
+                  title="Select barangay to manage"
+                  style={{ maxWidth: '110px', fontSize: '0.72rem' }}
+                >
+                  <option value="">All Brgy</option>
+                  {BARANGAYS.map(b => <option key={b} value={b}>{b}</option>)}
+                </select>
+              )}
+
+              {!user && (
+                <>
+                  <Link to="/login" className="btn btn-primary btn-sm">Log In</Link>
+                  <Link to="/register" className="btn btn-secondary btn-sm">Sign Up</Link>
+                </>
+              )}
+
+              <button
+                className="landing-menu-toggle"
+                onClick={() => setNavOpen(!navOpen)}
+                aria-label="Toggle Navigation Menu"
+                aria-expanded={navOpen}
+              >
+                {navOpen ? <X size={24} /> : <Menu size={24} />}
+              </button>
+            </div>
+          </div>
+
+          {/* Mobile Dropdown — nav links + logout */}
+          <div className={`landing-mobile-dropdown mobile-only ${navOpen ? 'open' : ''}`}>
+            <div className="landing-mobile-nav-links">
+              {nav.map(item => (
+                <NavLink key={item.path} to={item.path}
+                  className={({ isActive }) => `landing-mobile-nav-link${isActive ? ' active' : ''}`}
+                  onClick={() => setNavOpen(false)}>
+                  {item.title}
+                </NavLink>
+              ))}
+            </div>
+
+            {user && (
+              <div style={{ padding: '0 1.25rem 1.25rem' }}>
+                <button className="btn btn-secondary btn-sm" style={{ width: '100%' }}
+                  onClick={() => { setNavOpen(false); confirmLogout() }}>
+                  Log Out
+                </button>
+              </div>
+            )}
           </div>
         </header>
       )}
 
       <main style={{ position: 'relative', zIndex: 1, minHeight: isLanding ? undefined : 'calc(100vh - 140px)' }}>
         <Routes>
-          <Route path="/"                    element={<Landing />} />
-          <Route path="/login"               element={<LoginPage onLogin={handleLogin} />} />
-          <Route path="/register"            element={<RegisterPage onRegister={handleRegister} />} />
-          <Route path="/home"                element={<Navigate to="/" replace />} />
-          <Route path="/about"               element={<About />} />
-          <Route path="/sks"                 element={<SKsPage />} />
-          <Route path="/citizen/home"        element={<CitizenHome user={user} />} />
-          <Route path="/citizen/projects"    element={<CitizenProjects user={user} />} />
-          <Route path="/citizen/mysks"       element={<CitizenMySKs user={user} />} />
-          <Route path="/sk/home"             element={<SKHome user={user} />} />
-          <Route path="/sk/projects"         element={<SKProjects user={user} />} />
-          <Route path="/superadmin/home"     element={<SuperAdminHome selectedBarangay={selectedBarangay} setSelectedBarangay={setSelectedBarangay} />} />
+          <Route path="/" element={<Landing />} />
+          <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
+          <Route path="/register" element={<RegisterPage onRegister={handleRegister} />} />
+          <Route path="/home" element={<Navigate to="/" replace />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/sks" element={<SKsPage />} />
+          <Route path="/citizen/home" element={<CitizenHome user={user} />} />
+          <Route path="/citizen/projects" element={<CitizenProjects user={user} />} />
+          <Route path="/citizen/mysks" element={<CitizenMySKs user={user} />} />
+          <Route path="/sk/home" element={<SKHome user={user} />} />
+          <Route path="/sk/projects" element={<SKProjects user={user} />} />
+          <Route path="/superadmin/home" element={<SuperAdminHome selectedBarangay={selectedBarangay} setSelectedBarangay={setSelectedBarangay} />} />
           <Route path="/superadmin/accounts" element={<SuperAdminAccounts selectedBarangay={selectedBarangay} />} />
           <Route path="/superadmin/activity" element={<SuperAdminActivity selectedBarangay={selectedBarangay} />} />
-          <Route path="/superadmin/news"     element={<SuperAdminNews />} />
-          <Route path="*"                    element={<Landing />} />
+          <Route path="/superadmin/news" element={<SuperAdminNews />} />
+          <Route path="*" element={<Landing />} />
         </Routes>
       </main>
 
