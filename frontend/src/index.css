@@ -3520,25 +3520,163 @@ tbody tr:last-child td {
 }
 
 @media (max-width: 1171px) {
+  .site-header {
+    padding: 0.75rem 0;
+  }
+
+  .header-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+  }
+
+  /* Brand: stack logos row above the text so the tagline doesn't get squished */
   .brand-block {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
     gap: 0.35rem;
+    max-width: 60%;
   }
 
   .brand-logos {
     display: flex;
     align-items: center;
+    gap: 0.4rem;
   }
 
   .brand-text {
     display: flex;
     flex-direction: column;
+    line-height: 1.2;
+  }
+
+  .brand-name {
+    font-size: 1.1rem;
   }
 
   .brand-tagline {
-    font-size: 0.68rem;
+    font-size: 0.62rem;
     white-space: normal;
+    color: var(--muted, #6b6b6b);
+  }
+
+  /* Mobile actions row: barangay select (superadmin) / login-signup (guest) + hamburger */
+  .mobile-only[style] {
+    /* covers the inline-styled wrapper div around select/buttons/hamburger */
+    flex-shrink: 0;
+  }
+
+  .landing-menu-toggle {
+    color: #7A0C2E;
+    background: none;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem;
+    transition: color var(--transition);
+  }
+
+  .landing-menu-toggle:hover {
+    color: #580820;
+  }
+
+  .barangay-select-header {
+    font-family: var(--font-display);
+    font-weight: 700;
+    border: 1.5px solid rgba(118, 0, 49, 0.18);
+    padding: 0.4rem 0.5rem;
+    background: #fff;
+    color: #7A0C2E;
+  }
+
+  .btn-sm {
+    padding: 0.45rem 0.85rem;
+    font-size: 0.72rem;
+  }
+}
+
+@media (max-width: 1171px) {
+  .site-header {
+    padding: 0.75rem 0;
+  }
+
+  .header-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+  }
+
+  /* Brand: stack logos row above the text so the tagline doesn't get squished */
+  .brand-block {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+    max-width: 60%;
+  }
+
+  .brand-logos {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .brand-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.2;
+  }
+
+  .brand-name {
+    font-size: 1.1rem;
+  }
+
+  .brand-tagline {
+    font-size: 0.62rem;
+    white-space: normal;
+    color: var(--muted, #6b6b6b);
+  }
+
+  /* Mobile actions row: barangay select (superadmin) / login-signup (guest) + hamburger */
+  .mobile-only[style] {
+    /* covers the inline-styled wrapper div around select/buttons/hamburger */
+    flex-shrink: 0;
+  }
+
+  .landing-menu-toggle {
+    color: #7A0C2E;
+    background: none;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem;
+    transition: color var(--transition);
+  }
+
+  .landing-menu-toggle:hover {
+    color: #580820;
+  }
+
+  .barangay-select-header {
+    font-family: var(--font-display);
+    font-weight: 700;
+    border: 1.5px solid rgba(118, 0, 49, 0.18);
+    padding: 0.4rem 0.5rem;
+    background: #fff;
+    color: #7A0C2E;
+  }
+
+  .btn-sm {
+    padding: 0.45rem 0.85rem;
+    font-size: 0.72rem;
   }
 }
