@@ -308,7 +308,7 @@ function App() {
               <div>
                 <div className="footer-col-title">Navigation</div>
                 <div className="footer-links">
-                  <Link to="/about">About eSKala</Link>
+                  <Link to="/">Public Portal</Link>
                   <Link to="/about">About eSKala</Link>
                   <Link to="/sks">SK Officials</Link>
                   <Link to="/login">Citizen Login</Link>

@@ -102,7 +102,7 @@ def export_audit_logs_pdf(
                 (log.details or "")[:80],
             ])
 
-        table = Table(data, colWidths=[0.6*cm, 3.2*cm, 3.5*cm, 3*cm, 2.5*cm, 4*cm, 2.5*cm, 8*cm])
+        table = Table(data, colWidths=[0.6*cm, 2.8*cm, 3.0*cm, 2.4*cm, 2.2*cm, 3.5*cm, 2.2*cm, 8.8*cm])
         table.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#760031")),
             ("TEXTCOLOR",  (0, 0), (-1, 0), colors.white),

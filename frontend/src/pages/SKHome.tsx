@@ -201,9 +201,9 @@ export default function SKHome({ user }: SKHomeProps) {
                 </h2>
               </div>
 
-              {myProjects.length > 0 ? (
+              {localProjects.length > 0 ? (
                 <div className="card-grid card-grid-2" style={{ gap: '1.1rem' }}>
-                  {myProjects.map(p => (
+                  {localProjects.map(p => (
                     <div key={p.id} className="v-card" onClick={() => setSelectedProject(p)}>
                       <div className="v-card-img-wrap" style={{ height: 140 }}>
                         <img

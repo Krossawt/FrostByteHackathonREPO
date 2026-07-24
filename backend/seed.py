@@ -11,6 +11,12 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+if sys.platform == 'win32':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
+
 from datetime import datetime, date, timedelta
 from database import engine, SessionLocal, Base
 import models
