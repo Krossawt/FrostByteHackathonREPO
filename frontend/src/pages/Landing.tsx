@@ -1,20 +1,12 @@
 import { Link } from 'react-router-dom'
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { Menu, X } from 'lucide-react'
 import { news, projects, barangaySummary, receipts, BARANGAYS } from '../data/mockData'
 import { DonutChart, HBarChart } from '../components/MiniChart'
 import ProjectDetailModal from '../components/ProjectDetailModal'
 import BarangayTransactionsModal from '../components/BarangayTransactionsModal'
 import NewsTicker from '../components/NewsTicker'
 import type { ReportProject } from '../types'
-
-const TICKER_ITEMS = [
-  'SK Q1 2025 Financial Transparency Report — Now Published for All 18 Barangays',
-  'eSKala Citizen Suggestion Portal Now Active',
-  'SK Federation President joins City Council Education Committee',
-  'CYDO Youth Leadership Summit 2025 — 400 Participants',
-  'RA 11768 Amendment: Enhanced SK Fund Guidelines Effective July 2025',
-  'Santa Rosa Named Top Youth-Friendly City in Region IV-A',
-]
 
 const NEWS_IMAGES: Record<string, string> = {
   'N-01': 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=640&q=75',
@@ -28,14 +20,14 @@ const NEWS_IMAGES: Record<string, string> = {
 }
 
 const CATEGORY_IMAGES: Record<string, string> = {
-  'Education':            'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=640&q=75',
-  'Health':               'https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=640&q=75',
-  'Sports':               'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=640&q=75',
-  'Environment':          'https://images.unsplash.com/photo-1588880331179-bc9b93a8cb5e?w=640&q=75',
-  'Livelihood':           'https://images.unsplash.com/photo-1556761175-b413da4baf72?w=640&q=75',
-  'Arts & Culture':       'https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=640&q=75',
-  'Governance':           'https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?w=640&q=75',
-  'Other':                'https://images.unsplash.com/photo-1532629345422-7515f3d16bb6?w=640&q=75',
+  'Education': 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=640&q=75',
+  'Health': 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=640&q=75',
+  'Sports': 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=640&q=75',
+  'Environment': 'https://images.unsplash.com/photo-1588880331179-bc9b93a8cb5e?w=640&q=75',
+  'Livelihood': 'https://images.unsplash.com/photo-1556761175-b413da4baf72?w=640&q=75',
+  'Arts & Culture': 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=640&q=75',
+  'Governance': 'https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?w=640&q=75',
+  'Other': 'https://images.unsplash.com/photo-1532629345422-7515f3d16bb6?w=640&q=75',
 }
 
 function getCover(cat?: string) { return CATEGORY_IMAGES[cat ?? 'Other'] ?? CATEGORY_IMAGES['Other'] }
@@ -52,17 +44,17 @@ function useScrollReveal() {
   }, [])
 }
 
-const totalBudget   = barangaySummary.reduce((s, b) => s + b.annualBudget, 0)
-const totalSpent    = barangaySummary.reduce((s, b) => s + b.spent, 0)
-const utilizationPct= totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0
+const totalBudget = barangaySummary.reduce((s, b) => s + b.annualBudget, 0)
+const totalSpent = barangaySummary.reduce((s, b) => s + b.spent, 0)
+const utilizationPct = totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0
 const totalProjects = projects.length
-const totalBarangays= 18
+const totalBarangays = 18
 
 const STAT_CARDS = [
   {
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" />
       </svg>
     ),
     val: `${totalBarangays}`, lbl: 'Barangays Covered',
@@ -70,7 +62,7 @@ const STAT_CARDS = [
   {
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-        <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+        <line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
       </svg>
     ),
     val: totalBudget === 0 ? '₱0' : `₱${(totalBudget / 1_000_000).toFixed(1)}M`, lbl: 'Total SK Budget FY 2025',
@@ -78,7 +70,7 @@ const STAT_CARDS = [
   {
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
       </svg>
     ),
     val: `${totalProjects}`, lbl: 'SK Projects Tracked',
@@ -86,7 +78,7 @@ const STAT_CARDS = [
   {
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
       </svg>
     ),
     val: '54+', lbl: 'SK Officials Serving',
@@ -95,6 +87,8 @@ const STAT_CARDS = [
 
 export default function Landing() {
   useScrollReveal()
+
+  const [navOpen, setNavOpen] = useState(false)
 
   // News carousel
   const [newsIdx, setNewsIdx] = useState(0)
@@ -125,10 +119,10 @@ export default function Landing() {
   const clearBrgy = () => setSelectedBrgy(null)
 
   // Barangay-specific data
-  const brgyData   = selectedBrgy ? barangaySummary.find(b => b.barangay === selectedBrgy) : null
-  const brgyProj   = selectedBrgy ? projects.filter(p => p.barangay === selectedBrgy) : []
-  const brgyTxn    = selectedBrgy ? receipts.filter(r => r.barangay === selectedBrgy) : []
-  const brgyUsage  = brgyData ? Math.min(Math.round((brgyData.spent / brgyData.annualBudget) * 100), 100) : 0
+  const brgyData = selectedBrgy ? barangaySummary.find(b => b.barangay === selectedBrgy) : null
+  const brgyProj = selectedBrgy ? projects.filter(p => p.barangay === selectedBrgy) : []
+  const brgyTxn = selectedBrgy ? receipts.filter(r => r.barangay === selectedBrgy) : []
+  const brgyUsage = brgyData ? Math.min(Math.round((brgyData.spent / brgyData.annualBudget) * 100), 100) : 0
 
   const barData = barangaySummary.slice(0, 9).map(b => ({
     label: b.barangay.length > 10 ? b.barangay.slice(0, 9) + '…' : b.barangay,
@@ -143,14 +137,43 @@ export default function Landing() {
 
       {/* ── Header ── */}
       <header className="landing-header">
-        <nav className="landing-nav-left">
+        {/* Desktop Navigation */}
+        <nav className="landing-nav-left desktop-only">
           <Link to="/" className="landing-nav-link">HOME</Link>
           <Link to="/about" className="landing-nav-link">ABOUT</Link>
           <Link to="/sks" className="landing-nav-link">SK OFFICIALS</Link>
         </nav>
-        <div className="landing-nav-right">
+        <div className="landing-nav-right desktop-only">
           <Link to="/login" className="btn-landing-login">LOGIN</Link>
           <Link to="/register" className="landing-signup-link">SIGN UP</Link>
+        </div>
+
+        {/* Mobile Header Bar */}
+        <div className="landing-header-mobile-bar mobile-only">
+          <Link to="/" className="landing-mobile-brand">
+            e<span className="maroon">SK</span>ala
+          </Link>
+          <div className="landing-mobile-bar-actions">
+            <Link to="/login" className="btn-landing-login-mobile">LOGIN</Link>
+            <Link to="/register" className="landing-signup-link-mobile">SIGN UP</Link>
+            <button
+              className="landing-menu-toggle"
+              onClick={() => setNavOpen(!navOpen)}
+              aria-label="Toggle Navigation Menu"
+              aria-expanded={navOpen}
+            >
+              {navOpen ? <X size={24} /> : <Menu size={24} />}
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile Dropdown Menu — nav links only */}
+        <div className={`landing-mobile-dropdown mobile-only ${navOpen ? 'open' : ''}`}>
+          <div className="landing-mobile-nav-links">
+            <Link to="/" className="landing-mobile-nav-link" onClick={() => setNavOpen(false)}>HOME</Link>
+            <Link to="/about" className="landing-mobile-nav-link" onClick={() => setNavOpen(false)}>ABOUT</Link>
+            <Link to="/sks" className="landing-mobile-nav-link" onClick={() => setNavOpen(false)}>SK OFFICIALS</Link>
+          </div>
         </div>
       </header>
 
@@ -253,7 +276,7 @@ export default function Landing() {
                 The City of Santa Rosa, Laguna officially launches eSKala — giving all 18 barangay SK councils a unified platform for financial transparency, project tracking, and citizen engagement.
               </p>
               <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.5rem' }}>
-                {[ { v: '18', l: 'Barangays' }, { v: '54+', l: 'SK Officials' }, { v: '284', l: 'Suggestions' } ].map(s => (
+                {[{ v: '18', l: 'Barangays' }, { v: '54+', l: 'SK Officials' }, { v: '284', l: 'Suggestions' }].map(s => (
                   <div key={s.l}>
                     <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.25rem', color: '#fff', lineHeight: 1 }}>{s.v}</div>
                     <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.65)', fontFamily: 'var(--font-display)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: '0.15rem' }}>{s.l}</div>
@@ -284,7 +307,7 @@ export default function Landing() {
                 style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}
               >
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" />
                 </svg>
                 Track Funds &amp; Receipts ({brgyTxn.length})
               </button>
@@ -472,12 +495,12 @@ export default function Landing() {
                   label={`${utilizationPct}%`} sublabel="used" />
                 <div className="donut-legend">
                   {[
-                    { dot: '#760031', label: 'Disbursed', val: totalSpent === 0 ? '₱0' : `₱${(totalSpent/1_000_000).toFixed(1)}M` },
-                    { dot: 'rgba(118,0,49,0.12)', label: 'Remaining', val: (totalBudget-totalSpent) === 0 ? '₱0' : `₱${((totalBudget-totalSpent)/1_000_000).toFixed(1)}M` },
+                    { dot: '#760031', label: 'Disbursed', val: totalSpent === 0 ? '₱0' : `₱${(totalSpent / 1_000_000).toFixed(1)}M` },
+                    { dot: 'rgba(118,0,49,0.12)', label: 'Remaining', val: (totalBudget - totalSpent) === 0 ? '₱0' : `₱${((totalBudget - totalSpent) / 1_000_000).toFixed(1)}M` },
                     { dot: '#b45309', label: 'Utilization Rate', val: `${utilizationPct}%` },
                   ].map(item => (
                     <div key={item.label} className="donut-legend-item">
-                      <div className="donut-legend-dot" style={{ background: item.dot }}/>
+                      <div className="donut-legend-dot" style={{ background: item.dot }} />
                       <span>{item.label}: <strong style={{ color: 'var(--ink)', fontWeight: 700 }}>{item.val}</strong></span>
                     </div>
                   ))}
@@ -500,11 +523,11 @@ export default function Landing() {
           {/* Project status row */}
           <div className="card-grid card-grid-3 reveal" style={{ marginTop: '1.5rem' }}>
             {[
-              { label: 'Ongoing Projects',   count: projects.filter(p => p.status === 'ongoing').length,   color: 'var(--maroon)', badge: 'badge-ongoing'   },
-              { label: 'Upcoming Projects',  count: projects.filter(p => p.status === 'upcoming').length,  color: '#1d4ed8',       badge: 'badge-upcoming'  },
-              { label: 'Completed Projects', count: projects.filter(p => p.status === 'completed').length, color: '#166534',       badge: 'badge-completed' },
+              { label: 'Ongoing Projects', count: projects.filter(p => p.status === 'ongoing').length, color: 'var(--maroon)', badge: 'badge-ongoing' },
+              { label: 'Upcoming Projects', count: projects.filter(p => p.status === 'upcoming').length, color: '#1d4ed8', badge: 'badge-upcoming' },
+              { label: 'Completed Projects', count: projects.filter(p => p.status === 'completed').length, color: '#166534', badge: 'badge-completed' },
             ].map((s, i) => (
-              <div key={s.label} className={`city-stat-card reveal reveal-delay-${i+1}`}>
+              <div key={s.label} className={`city-stat-card reveal reveal-delay-${i + 1}`}>
                 <div style={{ fontSize: '2.6rem', fontFamily: 'var(--font-display)', fontWeight: 900, color: s.color, lineHeight: 1, minWidth: '3rem' }}>{s.count}</div>
                 <div>
                   <div className={`badge ${s.badge}`} style={{ marginBottom: '0.3rem' }}>{s.label}</div>
@@ -529,11 +552,11 @@ export default function Landing() {
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               <button onClick={() => { pauseAuto(); prevNews(); resumeAuto() }}
                 style={{ width: 36, height: 36, border: '1.5px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.07)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'background 150ms' }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 18l-6-6 6-6" /></svg>
               </button>
               <button onClick={() => { pauseAuto(); nextNews(); resumeAuto() }}
                 style={{ width: 36, height: 36, border: '1.5px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.07)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'background 150ms' }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 18l6-6-6-6"/></svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 18l6-6-6-6" /></svg>
               </button>
             </div>
           </div>
@@ -615,11 +638,11 @@ export default function Landing() {
         title="Select a barangay to view its data"
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" />
         </svg>
         {selectedBrgy ? `Brgy. ${selectedBrgy}` : 'Select Barangay'}
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-          <path d={pickerOpen ? 'M6 15l6-6 6 6' : 'M6 9l6 6 6-6'}/>
+          <path d={pickerOpen ? 'M6 15l6-6 6 6' : 'M6 9l6 6 6-6'} />
         </svg>
       </button>
 

@@ -1,5 +1,6 @@
 import { FormEvent, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { Menu, X } from 'lucide-react'
 import NewsTicker from '../components/NewsTicker'
 
 interface LoginPageProps {
@@ -7,20 +8,21 @@ interface LoginPageProps {
 }
 
 const DEMO_ACCOUNTS = [
-  { role: 'Super Admin',    sub: 'City-wide oversight', email: 'superadmin@eskala.ph', password: 'Admin2026!', color: '#760031' },
+  { role: 'Super Admin', sub: 'City-wide oversight', email: 'superadmin@eskala.ph', password: 'Admin2026!', color: '#760031' },
   { role: 'SK Chairperson', sub: 'Balibago · Manage & Approve', email: 'padizon.balibago@sk.gov.ph', password: 'Sk2026!', color: '#b45309' },
-  { role: 'SK Secretary',   sub: 'Balibago · Add Projects (Proposal Upload & OCR)', email: 'mvillanueva.balibago@sk.gov.ph', password: 'Sk2026!', color: '#7c3aed' },
-  { role: 'SK Treasurer',   sub: 'Balibago · Add Receipts (Upload & OCR)', email: 'klim.balibago@sk.gov.ph', password: 'Sk2026!', color: '#1d4ed8' },
-  { role: 'Citizen',        sub: 'Balibago resident', email: 'citizen@eskala.ph', password: 'Citizen2026!', color: '#166534' },
+  { role: 'SK Secretary', sub: 'Balibago · Add Projects (Proposal Upload & OCR)', email: 'mvillanueva.balibago@sk.gov.ph', password: 'Sk2026!', color: '#7c3aed' },
+  { role: 'SK Treasurer', sub: 'Balibago · Add Receipts (Upload & OCR)', email: 'klim.balibago@sk.gov.ph', password: 'Sk2026!', color: '#1d4ed8' },
+  { role: 'Citizen', sub: 'Balibago resident', email: 'citizen@eskala.ph', password: 'Citizen2026!', color: '#166534' },
 ]
 
 export default function LoginPage({ onLogin }: LoginPageProps) {
   const [credential, setCredential] = useState('')
-  const [password, setPassword]     = useState('')
-  const [showPw, setShowPw]         = useState(false)
-  const [error, setError]           = useState('')
+  const [password, setPassword] = useState('')
+  const [showPw, setShowPw] = useState(false)
+  const [error, setError] = useState('')
   const [resetNotice, setResetNotice] = useState('')
-  const [showDemo, setShowDemo]     = useState(false)
+  const [showDemo, setShowDemo] = useState(false)
+  const [navOpen, setNavOpen] = useState(false)
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
@@ -38,14 +40,43 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
 
       {/* ── Header ── */}
       <header className="landing-header">
-        <nav className="landing-nav-left">
+        {/* Desktop Navigation */}
+        <nav className="landing-nav-left desktop-only">
           <Link to="/" className="landing-nav-link">HOME</Link>
           <Link to="/about" className="landing-nav-link">ABOUT</Link>
           <Link to="/sks" className="landing-nav-link">SK OFFICIALS</Link>
         </nav>
-        <div className="landing-nav-right">
+        <div className="landing-nav-right desktop-only">
           <Link to="/login" className="btn-landing-login">LOGIN</Link>
           <Link to="/register" className="landing-signup-link">SIGN UP</Link>
+        </div>
+
+        {/* Mobile Header Bar */}
+        <div className="landing-header-mobile-bar mobile-only">
+          <Link to="/" className="landing-mobile-brand">
+            e<span className="maroon">SK</span>ala
+          </Link>
+          <div className="landing-mobile-bar-actions">
+            <Link to="/login" className="btn-landing-login-mobile">LOGIN</Link>
+            <Link to="/register" className="landing-signup-link-mobile">SIGN UP</Link>
+            <button
+              className="landing-menu-toggle"
+              onClick={() => setNavOpen(!navOpen)}
+              aria-label="Toggle Navigation Menu"
+              aria-expanded={navOpen}
+            >
+              {navOpen ? <X size={24} /> : <Menu size={24} />}
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile Dropdown Menu — nav links only */}
+        <div className={`landing-mobile-dropdown mobile-only ${navOpen ? 'open' : ''}`}>
+          <div className="landing-mobile-nav-links">
+            <Link to="/" className="landing-mobile-nav-link" onClick={() => setNavOpen(false)}>HOME</Link>
+            <Link to="/about" className="landing-mobile-nav-link" onClick={() => setNavOpen(false)}>ABOUT</Link>
+            <Link to="/sks" className="landing-mobile-nav-link" onClick={() => setNavOpen(false)}>SK OFFICIALS</Link>
+          </div>
         </div>
       </header>
 
@@ -155,7 +186,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
               </div>
             </div>
 
-            {error       && <div className="notice error">{error}</div>}
+            {error && <div className="notice error">{error}</div>}
             {resetNotice && <div className="notice info">{resetNotice}</div>}
 
             <button type="submit" className="btn-login-submit">

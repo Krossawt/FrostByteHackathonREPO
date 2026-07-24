@@ -1,5 +1,6 @@
 import { FormEvent, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { Menu, X } from 'lucide-react'
 import { BARANGAYS } from '../data/mockData'
 import type { UserAccount } from '../types'
 import NewsTicker from '../components/NewsTicker'
@@ -10,30 +11,31 @@ interface RegisterPageProps {
 
 export default function RegisterPage({ onRegister }: RegisterPageProps) {
   const navigate = useNavigate()
-  const [name, setName]           = useState('')
-  const [username, setUsername]   = useState('')
-  const [email, setEmail]         = useState('')
-  const [password, setPassword]   = useState('')
+  const [name, setName] = useState('')
+  const [username, setUsername] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [confirmPw, setConfirmPw] = useState('')
-  const [barangay, setBarangay]   = useState('Balibago')
+  const [barangay, setBarangay] = useState('Balibago')
   const [isStaRosa, setIsStaRosa] = useState(true)
-  const [agreed, setAgreed]       = useState(false)
-  const [showPw, setShowPw]       = useState(false)
-  const [error, setError]         = useState('')
+  const [agreed, setAgreed] = useState(false)
+  const [showPw, setShowPw] = useState(false)
+  const [error, setError] = useState('')
   const [showSuccessModal, setShowSuccessModal] = useState(false)
-  const [createdUser, setCreatedUser]           = useState<UserAccount | null>(null)
+  const [createdUser, setCreatedUser] = useState<UserAccount | null>(null)
+  const [navOpen, setNavOpen] = useState(false)
 
   const pwStrength = password.length >= 12 ? 'Strong' : password.length >= 8 ? 'Good' : password.length >= 4 ? 'Weak' : ''
-  const pwColor    = pwStrength === 'Strong' ? '#166534' : pwStrength === 'Good' ? '#b45309' : '#b91c1c'
+  const pwColor = pwStrength === 'Strong' ? '#166534' : pwStrength === 'Good' ? '#b45309' : '#b91c1c'
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault(); setError('')
     if (!name.trim() || !email.trim() || !password) { setError('Please complete all required fields.'); return }
     if (!isStaRosa) { setError('Registration is strictly restricted to Santa Rosa City, Laguna residents.'); return }
     if (password !== confirmPw) { setError('Passwords do not match.'); return }
-    if (password.length < 6)   { setError('Password must be at least 6 characters.'); return }
+    if (password.length < 6) { setError('Password must be at least 6 characters.'); return }
     if (!agreed) { setError('You must agree to the Terms & Conditions and Privacy Policy.'); return }
-    
+
     const result = onRegister(name.trim(), email.trim(), password, barangay, true, username.trim() || undefined)
     const storedUser: UserAccount = (result as UserAccount) || {
       id: `u-${Math.random().toString(36).slice(2, 10)}`,
@@ -55,16 +57,45 @@ export default function RegisterPage({ onRegister }: RegisterPageProps) {
       {/* Full-width continuous News Ticker */}
       <NewsTicker />
 
-      {/* ── Header ── same as Landing/Login ── */}
+      {/* ── Header ── */}
       <header className="landing-header">
-        <nav className="landing-nav-left">
+        {/* Desktop Navigation */}
+        <nav className="landing-nav-left desktop-only">
           <Link to="/" className="landing-nav-link">HOME</Link>
           <Link to="/about" className="landing-nav-link">ABOUT</Link>
           <Link to="/sks" className="landing-nav-link">SK OFFICIALS</Link>
         </nav>
-        <div className="landing-nav-right">
+        <div className="landing-nav-right desktop-only">
           <Link to="/login" className="btn-landing-login">LOGIN</Link>
           <Link to="/register" className="landing-signup-link">SIGN UP</Link>
+        </div>
+
+        {/* Mobile Header Bar */}
+        <div className="landing-header-mobile-bar mobile-only">
+          <Link to="/" className="landing-mobile-brand">
+            e<span className="maroon">SK</span>ala
+          </Link>
+          <div className="landing-mobile-bar-actions">
+            <Link to="/login" className="btn-landing-login-mobile">LOGIN</Link>
+            <Link to="/register" className="landing-signup-link-mobile">SIGN UP</Link>
+            <button
+              className="landing-menu-toggle"
+              onClick={() => setNavOpen(!navOpen)}
+              aria-label="Toggle Navigation Menu"
+              aria-expanded={navOpen}
+            >
+              {navOpen ? <X size={24} /> : <Menu size={24} />}
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile Dropdown Menu — nav links only */}
+        <div className={`landing-mobile-dropdown mobile-only ${navOpen ? 'open' : ''}`}>
+          <div className="landing-mobile-nav-links">
+            <Link to="/" className="landing-mobile-nav-link" onClick={() => setNavOpen(false)}>HOME</Link>
+            <Link to="/about" className="landing-mobile-nav-link" onClick={() => setNavOpen(false)}>ABOUT</Link>
+            <Link to="/sks" className="landing-mobile-nav-link" onClick={() => setNavOpen(false)}>SK OFFICIALS</Link>
+          </div>
         </div>
       </header>
 
@@ -74,10 +105,10 @@ export default function RegisterPage({ onRegister }: RegisterPageProps) {
         {/* LEFT — same hero panel */}
         <div className="landing-hero-left">
           <Link to="/" className="landing-logos-strip" style={{ cursor: 'pointer', textDecoration: 'none' }}>
-            <img src="/eSKalaLogo.svg"           alt="eSKala SK Logo"        className="landing-logo-img logo-sk"  onError={e => { (e.target as HTMLImageElement).style.display='none' }} />
-            <img src="/SantaRosa.svg"            alt="Santa Rosa City Seal"  className="landing-logo-img"          onError={e => { (e.target as HTMLImageElement).style.display='none' }} />
-            <img src="/CYDOlogo.svg"             alt="CYDO Office Seal"      className="landing-logo-img"          onError={e => { (e.target as HTMLImageElement).style.display='none' }} />
-            <img src="/bagongPilipinasLogo.svg"  alt="Bagong Pilipinas Logo" className="landing-logo-img"          onError={e => { (e.target as HTMLImageElement).style.display='none' }} />
+            <img src="/eSKalaLogo.svg" alt="eSKala SK Logo" className="landing-logo-img logo-sk" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+            <img src="/SantaRosa.svg" alt="Santa Rosa City Seal" className="landing-logo-img" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+            <img src="/CYDOlogo.svg" alt="CYDO Office Seal" className="landing-logo-img" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+            <img src="/bagongPilipinasLogo.svg" alt="Bagong Pilipinas Logo" className="landing-logo-img" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
           </Link>
 
           <h1 className="landing-brand-title">
@@ -96,7 +127,7 @@ export default function RegisterPage({ onRegister }: RegisterPageProps) {
                 {
                   icon: (
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--maroon)" strokeWidth="2">
-                      <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+                      <line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" />
                     </svg>
                   ),
                   t: 'View Financial Reports',
@@ -105,7 +136,7 @@ export default function RegisterPage({ onRegister }: RegisterPageProps) {
                 {
                   icon: (
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--maroon)" strokeWidth="2">
-                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                     </svg>
                   ),
                   t: 'Comment & Suggest',
@@ -114,7 +145,7 @@ export default function RegisterPage({ onRegister }: RegisterPageProps) {
                 {
                   icon: (
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--maroon)" strokeWidth="2">
-                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
                     </svg>
                   ),
                   t: 'Know Your SK Officials',
@@ -123,7 +154,7 @@ export default function RegisterPage({ onRegister }: RegisterPageProps) {
                 {
                   icon: (
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--maroon)" strokeWidth="2">
-                      <path d="M19 20H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h10l5 5v11a2 2 0 0 1-2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/>
+                      <path d="M19 20H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h10l5 5v11a2 2 0 0 1-2 2z" /><line x1="12" y1="11" x2="12" y2="17" /><line x1="9" y1="14" x2="15" y2="14" />
                     </svg>
                   ),
                   t: 'Stay Informed',
@@ -146,7 +177,7 @@ export default function RegisterPage({ onRegister }: RegisterPageProps) {
           {/* Data Privacy Notice */}
           <div style={{ padding: '0.9rem 1rem', background: 'rgba(254,236,65,0.12)', border: '1.5px solid rgba(254,236,65,0.3)' }}>
             <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.72rem', color: '#7a5200', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: '0.3rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
               Data Privacy Notice · RA 10173
             </div>
             <p style={{ fontSize: '0.8rem', color: '#7a5200', lineHeight: 1.65, margin: 0 }}>
@@ -169,7 +200,7 @@ export default function RegisterPage({ onRegister }: RegisterPageProps) {
               <div className="login-input-wrapper">
                 <span className="login-input-icon-left">
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
                   </svg>
                 </span>
                 <input id="reg-name" type="text" className="login-input no-right-icon" value={name} onChange={e => setName(e.target.value)} placeholder="Juan dela Cruz" required />
@@ -191,7 +222,7 @@ export default function RegisterPage({ onRegister }: RegisterPageProps) {
               <div className="login-input-wrapper">
                 <span className="login-input-icon-left">
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" />
                   </svg>
                 </span>
                 <input id="reg-email" type="email" className="login-input no-right-icon" value={email} onChange={e => setEmail(e.target.value)} placeholder="juan@example.com" required />
@@ -211,7 +242,7 @@ export default function RegisterPage({ onRegister }: RegisterPageProps) {
             <div className="login-field-group">
               <label className="login-label">City Residency Verification <span style={{ color: 'var(--maroon)' }}>*</span></label>
               <div style={{ padding: '0.75rem 0.9rem', background: 'rgba(118,0,49,0.04)', border: '1.5px solid rgba(118,0,49,0.14)', display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--maroon)" strokeWidth="2.2" style={{ flexShrink: 0 }}><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--maroon)" strokeWidth="2.2" style={{ flexShrink: 0 }}><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>
                 <div>
                   <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.85rem', color: 'var(--ink)' }}>
                     Santa Rosa City, Laguna Resident
@@ -232,14 +263,14 @@ export default function RegisterPage({ onRegister }: RegisterPageProps) {
               <div className="login-input-wrapper">
                 <span className="login-input-icon-left">
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                    <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
                   </svg>
                 </span>
                 <input id="reg-password" type={showPw ? 'text' : 'password'} className="login-input" value={password} onChange={e => setPassword(e.target.value)} placeholder="Minimum 6 characters" required />
                 <button type="button" className="login-input-icon-right" onClick={() => setShowPw(p => !p)}>
                   {showPw
-                    ? <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-                    : <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    ? <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" /><line x1="1" y1="1" x2="23" y2="23" /></svg>
+                    : <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
                   }
                 </button>
               </div>
@@ -251,7 +282,7 @@ export default function RegisterPage({ onRegister }: RegisterPageProps) {
               <div className="login-input-wrapper">
                 <span className="login-input-icon-left">
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                    <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
                   </svg>
                 </span>
                 <input id="reg-confirm" type="password" className="login-input no-right-icon" value={confirmPw} onChange={e => setConfirmPw(e.target.value)} placeholder="Re-enter your password" required />
@@ -294,7 +325,7 @@ export default function RegisterPage({ onRegister }: RegisterPageProps) {
                 <p style={{ fontSize: '0.8rem', color: '#15803d', margin: 0 }}>Your Citizen Account has been saved to the user database.</p>
               </div>
               <button className="modal-close" onClick={() => setShowSuccessModal(false)} title="Close">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12" /></svg>
               </button>
             </div>
 
