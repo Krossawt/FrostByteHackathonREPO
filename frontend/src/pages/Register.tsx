@@ -1,5 +1,5 @@
 import { FormEvent, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { Menu, X } from 'lucide-react'
 import { BARANGAYS } from '../data/mockData'
 import type { UserAccount } from '../types'
@@ -66,8 +66,12 @@ export default function RegisterPage({ onRegister }: RegisterPageProps) {
           <Link to="/sks" className="landing-nav-link">SK OFFICIALS</Link>
         </nav>
         <div className="landing-nav-right desktop-only">
-          <Link to="/login" className="btn-landing-login">LOGIN</Link>
-          <Link to="/register" className="landing-signup-link">SIGN UP</Link>
+          <NavLink to="/login" className={({ isActive }) => `btn-landing-login btn-landing-login--hover${isActive ? ' is-active' : ''}`}>
+            LOGIN
+          </NavLink>
+          <NavLink to="/register" className={({ isActive }) => `landing-signup-link${isActive ? ' is-active' : ''}`}>
+            SIGN UP
+          </NavLink>
         </div>
 
         {/* Mobile Header Bar */}
@@ -76,8 +80,12 @@ export default function RegisterPage({ onRegister }: RegisterPageProps) {
             e<span className="maroon">SK</span>ala
           </Link>
           <div className="landing-mobile-bar-actions">
-            <Link to="/login" className="btn-landing-login-mobile">LOGIN</Link>
-            <Link to="/register" className="landing-signup-link-mobile">SIGN UP</Link>
+            <NavLink to="/login" className={({ isActive }) => `btn-landing-login-mobile${isActive ? ' is-active' : ''}`}>
+              LOGIN
+            </NavLink>
+            <NavLink to="/register" className={({ isActive }) => `landing-signup-link-mobile${isActive ? ' is-active' : ''}`}>
+              SIGN UP
+            </NavLink>
             <button
               className="landing-menu-toggle"
               onClick={() => setNavOpen(!navOpen)}
@@ -394,4 +402,3 @@ export default function RegisterPage({ onRegister }: RegisterPageProps) {
     </div>
   )
 }
-

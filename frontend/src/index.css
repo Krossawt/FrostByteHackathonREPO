@@ -87,18 +87,22 @@ img {
    LANDING SHELL — the original graph-paper background with cursor+scroll effects
    All Landing, Login, Register pages use this class
    ═══════════════════════════════════════════════════════════════════════════════ */
+
 .landing-shell {
   font-family: var(--font-display);
   min-height: 100vh;
-  background-color: #F8F6F0;
   background-image:
-    /* Real-time Pressed-Down Stomp Shadow following cursor in background layer */
-    radial-gradient(circle 240px at var(--cursor-x, 50%) var(--cursor-y, 50%), rgba(20, 4, 12, 0.08) 0%, rgba(118, 0, 49, 0.05) 45%, transparent 75%),
-    radial-gradient(circle 100px at var(--cursor-x, 50%) var(--cursor-y, 50%), rgba(0, 0, 0, 0.12) 0%, transparent 65%),
-    linear-gradient(var(--bg-grid) 1px, transparent 1px),
-    linear-gradient(90deg, var(--bg-grid) 1px, transparent 1px);
-  background-size: auto, auto, 32px 32px, 32px 32px;
-  color: #111111;
+    radial-gradient(circle 240px at var(--cursor-x, 50%) var(--cursor-y, 50%), rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.08) 45%, transparent 75%),
+    radial-gradient(circle 100px at var(--cursor-x, 50%) var(--cursor-y, 50%), rgba(255, 255, 255, 0.28) 0%, transparent 65%),
+    /* grid lines, now drawn over the maroon/gold gradient */
+    linear-gradient(rgba(255, 255, 255, 0.18) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.18) 1px, transparent 1px),
+    /* 3-color diagonal: white → gold → maroon */
+    linear-gradient(135deg, #ffffff 0%, var(--gold) 50%, var(--maroon) 100%);
+  background-size: auto, auto, 32px 32px, 32px 32px, cover;
+  background-attachment: fixed, fixed, fixed, fixed, fixed;
+  color:
+    #111111;
   position: relative;
   overflow: hidden;
 }
@@ -106,28 +110,28 @@ img {
 .landing-shell::before {
   content: '';
   position: fixed;
-  width: 40vw;
-  height: 40vw;
-  top: -10vw;
-  right: -10vw;
-  background: radial-gradient(circle, rgba(118, 0, 49, 0.07), transparent 70%);
+  width: 45vw;
+  height: 45vw;
+  top: -12vw;
+  right: -12vw;
+  background: radial-gradient(circle, rgba(216, 90, 48, 0.16), transparent 70%);
   pointer-events: none;
   z-index: 0;
-  filter: blur(8px);
+  filter: blur(20px);
   transform: translateY(calc(var(--scroll-y, 0) * -0.04px));
 }
 
 .landing-shell::after {
   content: '';
   position: fixed;
-  width: 32vw;
-  height: 32vw;
-  bottom: -8vw;
-  left: -8vw;
-  background: radial-gradient(circle, rgba(254, 236, 65, 0.15), transparent 70%);
+  width: 38vw;
+  height: 38vw;
+  bottom: -10vw;
+  left: -10vw;
+  background: radial-gradient(circle, rgba(254, 236, 65, 0.26), transparent 70%);
   pointer-events: none;
   z-index: 0;
-  filter: blur(10px);
+  filter: blur(24px);
 }
 
 /* ─── LANDING CONTAINER ──────────────────────────────────────────────────────── */
@@ -250,19 +254,49 @@ img {
   text-transform: uppercase;
   letter-spacing: 0.06em;
   text-decoration: none;
-  transition: background-color 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+  border: 1.5px solid transparent;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: none;
   cursor: pointer;
   box-shadow: 0 6px 20px rgba(118, 0, 49, 0.2);
 }
 
-.btn-landing-login:hover {
-  background-color: #580820;
+.btn-landing-login--home:hover {
+  background-color: rgba(118, 0, 49, 0.07);
+  color: #7A0C2E;
+  border-color: #7A0C2E;
   transform: translateY(-1px);
-  box-shadow: 0 10px 28px rgba(118, 0, 49, 0.3);
+  box-shadow: none;
+}
+
+.btn-landing-login--hover:hover {
+  background-color: rgba(118, 0, 49, 0.07);
+  color: #7A0C2E;
+  border-color: #7A0C2E;
+  transform: translateY(-1px);
+  box-shadow: none;
+}
+
+.btn-landing-login.is-active {
+  background-color: #5a5560;
+  color: #ffffff;
+}
+
+.btn-landing-login-mobile.is-active {
+  background-color: #5a5560;
+  color: #ffffff;
+}
+
+.landing-signup-link.is-active {
+  color: #5a5560;
+  border-bottom-color: #5a5560;
+}
+
+.landing-signup-link-mobile.is-active {
+  color: #5a5560;
+  border-bottom-color: #5a5560;
 }
 
 .landing-signup-link {
@@ -496,7 +530,7 @@ img {
 .landing-footer-version {
   font-size: 0.78rem;
   font-weight: 500;
-  color: #666666;
+  color: #000000;
 }
 
 .landing-footer-links {
@@ -504,11 +538,11 @@ img {
   gap: 2rem;
   font-size: 0.78rem;
   font-weight: 600;
-  color: #444444;
+  color: #000000;
 }
 
 .landing-footer-links a {
-  color: #444444;
+  color: #000000;
   text-decoration: none;
   transition: color 0.15s;
 }
@@ -728,7 +762,7 @@ select.login-input {
    APP SHELL — for all authenticated / inner pages
    Same graph-paper bg, cursor-reactive, extends the landing design language
    ═══════════════════════════════════════════════════════════════════════════════ */
-.landing-shell,
+
 .app-shell {
   font-family: var(--font-display);
   min-height: 100vh;
@@ -3519,6 +3553,35 @@ tbody tr:last-child td {
   }
 }
 
+/* ─── RESPONSIVE pages HEADER & MOBILE MENU ───────────────────────────────── */
+
+@media (max-width: 1171px) {
+  .header-inner {
+    flex-wrap: nowrap;
+    min-width: 0;
+  }
+
+  .brand-block {
+    min-width: 0;
+    flex-shrink: 1;
+  }
+
+  .brand-text {
+    min-width: 0;
+  }
+
+  .brand-tagline {
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    max-width: 100%;
+  }
+
+  .brand-name {
+    white-space: nowrap;
+  }
+}
+
 @media (max-width: 1171px) {
   .site-header {
     padding: 0.75rem 0;
@@ -3678,5 +3741,35 @@ tbody tr:last-child td {
   .btn-sm {
     padding: 0.45rem 0.85rem;
     font-size: 0.72rem;
+  }
+}
+
+@media (max-width: 500px) {
+  .brand-name {
+    font-size: 0.92rem;
+  }
+
+  .brand-tagline {
+    font-size: 0.56rem;
+  }
+
+  .brand-logo-img {
+    height: 26px;
+  }
+
+  .brand-logo-img.logo-main {
+    height: 30px;
+  }
+
+  .brand-logos {
+    gap: 0.3rem;
+  }
+
+  .brand-divider {
+    height: 18px;
+  }
+
+  .brand-block {
+    max-width: 55%;
   }
 }

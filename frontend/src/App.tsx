@@ -21,6 +21,7 @@ import SKProjects from './pages/SKProjects'
 import { BARANGAYS } from './data/mockData'
 import ConfirmDialog from './components/ConfirmDialog'
 
+
 const PUBLIC_NAV = [
   { title: 'Home', path: '/' },
   { title: 'About', path: '/about' },

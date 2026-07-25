@@ -8,6 +8,7 @@ import BarangayTransactionsModal from '../components/BarangayTransactionsModal'
 import NewsTicker from '../components/NewsTicker'
 import type { ReportProject } from '../types'
 
+
 const NEWS_IMAGES: Record<string, string> = {
   'N-01': 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=640&q=75',
   'N-02': 'https://images.unsplash.com/photo-1531545514256-b1400bc00f31?w=640&q=75',
@@ -144,8 +145,8 @@ export default function Landing() {
           <Link to="/sks" className="landing-nav-link">SK OFFICIALS</Link>
         </nav>
         <div className="landing-nav-right desktop-only">
-          <Link to="/login" className="btn-landing-login">LOGIN</Link>
-          <Link to="/register" className="landing-signup-link">SIGN UP</Link>
+          <Link to="/login" className="btn-landing-login btn-landing-login--home">LOGIN</Link>
+          <Link to="/register" className="landing-signup-link landing-signup-link--home">SIGN UP</Link>
         </div>
 
         {/* Mobile Header Bar */}
