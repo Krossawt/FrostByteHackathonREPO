@@ -145,7 +145,7 @@ function App() {
         <header className="site-header">
           <div className="container header-inner">
             {/* Brand (Clicking logo redirects to active session home) */}
-            <Link to={userHomePath(user)} className="brand-block" style={{ textDecoration: 'none', cursor: 'pointer' }}>
+            <Link to={userHomePath(user)} className="brand-block" style={{ textDecoration: 'none', cursor: 'default' }}>
               <div className="brand-logos">
                 <img src="/eSKalaLogo.svg" alt="eSKala" className="brand-logo-img logo-main"
                   onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />

@@ -112,7 +112,7 @@ export default function RegisterPage({ onRegister }: RegisterPageProps) {
 
         {/* LEFT — same hero panel */}
         <div className="landing-hero-left">
-          <Link to="/" className="landing-logos-strip" style={{ cursor: 'pointer', textDecoration: 'none' }}>
+          <Link to="/" className="landing-logos-strip" style={{ cursor: 'default', textDecoration: 'none' }}>
             <img src="/eSKalaLogo.svg" alt="eSKala SK Logo" className="landing-logo-img logo-sk" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
             <img src="/SantaRosa.svg" alt="Santa Rosa City Seal" className="landing-logo-img" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
             <img src="/CYDOlogo.svg" alt="CYDO Office Seal" className="landing-logo-img" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />

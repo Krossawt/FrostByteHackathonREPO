@@ -93,7 +93,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
 
         {/* LEFT — same hero as landing */}
         <div className="landing-hero-left">
-          <Link to="/" className="landing-logos-strip" style={{ cursor: 'pointer', textDecoration: 'none' }}>
+          <Link to="/" className="landing-logos-strip" style={{ cursor: 'default', textDecoration: 'none' }}>
             <img src="/eSKalaLogo.svg" alt="eSKala SK Logo" className="landing-logo-img logo-sk"
               onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
             <img src="/SantaRosa.svg" alt="Santa Rosa City Seal" className="landing-logo-img"

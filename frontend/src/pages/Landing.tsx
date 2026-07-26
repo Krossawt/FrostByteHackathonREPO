@@ -184,7 +184,7 @@ export default function Landing() {
 
           {/* LEFT — City Hero */}
           <div className="landing-hero-left">
-            <Link to="/" className="landing-logos-strip" style={{ cursor: 'pointer', textDecoration: 'none' }}>
+            <Link to="/" className="landing-logos-strip" style={{ cursor: 'default', textDecoration: 'none' }}>
               <img src="/eSKalaLogo.svg" alt="eSKala SK Logo" className="landing-logo-img logo-sk"
                 onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
               <img src="/SantaRosa.svg" alt="Santa Rosa City Seal" className="landing-logo-img"
@@ -552,11 +552,11 @@ export default function Landing() {
             </div>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               <button onClick={() => { pauseAuto(); prevNews(); resumeAuto() }}
-                style={{ width: 36, height: 36, border: '1.5px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.07)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'background 150ms' }}>
+                style={{ width: 36, height: 36, border: '1.5px solid rgba(118,0,49,0.25)', background: 'rgba(118,0,49,0.10)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', color: '#760031', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'background 150ms, border-color 150ms' }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 18l-6-6 6-6" /></svg>
               </button>
               <button onClick={() => { pauseAuto(); nextNews(); resumeAuto() }}
-                style={{ width: 36, height: 36, border: '1.5px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.07)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'background 150ms' }}>
+                style={{ width: 36, height: 36, border: '1.5px solid rgba(118,0,49,0.25)', background: 'rgba(118,0,49,0.10)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', color: '#760031', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'background 150ms, border-color 150ms' }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 18l6-6-6-6" /></svg>
               </button>
             </div>

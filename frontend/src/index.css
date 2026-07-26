@@ -91,18 +91,16 @@ img {
 .landing-shell {
   font-family: var(--font-display);
   min-height: 100vh;
+  background-color: #FFFFFF;
   background-image:
-    radial-gradient(circle 240px at var(--cursor-x, 50%) var(--cursor-y, 50%), rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.08) 45%, transparent 75%),
-    radial-gradient(circle 100px at var(--cursor-x, 50%) var(--cursor-y, 50%), rgba(255, 255, 255, 0.28) 0%, transparent 65%),
-    /* grid lines, now drawn over the maroon/gold gradient */
-    linear-gradient(rgba(255, 255, 255, 0.18) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.18) 1px, transparent 1px),
-    /* 3-color diagonal: white → gold → maroon */
-    linear-gradient(135deg, #ffffff 0%, var(--gold) 50%, var(--maroon) 100%);
-  background-size: auto, auto, 32px 32px, 32px 32px, cover;
-  background-attachment: fixed, fixed, fixed, fixed, fixed;
-  color:
-    #111111;
+    /* cursor effect — now matches .app-shell exactly */
+    radial-gradient(ellipse at var(--cursor-x, 50%) var(--cursor-y, 50%), rgba(254, 236, 65, 0.22) 0%, transparent 45%),
+    /* grid lines */
+    linear-gradient(rgba(118, 0, 49, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(118, 0, 49, 0.08) 1px, transparent 1px);
+  background-size: auto, 32px 32px, 32px 32px;
+  background-attachment: fixed, scroll, scroll;
+  color: #111111;
   position: relative;
   overflow: hidden;
 }
@@ -110,28 +108,59 @@ img {
 .landing-shell::before {
   content: '';
   position: fixed;
-  width: 45vw;
-  height: 45vw;
-  top: -12vw;
-  right: -12vw;
-  background: radial-gradient(circle, rgba(216, 90, 48, 0.16), transparent 70%);
+  inset: -20%;
+  background:
+    radial-gradient(circle at 18% 25%, rgba(254, 236, 65, 0.65) 0%, transparent 32%),
+    radial-gradient(circle at 82% 72%, rgba(118, 0, 49, 0.40) 0%, transparent 34%);
+  background-repeat: no-repeat;
+  filter: blur(70px);
   pointer-events: none;
   z-index: 0;
-  filter: blur(20px);
-  transform: translateY(calc(var(--scroll-y, 0) * -0.04px));
+  will-change: transform;
+  animation: meshDrift1 5s ease-in-out infinite alternate;
 }
 
 .landing-shell::after {
   content: '';
   position: fixed;
-  width: 38vw;
-  height: 38vw;
-  bottom: -10vw;
-  left: -10vw;
-  background: radial-gradient(circle, rgba(254, 236, 65, 0.26), transparent 70%);
+  inset: -20%;
+  background:
+    radial-gradient(circle at 75% 18%, rgba(254, 236, 65, 0.55) 0%, transparent 36%),
+    radial-gradient(circle at 25% 82%, rgba(154, 0, 64, 0.35) 0%, transparent 36%);
+  background-repeat: no-repeat;
+  filter: blur(75px);
   pointer-events: none;
   z-index: 0;
-  filter: blur(24px);
+  will-change: transform;
+  animation: meshDrift2 6s ease-in-out infinite alternate-reverse;
+}
+
+@keyframes meshDrift1 {
+  0% {
+    transform: translate(0%, 0%) scale(1);
+  }
+
+  50% {
+    transform: translate(14%, 16%) scale(1.25);
+  }
+
+  100% {
+    transform: translate(-15%, -10%) scale(0.85);
+  }
+}
+
+@keyframes meshDrift2 {
+  0% {
+    transform: translate(0%, 0%) scale(1);
+  }
+
+  50% {
+    transform: translate(-16%, 12%) scale(1.2);
+  }
+
+  100% {
+    transform: translate(15%, -16%) scale(0.82);
+  }
 }
 
 /* ─── LANDING CONTAINER ──────────────────────────────────────────────────────── */
@@ -368,8 +397,13 @@ img {
   color: #000000;
 }
 
-.landing-brand-title span.maroon {
-  color: #7A0C2E;
+.landing-brand-title span.maroon,
+.landing-mobile-brand span.maroon {
+  background: linear-gradient(135deg, var(--maroon-dark) 0%, var(--maroon) 35%, var(--maroon-mid) 60%, var(--gold-dark) 85%, var(--gold) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
 }
 
 .landing-hero-subtitle {
@@ -876,7 +910,11 @@ select.login-input {
 }
 
 .brand-name span {
-  color: var(--maroon);
+  background: linear-gradient(135deg, var(--maroon-dark) 0%, var(--maroon) 35%, var(--maroon-mid) 60%, var(--gold-dark) 85%, var(--gold) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
 }
 
 .brand-tagline {
@@ -2429,24 +2467,24 @@ tbody tr:last-child td {
 
 /* Dark section */
 .landing-section-dark {
-  background: linear-gradient(160deg, #0f0409 0%, #1a0510 100%);
-  color: #fff;
+  background: linear-gradient(135deg, #ffffff 0%, #FEF5A0 50%, #D9A0B8 100%);
+  color: #111111;
 }
 
 .landing-section-dark .landing-section-label {
-  color: var(--gold);
+  color: var(--maroon);
 }
 
 .landing-section-dark .landing-section-label::before {
-  background: var(--gold);
+  background: var(--maroon);
 }
 
 .landing-section-dark .landing-section-title {
-  color: #fff;
+  color: #111111;
 }
 
 .landing-section-dark .landing-section-sub {
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(17, 17, 17, 0.65);
 }
 
 /* ─── Scroll Reveal ─────────────────────────────────────────────────────────── */
@@ -2593,29 +2631,24 @@ tbody tr:last-child td {
 
 /* Dark section carousel item */
 .landing-section-dark .news-carousel-item {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.1);
-}
-
-.landing-section-dark .news-carousel-item:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(254, 236, 65, 0.3);
+  background: rgba(255, 255, 255, 0.85);
+  border-color: rgba(118, 0, 49, 0.15);
 }
 
 .landing-section-dark .news-title {
-  color: rgba(255, 255, 255, 0.92);
+  color: #111111;
 }
 
 .landing-section-dark .news-summary {
-  color: rgba(255, 255, 255, 0.55);
+  color: rgba(17, 17, 17, 0.6);
 }
 
 .landing-section-dark .news-cat {
-  color: var(--gold);
+  color: var(--maroon);
 }
 
 .landing-section-dark .news-date {
-  color: rgba(255, 255, 255, 0.35);
+  color: rgba(17, 17, 17, 0.4);
 }
 
 /* ─── Barangay Picker (floating) ────────────────────────────────────────────── */
@@ -3430,10 +3463,6 @@ tbody tr:last-child td {
     font-size: 1.6rem;
     letter-spacing: -0.04em;
     color: #111111;
-  }
-
-  .landing-mobile-brand span.maroon {
-    color: #7A0C2E;
   }
 
   .landing-mobile-bar-actions {
