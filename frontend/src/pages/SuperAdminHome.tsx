@@ -75,10 +75,10 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
     }, 1000)
   }
 
-  const totalBudget  = cityBudgetOverride !== null ? cityBudgetOverride : barangayList.reduce((s, b) => s + b.annualBudget, 0)
-  const totalSpent   = barangayList.reduce((s, b) => s + b.spent, 0)
-  const totalProj    = projects.length
-  const usagePct     = totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0
+  const totalBudget = cityBudgetOverride !== null ? cityBudgetOverride : barangayList.reduce((s, b) => s + b.annualBudget, 0)
+  const totalSpent = barangayList.reduce((s, b) => s + b.spent, 0)
+  const totalProj = projects.length
+  const usagePct = totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0
 
   const bSummary = selectedBarangay
     ? barangayList.find(b => b.barangay === selectedBarangay)
@@ -88,9 +88,9 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
     : []
 
   const displayBudget = selectedBarangay && bSummary ? bSummary.annualBudget : totalBudget
-  const displaySpent  = selectedBarangay && bSummary ? bSummary.spent : totalSpent
-  const displayProj   = selectedBarangay ? bProjects.length : totalProj
-  const displayUsage  = displayBudget > 0 ? Math.min(Math.round((displaySpent / displayBudget) * 100), 100) : 0
+  const displaySpent = selectedBarangay && bSummary ? bSummary.spent : totalSpent
+  const displayProj = selectedBarangay ? bProjects.length : totalProj
+  const displayUsage = displayBudget > 0 ? Math.min(Math.round((displaySpent / displayBudget) * 100), 100) : 0
 
   const recentLogs = logs.slice(0, 10)
 
@@ -154,9 +154,9 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
             <div style={{ flex: 1 }}>
               <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.88rem', marginBottom: '0.5rem' }}>City-Wide SK Fund Utilization</div>
               {[
-                { label: 'Total Budget', val: totalBudget === 0 ? '₱0' : `₱${(totalBudget/1_000_000).toFixed(1)}M`, color: 'var(--maroon)' },
-                { label: 'Disbursed',    val: totalSpent === 0 ? '₱0' : `₱${(totalSpent/1_000_000).toFixed(1)}M`,  color: '#b45309' },
-                { label: 'Remaining',   val: (totalBudget-totalSpent) === 0 ? '₱0' : `₱${((totalBudget-totalSpent)/1_000_000).toFixed(1)}M`, color: '#166534' },
+                { label: 'Total Budget', val: totalBudget === 0 ? '₱0' : `₱${(totalBudget / 1_000_000).toFixed(1)}M`, color: 'var(--maroon)' },
+                { label: 'Disbursed', val: totalSpent === 0 ? '₱0' : `₱${(totalSpent / 1_000_000).toFixed(1)}M`, color: '#b45309' },
+                { label: 'Remaining', val: (totalBudget - totalSpent) === 0 ? '₱0' : `₱${((totalBudget - totalSpent) / 1_000_000).toFixed(1)}M`, color: '#166534' },
               ].map(item => (
                 <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontFamily: 'var(--font-display)', marginBottom: '0.25rem' }}>
                   <span style={{ color: 'var(--muted)' }}>{item.label}</span>
@@ -168,8 +168,8 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
           <div className="chart-card">
             <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.88rem', marginBottom: '0.75rem' }}>Project Status Breakdown</div>
             {[
-              { label: 'Ongoing',   count: projects.filter(p => p.status === 'ongoing').length,   color: 'var(--maroon)' },
-              { label: 'Upcoming',  count: projects.filter(p => p.status === 'upcoming').length,  color: '#1d4ed8' },
+              { label: 'Ongoing', count: projects.filter(p => p.status === 'ongoing').length, color: 'var(--maroon)' },
+              { label: 'Upcoming', count: projects.filter(p => p.status === 'upcoming').length, color: '#1d4ed8' },
               { label: 'Completed', count: projects.filter(p => p.status === 'completed').length, color: '#166534' },
             ].map(s => (
               <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.6rem' }}>
@@ -267,7 +267,7 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
                 {/* Banner */}
                 <div style={{ marginBottom: '1rem', padding: '0.85rem 1rem', background: 'linear-gradient(135deg, var(--maroon), var(--maroon-dark))', color: '#fff' }}>
                   <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: '1.2rem', letterSpacing: '-0.02em' }}>Barangay {selectedBarangay}</div>
-                  <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.65)', marginTop: '0.1rem' }}>{bSummary.projects} projects · {bSummary.annualBudget === 0 ? '₱0' : `₱${(bSummary.annualBudget/1_000_000).toFixed(2)}M`} allocated</div>
+                  <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.65)', marginTop: '0.1rem' }}>{bSummary.projects} projects · {bSummary.annualBudget === 0 ? '₱0' : `₱${(bSummary.annualBudget / 1_000_000).toFixed(2)}M`} allocated</div>
                 </div>
 
                 {/* Barangay Stats */}
@@ -341,7 +341,7 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
               <div className="modal-header">
                 <span className="modal-title">Submit Annual Budget</span>
                 <button className="modal-close" onClick={handleCloseBudgetModal}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12" /></svg>
                 </button>
               </div>
               <form onSubmit={handleSubmitBudget}>
@@ -356,14 +356,14 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
                       {errorMessage}
                     </div>
                   )}
-                  
+
                   {!successMessage && (
                     <>
                       <div className="field-group">
                         <label className="field-label">Annual Year *</label>
-                        <select 
-                          className="input" 
-                          value={annualYear} 
+                        <select
+                          className="input"
+                          value={annualYear}
                           onChange={e => setAnnualYear(e.target.value)}
                           required
                         >
@@ -376,9 +376,9 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
 
                       <div className="field-group">
                         <label className="field-label">Approved SK Budget (₱) *</label>
-                        <input 
-                          type="number" 
-                          className="input" 
+                        <input
+                          type="number"
+                          className="input"
                           placeholder="e.g. 2500000"
                           value={approvedBudget}
                           onChange={e => setApprovedBudget(e.target.value)}

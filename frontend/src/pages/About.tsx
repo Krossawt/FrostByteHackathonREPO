@@ -29,8 +29,8 @@ export default function About() {
             {[
               {
                 icon: (
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--maroon)" strokeWidth="2">
-                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" />
                   </svg>
                 ),
                 title: 'Public Trust & Transparency',
@@ -38,8 +38,8 @@ export default function About() {
               },
               {
                 icon: (
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--maroon)" strokeWidth="2">
-                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
                   </svg>
                 ),
                 title: 'Operational Clarity for SK Officers',
@@ -47,8 +47,8 @@ export default function About() {
               },
               {
                 icon: (
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--maroon)" strokeWidth="2">
-                    <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="2" y="7" width="20" height="14" rx="2" ry="2" /><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
                   </svg>
                 ),
                 title: 'City-Wide Oversight for Administrators',
@@ -56,8 +56,8 @@ export default function About() {
               },
               {
                 icon: (
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--maroon)" strokeWidth="2">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                   </svg>
                 ),
                 title: 'Citizen Participation',
@@ -65,8 +65,8 @@ export default function About() {
               },
               {
                 icon: (
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--maroon)" strokeWidth="2">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" />
                   </svg>
                 ),
                 title: 'Receipt & Document Intelligence',
@@ -74,7 +74,7 @@ export default function About() {
               },
             ].map(f => (
               <div key={f.title} className="card">
-                <div style={{ width: '40px', height: '40px', background: 'rgba(118,0,49,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '0.85rem' }}>
+                <div className="city-stat-icon" style={{ width: '40px', height: '40px', marginBottom: '0.85rem' }}>
                   {f.icon}
                 </div>
                 <div className="card-title" style={{ marginBottom: '0.4rem', fontSize: '0.96rem' }}>{f.title}</div>
@@ -141,19 +141,19 @@ export default function About() {
 
             {/* CYDO Contact */}
             <div className="card" style={{ background: 'rgba(118,0,49,0.04)', border: '1.5px solid rgba(118,0,49,0.14)' }}>
-              <span className="page-kicker" style={{ marginBottom: '0.6rem', display: 'block' }}>Contact Office</span>
+              <span className="page-kicker" style={{ marginBottom: '0.6rem' }}>Contact Office</span>
               <div className="card-title" style={{ marginBottom: '0.6rem' }}>City Youth Development Office (CYDO)</div>
-              <div style={{ display: 'grid', gap: '0.45rem', fontSize: '0.84rem', color: 'var(--muted)', fontFamily: 'var(--font-display)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                  City Government Center, J.P. Rizal, Santa Rosa City, Laguna
+              <div style={{ display: 'grid', gap: '0.55rem', fontSize: '0.84rem', color: 'var(--muted)', fontFamily: 'var(--font-display)' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.4rem' }}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0, marginTop: '3px' }}><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>
+                  <span style={{ lineHeight: 1.5 }}>City Government Center, J.P. Rizal, Santa Rosa City, Laguna</span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13 19.79 19.79 0 0 1 1.62 4.45 2 2 0 0 1 3.6 2.27h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9.91a16 16 0 0 0 6 6l.92-.92a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.73 17l.19-.08z"/></svg>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13 19.79 19.79 0 0 1 1.62 4.45 2 2 0 0 1 3.6 2.27h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9.91a16 16 0 0 0 6 6l.92-.92a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.73 17l.19-.08z" /></svg>
                   (049) 530-0015 local 5011
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></svg>
                   cydo@santarosacity.gov.ph
                 </div>
               </div>
@@ -184,7 +184,7 @@ export default function About() {
                 <ul style={{ display: 'grid', gap: '0.5rem', paddingLeft: '0', listStyle: 'none' }}>
                   {r.abilities.map(a => (
                     <li key={a} style={{ display: 'flex', gap: '0.55rem', alignItems: 'flex-start' }}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={r.color} strokeWidth="3" style={{ flexShrink: 0, marginTop: '3px' }}><polyline points="20 6 9 17 4 12"/></svg>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={r.color} strokeWidth="3" style={{ flexShrink: 0, marginTop: '3px' }}><polyline points="20 6 9 17 4 12" /></svg>
                       <span style={{ fontSize: '0.84rem', color: 'var(--muted)', lineHeight: 1.55 }}>{a}</span>
                     </li>
                   ))}

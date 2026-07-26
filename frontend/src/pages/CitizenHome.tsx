@@ -35,6 +35,7 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
   const summary = barangaySummary.find(b => b.barangay === barangay)
   const localProjects = projects.filter(p => p.barangay === barangay)
   const [localComments, setLocalComments] = useState(citizenComments.filter(c => c.barangay === barangay))
+  const [votedIds, setVotedIds] = useState<Set<string>>(new Set())
 
   const [comment, setComment] = useState('')
   const [suggestionCat, setSuggestionCat] = useState('Sports Facilities')
@@ -67,7 +68,17 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
   }
 
   const handleVote = (id: string) => {
-    setLocalComments(prev => prev.map(c => c.id === id ? { ...c, votes: (c.votes ?? 0) + 1 } : c))
+    setLocalComments(prev => prev.map(c => {
+      if (c.id !== id) return c
+      const alreadyVoted = votedIds.has(id)
+      return { ...c, votes: (c.votes ?? 0) + (alreadyVoted ? -1 : 1) }
+    }))
+    setVotedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
   }
 
   return (
@@ -292,10 +303,33 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
                         type="button"
                         onClick={() => handleVote(c.id)}
                         className="link-button"
-                        style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.76rem', color: 'var(--maroon)', fontWeight: 700, fontFamily: 'var(--font-display)' }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.4rem',
+                          fontSize: '0.76rem',
+                          color: 'var(--maroon)',
+                          fontWeight: 500,
+                          fontFamily: 'var(--font-display)',
+                          lineHeight: 1,
+                          transition: 'opacity 0.15s ease',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.opacity = '0.7' }}
+                        onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
                       >
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 21 12 17.77 5.82 21 7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
-                        Agree / Helpful ({c.votes ?? 0})
+                        <svg
+                          width="16" height="16" viewBox="0 0 24 24"
+                          fill={votedIds.has(c.id) ? 'var(--maroon)' : 'none'}
+                          stroke={votedIds.has(c.id) ? 'var(--maroon-dark)' : 'var(--maroon)'}
+                          strokeWidth="2"
+                          strokeLinejoin="round"
+                          style={{ display: 'block', flexShrink: 0, transition: 'transform 0.15s ease' }}
+                          onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.15)' }}
+                          onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}
+                        >
+                          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 21 12 17.77 5.82 21 7 14.14 2 9.27l6.91-1.01L12 2z" />
+                        </svg>
+                        <span style={{ lineHeight: 1 }}>Agree / Helpful ({c.votes ?? 0})</span>
                       </button>
                       <span style={{ fontSize: '0.72rem', color: 'var(--muted)', fontFamily: 'var(--font-display)' }}>
                         Barangay {barangay} Feed
