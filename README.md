@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🏛️ eSKala
+# 🏛️ ESKALA
 ### **Sangguniang Kabataan Financial Transparency & Governance Portal**
 *Santa Rosa City, Laguna · Republic of the Philippines*
 
