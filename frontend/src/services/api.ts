@@ -356,9 +356,29 @@ export async function createNewsletterApi(payload: {
   summary: string
   category?: string
   projectLocation?: string
+  imageURL?: string
 }): Promise<any> {
   return request('/newsletter', {
     method: 'POST',
     body: JSON.stringify(payload),
   })
+}
+
+export async function uploadNewsImageApi(file: File): Promise<{ imageURL: string }> {
+  const token = getStoredToken()
+  const formData = new FormData()
+  formData.append('file', file)
+
+  const res = await fetch(`${API_BASE_URL}/newsletter/upload-image`, {
+    method: 'POST',
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: formData,
+  })
+
+  if (!res.ok) {
+    throw new Error(`Image upload failed with status ${res.status}`)
+  }
+  return res.json()
 }

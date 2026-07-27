@@ -59,6 +59,38 @@ def get_newsletter(
     return NewsletterResponse.model_validate(item)
 
 
+import os
+import uuid
+from fastapi import UploadFile, File
+
+UPLOAD_DIR = os.getenv("UPLOAD_DIR", "static/uploads")
+
+
+@router.post("/upload-image", summary="Upload news display image (JPG, PNG, WEBP)")
+async def upload_news_image(
+    file: UploadFile = File(..., description="News image file"),
+    current_user: User = Depends(require_superadmin),
+):
+    allowed_types = {"image/jpeg", "image/png", "image/webp"}
+    if file.content_type not in allowed_types:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Only JPG, PNG, or WEBP image files are allowed",
+        )
+
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    ext = file.filename.rsplit(".", 1)[-1] if file.filename and "." in file.filename else "jpg"
+    filename = f"news_{uuid.uuid4().hex[:8]}.{ext}"
+    filepath = os.path.join(UPLOAD_DIR, filename)
+
+    content = await file.read()
+    with open(filepath, "wb") as f:
+        f.write(content)
+
+    image_url = f"/static/uploads/{filename}"
+    return {"imageURL": image_url}
+
+
 @router.post("", response_model=NewsletterResponse, status_code=status.HTTP_201_CREATED,
              summary="Super Admin: Create a manual newsletter entry")
 def create_newsletter(
