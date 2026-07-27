@@ -4,7 +4,7 @@ import ProjectDetailModal from '../components/ProjectDetailModal'
 import BarangayTransactionsModal from '../components/BarangayTransactionsModal'
 import { DonutChart } from '../components/MiniChart'
 import SingleNewsCarousel from '../components/SingleNewsCarousel'
-import { fetchProjectsApi, fetchBarangayReportApi } from '../services/api'
+import { fetchProjectsApi, fetchBarangayReportApi, fetchNewsApi } from '../services/api'
 
 interface CitizenHomeProps { user?: UserAccount | null }
 
@@ -34,16 +34,29 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
   const barangay = user?.barangay || 'Balibago'
   const [summary, setSummary] = useState({ spent: 0, annualBudget: 0, remaining: 0 })
   const [localProjects, setLocalProjects] = useState<ReportProject[]>([])
+  const [news, setNews] = useState<any[]>([])
   const [localComments, setLocalComments] = useState<any[]>([])
   const [votedIds, setVotedIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     async function loadCitizenData() {
       try {
-        const [projRes, repRes] = await Promise.all([
+        const [projRes, repRes, newsRes] = await Promise.all([
           fetchProjectsApi({ barangay }).catch(() => []),
           fetchBarangayReportApi(barangay).catch(() => null),
+          fetchNewsApi().catch(() => []),
         ])
+
+        if (Array.isArray(newsRes)) {
+          setNews(newsRes.map((n: any) => ({
+            id: String(n.newsletterID || n.id),
+            title: n.title,
+            category: n.category || 'City News',
+            summary: n.summary || n.fullContent || '',
+            date: n.publishedAt ? new Date(n.publishedAt).toLocaleDateString() : 'Today',
+            image: n.imageURL || undefined,
+          })))
+        }
 
         if (Array.isArray(projRes)) {
           setLocalProjects(projRes.map((p: any) => ({
@@ -384,7 +397,7 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
 
           {/* Right Column — Latest News Sidebar */}
           <div style={{ display: 'grid', gap: '1.5rem', alignContent: 'start' }}>
-            <SingleNewsCarousel />
+            <SingleNewsCarousel items={news} />
           </div>
 
         </div>

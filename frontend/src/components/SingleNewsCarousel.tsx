@@ -12,16 +12,22 @@ const NEWS_IMAGES: Record<string, string> = {
   'N-08': 'https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?w=700&q=80',
 }
 
-const FALLBACK_ITEMS: NewsItem[] = [
-  { id: '1', title: 'Santa Rosa SK Transparency System Operational', category: 'City News', summary: 'Live public financial portal active across 18 barangays.', date: 'Today' }
-]
-
 interface SingleNewsCarouselProps {
   items?: NewsItem[]
   autoPlayInterval?: number
 }
 
-export default function SingleNewsCarousel({ items = FALLBACK_ITEMS, autoPlayInterval = 4000 }: SingleNewsCarouselProps) {
+const resolveImage = (item?: NewsItem) => {
+  if (!item) return 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=700&q=80'
+  const raw = item.image || (item as any).imageURL || (item as any).image_url
+  if (raw) {
+    if (raw.startsWith('http')) return raw
+    return `https://frostbytehackathonrepo.onrender.com${raw}`
+  }
+  return NEWS_IMAGES[item.id] ?? 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=700&q=80'
+}
+
+export default function SingleNewsCarousel({ items = [], autoPlayInterval = 4000 }: SingleNewsCarouselProps) {
   const [index, setIndex] = useState(0)
   const [animating, setAnimating] = useState(false)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -29,7 +35,7 @@ export default function SingleNewsCarousel({ items = FALLBACK_ITEMS, autoPlayInt
   const count = items.length
 
   const goTo = useCallback((nextIdx: number) => {
-    if (animating) return
+    if (animating || count === 0) return
     setAnimating(true)
     setIndex((nextIdx + count) % count)
     setTimeout(() => setAnimating(false), 350)
@@ -40,6 +46,7 @@ export default function SingleNewsCarousel({ items = FALLBACK_ITEMS, autoPlayInt
 
   const startTimer = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current)
+    if (count <= 1) return
     timerRef.current = setInterval(() => {
       setIndex(i => (i + 1) % count)
     }, autoPlayInterval)
@@ -54,8 +61,17 @@ export default function SingleNewsCarousel({ items = FALLBACK_ITEMS, autoPlayInt
     return () => stopTimer()
   }, [startTimer, stopTimer])
 
+  if (count === 0) {
+    return (
+      <div className="single-news-container" style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>
+        <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1rem', color: 'var(--ink)' }}>Latest News</h2>
+        <div style={{ fontSize: '0.85rem', marginTop: '0.5rem' }}>No announcements published yet.</div>
+      </div>
+    )
+  }
+
   const item = items[index] || items[0]
-  const imgUrl = NEWS_IMAGES[item.id] ?? NEWS_IMAGES['N-01']
+  const imgUrl = resolveImage(item)
 
   return (
     <div

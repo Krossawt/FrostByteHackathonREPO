@@ -5,7 +5,7 @@ import CameraCaptureModal from '../components/CameraCaptureModal'
 import { DonutChart } from '../components/MiniChart'
 import SingleNewsCarousel from '../components/SingleNewsCarousel'
 import Portal from '../components/Portal'
-import { fetchBarangayReportApi, createProjectApi } from '../services/api'
+import { fetchBarangayReportApi, createProjectApi, fetchNewsApi } from '../services/api'
 
 interface SKHomeProps { user?: UserAccount | null }
 
@@ -40,6 +40,7 @@ export default function SKHome({ user }: SKHomeProps) {
 
   const [summary, setSummary] = useState({ spent: 0, annualBudget: 0, remaining: 0 })
   const [localProjects, setLocalProjects] = useState<ReportProject[]>([])
+  const [news, setNews] = useState<any[]>([])
   const [myComments, setMyComments] = useState<any[]>([])
   const [myLogs, setMyLogs] = useState<any[]>([])
 
@@ -69,6 +70,18 @@ export default function SKHome({ user }: SKHomeProps) {
               description: p.projectDescription || '',
             })))
           }
+        }
+
+        const newsRes = await fetchNewsApi()
+        if (Array.isArray(newsRes)) {
+          setNews(newsRes.map((n: any) => ({
+            id: String(n.newsletterID || n.id),
+            title: n.title,
+            category: n.category || 'City News',
+            summary: n.summary || n.fullContent || '',
+            date: n.publishedAt ? new Date(n.publishedAt).toLocaleDateString() : 'Today',
+            image: n.imageURL || undefined,
+          })))
         }
       } catch (err) {
         console.warn('API fetch warning in SKHome:', err)
@@ -292,7 +305,7 @@ export default function SKHome({ user }: SKHomeProps) {
             <div style={{ display: 'grid', gap: '1.4rem', alignContent: 'start' }}>
 
               {/* Single News Carousel (Replaces vertical news list & SK Council list) */}
-              <SingleNewsCarousel />
+              <SingleNewsCarousel items={news} />
 
               {/* Activity log */}
               <div>

@@ -117,9 +117,7 @@ export default function Landing() {
   const [newsIdx, setNewsIdx] = useState(0)
   const autoRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  const newsList = liveNews.length > 0 ? liveNews : [
-    { id: '1', title: 'Santa Rosa SK Financial Portal Operational', category: 'City News', summary: 'Live public financial transparency portal initialized.', date: 'Today' }
-  ]
+  const newsList = liveNews
 
   const nextNews = useCallback(() => setNewsIdx(i => (i + 1) % newsList.length), [newsList.length])
   const prevNews = useCallback(() => setNewsIdx(i => (i - 1 + newsList.length) % newsList.length), [newsList.length])
@@ -627,44 +625,60 @@ export default function Landing() {
             </div>
           </div>
 
-          <div
-            className="news-carousel-outer reveal"
-            onMouseEnter={pauseAuto}
-            onMouseLeave={resumeAuto}
-          >
-            <div
-              className="news-carousel-track"
-              style={{ transform: `translateX(calc(-${newsIdx * (320 + 20)}px))` }}
-            >
-              {[...newsList, ...newsList].map((item: any, i: number) => (
-                <div key={`${item.id}-${i}`} className="news-carousel-item">
-                  <img
-                    src={NEWS_IMAGES[item.id] ?? NEWS_IMAGES['N-01']}
-                    alt={item.category}
-                    className="news-carousel-item-img"
-                    onError={e => {
-                      const el = e.target as HTMLImageElement
-                      el.style.background = 'linear-gradient(135deg, rgba(118,0,49,0.8), rgba(15,5,10,0.9))'
-                      el.style.height = '160px'
-                    }}
-                  />
-                  <div className="news-carousel-item-body">
-                    <span className="news-cat">{item.category}</span>
-                    <div className="news-title" style={{ fontSize: '0.9rem' }}>{item.title}</div>
-                    <span className="news-date">{item.date}</span>
-                    <p className="news-summary" style={{ fontSize: '0.8rem', marginTop: '0.25rem' }}>{item.summary}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          {newsList.length > 0 ? (
+            <>
+              <div
+                className="news-carousel-outer reveal"
+                onMouseEnter={pauseAuto}
+                onMouseLeave={resumeAuto}
+              >
+                <div
+                  className="news-carousel-track"
+                  style={{ transform: `translateX(calc(-${newsIdx * (320 + 20)}px))` }}
+                >
+                  {(newsList.length > 2 ? [...newsList, ...newsList] : newsList).map((item: any, i: number) => {
+                    const rawImg = item.image || item.imageURL || item.image_url
+                    const imgSrc = rawImg
+                      ? (rawImg.startsWith('http') ? rawImg : `https://frostbytehackathonrepo.onrender.com${rawImg}`)
+                      : 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=700&q=80'
 
-          <div className="news-carousel-dots">
-            {newsList.map((_: any, i: number) => (
-              <button key={i} className={`news-carousel-dot${newsIdx % newsList.length === i ? ' active' : ''}`}
-                onClick={() => { pauseAuto(); setNewsIdx(i); resumeAuto() }} />
-            ))}
-          </div>
+                    return (
+                      <div key={`${item.id}-${i}`} className="news-carousel-item">
+                        <img
+                          src={imgSrc}
+                          alt={item.category}
+                          className="news-carousel-item-img"
+                          onError={e => {
+                            const el = e.target as HTMLImageElement
+                            el.src = 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=700&q=80'
+                          }}
+                        />
+                        <div className="news-carousel-item-body">
+                          <span className="news-cat">{item.category}</span>
+                          <div className="news-title" style={{ fontSize: '0.9rem' }}>{item.title}</div>
+                          <span className="news-date">{item.date}</span>
+                          <p className="news-summary" style={{ fontSize: '0.8rem', marginTop: '0.25rem' }}>{item.summary}</p>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {newsList.length > 1 && (
+                <div className="news-carousel-dots">
+                  {newsList.map((_: any, i: number) => (
+                    <button key={i} className={`news-carousel-dot${newsIdx % newsList.length === i ? ' active' : ''}`}
+                      onClick={() => { pauseAuto(); setNewsIdx(i); resumeAuto() }} />
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'rgba(255,255,255,0.6)' }}>
+              No city news published yet.
+            </div>
+          )}
 
         </div>
       </section>
