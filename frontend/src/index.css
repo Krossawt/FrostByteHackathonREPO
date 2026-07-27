@@ -808,7 +808,9 @@ select.login-input {
   background-size: auto, 32px 32px, 32px 32px;
   color: #111111;
   position: relative;
-  overflow: hidden;
+  /* overflow:clip clips decorative blobs without creating a new stacking context
+     overflow:hidden would break position:fixed modals when scroll happens */
+  overflow: clip;
 }
 
 .app-shell::before {
@@ -1554,12 +1556,13 @@ tbody tr:last-child td {
   inset: 0;
   background: rgba(10, 5, 8, 0.55);
   backdrop-filter: blur(4px);
-  z-index: 200;
+  z-index: 9999;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 1.5rem;
   animation: fadeIn 150ms ease;
+  overflow-y: auto;
 }
 
 @keyframes fadeIn {

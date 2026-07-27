@@ -5,6 +5,7 @@ import ProjectDetailModal from '../components/ProjectDetailModal'
 import CameraCaptureModal from '../components/CameraCaptureModal'
 import { DonutChart } from '../components/MiniChart'
 import SingleNewsCarousel from '../components/SingleNewsCarousel'
+import Portal from '../components/Portal'
 
 interface SKHomeProps { user?: UserAccount | null }
 
@@ -311,6 +312,7 @@ export default function SKHome({ user }: SKHomeProps) {
 
         {/* ── Add Project Modal (Secretary & Chairperson) ── */}
         {showAddModal && canAddProject && (
+          <Portal>
           <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowAddModal(false) }}>
             <div className="modal" style={{ width: 'min(560px, 100%)' }}>
               <div className="modal-header">
@@ -418,6 +420,7 @@ export default function SKHome({ user }: SKHomeProps) {
               </form>
             </div>
           </div>
+          </Portal>
         )}
 
         {/* ── Project Detail Modal ── */}

@@ -2,6 +2,7 @@ import { useState, FormEvent } from 'react'
 import { news as initialNews } from '../data/mockData'
 import type { NewsItem } from '../types'
 import ConfirmDialog from '../components/ConfirmDialog'
+import Portal from '../components/Portal'
 
 const CATEGORIES = ['Transparency', 'Youth Programs', 'SK Update', 'Health', 'Education', 'Environment', 'Sports', 'City News', 'Emergency']
 
@@ -152,6 +153,7 @@ export default function SuperAdminNews() {
 
         {/* ── Publish / Edit Modal ── */}
         {showModal && (
+          <Portal>
           <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowModal(false) }}>
             <div className="modal">
               <div className="modal-header">
@@ -196,6 +198,7 @@ export default function SuperAdminNews() {
               </form>
             </div>
           </div>
+          </Portal>
         )}
 
         {/* ── Delete Confirmation ── */}

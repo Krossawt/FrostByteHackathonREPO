@@ -7,6 +7,7 @@ import { useState, FormEvent } from 'react'
 import { receipts as allReceipts, citizenComments as allComments } from '../data/mockData'
 import type { ReportProject, Receipt, UserAccount } from '../types'
 import CameraCaptureModal from './CameraCaptureModal'
+import Portal from './Portal'
 
 const CATEGORY_IMAGES: Record<string, string> = {
   'Education':            'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=800&q=80',
@@ -130,7 +131,8 @@ export default function ProjectDetailModal({ project, user, onClose }: ProjectDe
   }
 
   return (
-    <div className="modal-overlay" style={{ zIndex: 1200 }} onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+    <Portal>
+      <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="modal project-modal">
 
         {/* ── Cover ── */}
@@ -556,6 +558,8 @@ export default function ProjectDetailModal({ project, user, onClose }: ProjectDe
         </div>
       )}
 
+      </div>
     </div>
+    </Portal>
   )
 }

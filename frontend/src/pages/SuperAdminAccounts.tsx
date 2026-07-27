@@ -3,6 +3,7 @@ import { getUsersDB } from '../services/auth'
 import { BARANGAYS } from '../data/mockData'
 import type { Role, UserAccount } from '../types'
 import ConfirmDialog from '../components/ConfirmDialog'
+import Portal from '../components/Portal'
 
 const ROLE_OPTIONS: (Role | 'all')[] = ['all', 'superadmin', 'sk', 'citizen']
 
@@ -169,6 +170,7 @@ export default function SuperAdminAccounts({ selectedBarangay }: SuperAdminAccou
 
         {/* ── Create SK Account Modal (placeholder) ── */}
         {showModal && (
+          <Portal>
           <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowModal(false) }}>
             <div className="modal">
               <div className="modal-header">
@@ -208,6 +210,7 @@ export default function SuperAdminAccounts({ selectedBarangay }: SuperAdminAccou
               </div>
             </div>
           </div>
+          </Portal>
         )}
 
         {/* ── Suspend/Reactivate Confirmation ── */}

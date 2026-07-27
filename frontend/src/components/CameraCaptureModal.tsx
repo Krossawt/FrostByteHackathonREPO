@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import Portal from './Portal'
 
 interface CameraCaptureModalProps {
   title: string
@@ -54,7 +55,8 @@ export default function CameraCaptureModal({ title, subtitle, onCapture, onClose
   }
 
   return (
-    <div className="modal-overlay" style={{ zIndex: 9999 }} onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+    <Portal>
+      <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="modal" style={{ width: 'min(540px, 95vw)', padding: '1.25rem', background: '#111', color: '#fff', borderRadius: '12px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
           <div>
@@ -105,6 +107,7 @@ export default function CameraCaptureModal({ title, subtitle, onCapture, onClose
           </button>
         </div>
       </div>
-    </div>
+      </div>
+    </Portal>
   )
 }

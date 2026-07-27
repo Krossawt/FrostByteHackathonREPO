@@ -3,8 +3,8 @@ import { projects } from '../data/mockData'
 import type { UserAccount } from '../types'
 import ProjectDetailModal from '../components/ProjectDetailModal'
 import ConfirmDialog from '../components/ConfirmDialog'
-import CameraCaptureModal from '../components/CameraCaptureModal'
 import type { ReportProject } from '../types'
+import Portal from '../components/Portal'
 
 interface SKProjectsProps { user?: UserAccount | null }
 
@@ -61,33 +61,8 @@ export default function SKProjects({ user }: SKProjectsProps) {
   const [newEnd, setNewEnd]     = useState('')
   const [formError, setFormError] = useState('')
 
-  // Proposal File Upload & OCR State
+  // Proposal file attachment state
   const [proposalFile, setProposalFile] = useState<File | null>(null)
-  const [scanningProposal, setScanningProposal] = useState(false)
-  const [proposalOcrMsg, setProposalOcrMsg] = useState('')
-  const [showCameraModal, setShowCameraModal] = useState(false)
-
-  const handleScanProposal = () => {
-    setScanningProposal(true)
-    setProposalOcrMsg('Scanning proposal document via AI OCR...')
-    setTimeout(() => {
-      setNewTitle('Barangay Youth Sports & Leadership Summit 2025')
-      setNewCat('Sports & Recreation')
-      setNewBudget('175000')
-      setNewStart(new Date().toISOString().slice(0, 10))
-      const nextMonth = new Date()
-      nextMonth.setMonth(nextMonth.getMonth() + 1)
-      setNewEnd(nextMonth.toISOString().slice(0, 10))
-      setNewDesc('Community-wide youth sports league, physical wellness workshops, and leadership development activities based on the official SK proposal.')
-      setScanningProposal(false)
-      setProposalOcrMsg('✓ Proposal Scanned! Extracted Title, Dates, Budget (₱175,000.00), and Description. All values below remain fully editable.')
-    }, 1200)
-  }
-
-  const handleCameraSnap = () => {
-    setShowCameraModal(false)
-    handleScanProposal()
-  }
 
   const filtered = localProjects.filter(p => {
     const matchStatus = filterStatus === 'all' || p.status === filterStatus
@@ -120,7 +95,7 @@ export default function SKProjects({ user }: SKProjectsProps) {
     projects.unshift(np)
     setLocalProjects(prev => [np, ...prev])
     setNewTitle(''); setNewCat('Education'); setNewDesc(''); setNewBudget(''); setNewStart(''); setNewEnd(''); setFormError('')
-    setProposalFile(null); setProposalOcrMsg('')
+    setProposalFile(null)
     setShowModal(false)
   }
 
@@ -270,6 +245,7 @@ export default function SKProjects({ user }: SKProjectsProps) {
 
         {/* ── Add Project Modal ── */}
         {showModal && canEdit && (
+          <Portal>
           <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowModal(false) }}>
             <div className="modal" style={{ width: 'min(560px, 100%)' }}>
               <div className="modal-header">
@@ -282,62 +258,32 @@ export default function SKProjects({ user }: SKProjectsProps) {
                 <div className="modal-body">
                   {formError && <div className="alert-error">{formError}</div>}
 
-                  {/* Proposal File Upload & OCR Scanner */}
+                  {/* Proposal File Attachment */}
                   <div style={{ marginBottom: '1rem', border: '1.5px dashed var(--maroon)', padding: '0.9rem 1rem', background: 'rgba(118,0,49,0.02)', borderRadius: '8px' }}>
-                    <div style={{ fontSize: '0.8rem', fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--maroon)', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--maroon)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                      Upload Proposal File or Capture Document (OCR Auto-Fill)
+                      Attach Proposal Document (Optional)
                     </div>
                     {proposalFile ? (
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
-                        <div style={{ fontSize: '0.82rem', fontFamily: 'var(--font-display)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '0.82rem', fontFamily: 'var(--font-display)' }}>
                           <strong>{proposalFile.name}</strong> ({(proposalFile.size / 1024).toFixed(1)} KB)
-                        </div>
-                        <div style={{ display: 'flex', gap: '0.4rem' }}>
-                          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowCameraModal(true)}>
-                            📷 Open Camera
-                          </button>
-                          <button type="button" className="btn btn-gold btn-sm" onClick={handleScanProposal} disabled={scanningProposal}>
-                            {scanningProposal ? 'Scanning Proposal...' : '⚡ Auto-Scan Proposal (OCR)'}
-                          </button>
-                        </div>
+                        </span>
+                        <button type="button" className="btn btn-secondary btn-sm" onClick={() => setProposalFile(null)}>Remove</button>
                       </div>
                     ) : (
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
-                        <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <input
-                            type="file"
-                            accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
-                            style={{ display: 'none' }}
-                            onChange={e => {
-                              if (e.target.files && e.target.files[0]) {
-                                setProposalFile(e.target.files[0])
-                              }
-                            }}
-                          />
-                          <span className="btn btn-secondary btn-sm" style={{ pointerEvents: 'none' }}>
-                            Browse File
-                          </span>
-                          <span style={{ fontSize: '0.78rem', color: 'var(--muted)' }}>
-                            Attach proposal file
-                          </span>
-                        </label>
-                        <button type="button" className="btn btn-gold btn-sm" onClick={() => setShowCameraModal(true)}>
-                          📷 Open Camera / Snap Photo
-                        </button>
-                      </div>
+                      <label style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <input
+                          type="file"
+                          accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
+                          style={{ display: 'none' }}
+                          onChange={e => { if (e.target.files?.[0]) setProposalFile(e.target.files[0]) }}
+                        />
+                        <span className="btn btn-secondary btn-sm" style={{ pointerEvents: 'none' }}>Browse File</span>
+                        <span style={{ fontSize: '0.78rem', color: 'var(--muted)' }}>PDF, DOC, or Image</span>
+                      </label>
                     )}
                   </div>
-                  {proposalOcrMsg && <div className="notice info" style={{ marginBottom: '0.85rem', fontSize: '0.78rem' }}>{proposalOcrMsg}</div>}
-
-                  {showCameraModal && (
-                    <CameraCaptureModal
-                      title="Capture Project Proposal Document"
-                      subtitle="Position official project proposal document inside reticle and snap photo"
-                      onCapture={handleCameraSnap}
-                      onClose={() => setShowCameraModal(false)}
-                    />
-                  )}
 
                   <div className="form-group">
                     <label className="form-label">Project Title *</label>
@@ -377,6 +323,7 @@ export default function SKProjects({ user }: SKProjectsProps) {
               </form>
             </div>
           </div>
+          </Portal>
         )}
 
         {/* ── Project Detail Modal ── */}

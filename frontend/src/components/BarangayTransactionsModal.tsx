@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { receipts as allReceipts } from '../data/mockData'
 import type { Receipt } from '../types'
+import Portal from './Portal'
 
 const SAMPLE_RECEIPT_IMAGES = [
   'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=700&q=80',
@@ -33,7 +34,8 @@ export default function BarangayTransactionsModal({ barangay, onClose }: Baranga
   }, [filteredReceipts])
 
   return (
-    <div className="modal-overlay" style={{ zIndex: 9999, paddingTop: '5.5rem', paddingBottom: '2rem', alignItems: 'flex-start' }} onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+    <Portal>
+      <div className="modal-overlay" style={{ paddingTop: '5.5rem', paddingBottom: '2rem', alignItems: 'flex-start' }} onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="modal" style={{ width: 'min(840px, 95vw)', maxHeight: '82vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         
         {/* Modal Header */}
@@ -143,7 +145,7 @@ export default function BarangayTransactionsModal({ barangay, onClose }: Baranga
 
       {/* ── Receipt Image Lightbox Modal ── */}
       {viewingReceipt && (
-        <div className="modal-overlay" style={{ zIndex: 10000 }} onClick={() => setViewingReceipt(null)}>
+        <div className="modal-overlay" onClick={() => setViewingReceipt(null)}>
           <div className="modal" style={{ width: 'min(500px, 90vw)', padding: '1.25rem' }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
               <div>
@@ -234,6 +236,7 @@ export default function BarangayTransactionsModal({ barangay, onClose }: Baranga
         </div>
       )}
 
-    </div>
+      </div>
+    </Portal>
   )
 }

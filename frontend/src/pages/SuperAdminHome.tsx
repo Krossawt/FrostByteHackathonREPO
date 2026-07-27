@@ -1,6 +1,30 @@
 import { useState } from 'react'
 import { barangaySummary, projects, news, activityLogs } from '../data/mockData'
 import { DonutChart } from '../components/MiniChart'
+import ProjectDetailModal from '../components/ProjectDetailModal'
+import type { ReportProject } from '../types'
+import Portal from '../components/Portal'
+
+// ── Category cover images (same palette as SKProjects) ──────────────────────
+const CATEGORY_IMAGES: Record<string, string> = {
+  'Education':            'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=640&q=75',
+  'Health':               'https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=640&q=75',
+  'Sports':               'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=640&q=75',
+  'Sports & Recreation':  'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=640&q=75',
+  'Environment':          'https://images.unsplash.com/photo-1588880331179-bc9b93a8cb5e?w=640&q=75',
+  'Infrastructure':       'https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=640&q=75',
+  'Livelihood':           'https://images.unsplash.com/photo-1556761175-b413da4baf72?w=640&q=75',
+  'Capacity Building':    'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=640&q=75',
+  'Peace & Order':        'https://images.unsplash.com/photo-1589994160839-163cd867cfe8?w=640&q=75',
+  'Arts & Culture':       'https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=640&q=75',
+  'Disaster Preparedness':'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=640&q=75',
+  'Governance':           'https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?w=640&q=75',
+  'Health & Wellness':    'https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=640&q=75',
+  'Other':                'https://images.unsplash.com/photo-1532629345422-7515f3d16bb6?w=640&q=75',
+}
+function getCover(cat?: string) {
+  return CATEGORY_IMAGES[cat ?? 'Other'] ?? CATEGORY_IMAGES['Other']
+}
 
 interface SuperAdminHomeProps {
   selectedBarangay: string
@@ -10,13 +34,15 @@ interface SuperAdminHomeProps {
 export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }: SuperAdminHomeProps) {
   const [view, setView] = useState<'city' | 'barangay'>(selectedBarangay ? 'barangay' : 'city')
 
-  // Dynamic States for data updates
+  // Dynamic States
   const [barangayList, setBarangayList] = useState(barangaySummary)
   const [logs, setLogs] = useState(activityLogs)
 
-  // Budget modal and form states
+  // Project detail modal
+  const [selectedProject, setSelectedProject] = useState<ReportProject | null>(null)
+
+  // ABYIP modal states
   const [showBudgetModal, setShowBudgetModal] = useState(false)
-  const [cityBudgetOverride, setCityBudgetOverride] = useState<number | null>(null)
   const [annualYear, setAnnualYear] = useState('2025')
   const [approvedBudget, setApprovedBudget] = useState('')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
@@ -24,9 +50,7 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
   const [successMessage, setSuccessMessage] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
 
-  const openBudgetModal = () => {
-    setShowBudgetModal(true)
-  }
+  const openBudgetModal = () => setShowBudgetModal(true)
 
   const handleCloseBudgetModal = () => {
     setShowBudgetModal(false)
@@ -39,64 +63,104 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
 
   const handleSubmitBudget = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!approvedBudget || parseFloat(approvedBudget) <= 0) {
-      setErrorMessage('Please enter a valid approved budget.')
+    if (!selectedBarangay) {
+      setErrorMessage('Please select a specific barangay first.')
       return
     }
     if (!selectedFile) {
-      setErrorMessage('Please upload a supporting document.')
+      setErrorMessage('Please upload the approved ABYIP document first.')
+      return
+    }
+    if (!approvedBudget || parseFloat(approvedBudget) <= 0) {
+      setErrorMessage('Please enter a valid approved ABYIP budget amount.')
       return
     }
 
     setIsSubmitting(true)
     setErrorMessage('')
 
-    // Simulate API submission delay
     setTimeout(() => {
       const budgetVal = parseFloat(approvedBudget)
 
-      // Set city-wide budget override
-      setCityBudgetOverride(budgetVal)
+      setBarangayList(prev =>
+        prev.map(b =>
+          b.barangay === selectedBarangay
+            ? { ...b, annualBudget: budgetVal, remaining: Math.max(0, budgetVal - b.spent) }
+            : b
+        )
+      )
 
-      // Create new activity log
       const newLog = {
         id: `log-${Date.now()}`,
         user: 'SCC Super Admin',
         actor: 'SCC Super Admin',
-        barangay: 'City-Wide',
-        action: `Approved Overall City SK Budget (FY ${annualYear}) - ₱${budgetVal.toLocaleString()}`,
+        barangay: selectedBarangay,
+        action: `Posted Approved ABYIP (FY ${annualYear}) for Barangay ${selectedBarangay} — ₱${budgetVal.toLocaleString()}`,
         date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
         when: 'Just now'
       }
       setLogs(prev => [newLog, ...prev])
 
       setIsSubmitting(false)
-      setSuccessMessage(`Overall SK Annual Budget (FY ${annualYear}) has been successfully submitted!`)
+      setSuccessMessage(`ABYIP (FY ${annualYear}) for Barangay ${selectedBarangay} — ₱${budgetVal.toLocaleString()} has been successfully posted!`)
     }, 1000)
   }
 
-  const totalBudget = cityBudgetOverride !== null ? cityBudgetOverride : barangayList.reduce((s, b) => s + b.annualBudget, 0)
-  const totalSpent = barangayList.reduce((s, b) => s + b.spent, 0)
-  const totalProj = projects.length
-  const usagePct = totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0
+  // ── Computed values ──────────────────────────────────────────────────────
+  const totalBudget = barangayList.reduce((s, b) => s + b.annualBudget, 0)
+  const totalSpent  = barangayList.reduce((s, b) => s + b.spent, 0)
+  const totalProj   = projects.length
+  const usagePct    = totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0
 
-  const bSummary = selectedBarangay
-    ? barangayList.find(b => b.barangay === selectedBarangay)
-    : null
-  const bProjects = selectedBarangay
-    ? projects.filter(p => p.barangay === selectedBarangay)
-    : []
+  const bSummary  = selectedBarangay ? barangayList.find(b => b.barangay === selectedBarangay) : null
+  const bProjects = selectedBarangay ? projects.filter(p => p.barangay === selectedBarangay) : []
 
   const displayBudget = selectedBarangay && bSummary ? bSummary.annualBudget : totalBudget
-  const displaySpent = selectedBarangay && bSummary ? bSummary.spent : totalSpent
-  const displayProj = selectedBarangay ? bProjects.length : totalProj
-  const displayUsage = displayBudget > 0 ? Math.min(Math.round((displaySpent / displayBudget) * 100), 100) : 0
+  const displaySpent  = selectedBarangay && bSummary ? bSummary.spent : totalSpent
+  const displayProj   = selectedBarangay ? bProjects.length : totalProj
+  const displayUsage  = displayBudget > 0 ? Math.min(Math.round((displaySpent / displayBudget) * 100), 100) : 0
 
   const recentLogs = logs.slice(0, 10)
+
+  // ── Barangay-filtered logs ───────────────────────────────────────────────
+  const barangayLogs = selectedBarangay
+    ? logs.filter(l => l.barangay === selectedBarangay)
+    : recentLogs
 
   return (
     <section className="section section-accent-flow" style={{ paddingTop: '2.5rem', paddingBottom: '3.5rem' }}>
       <div className="container">
+
+        {/* ── Back breadcrumb: only when a barangay is selected ── */}
+        {selectedBarangay && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.6rem',
+            marginBottom: '1.1rem',
+            padding: '0.65rem 1rem',
+            background: 'rgba(118,0,49,0.05)',
+            border: '1.5px solid rgba(118,0,49,0.12)',
+            borderRadius: '8px',
+          }}>
+            <button
+              onClick={() => { setSelectedBarangay(''); setView('city') }}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: '0.35rem',
+                background: 'none', border: 'none', cursor: 'pointer',
+                fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.82rem',
+                color: 'var(--maroon)', padding: 0,
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+              City Overview
+            </button>
+            <span style={{ color: 'var(--muted)', fontSize: '0.78rem' }}>/</span>
+            <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.82rem', color: 'var(--ink)' }}>
+              Barangay {selectedBarangay}
+            </span>
+          </div>
+        )}
 
         {/* ── Page Intro Banner ── */}
         <div className="page-intro reveal section-glass-grid" style={{ padding: '1.5rem 1.8rem', borderRadius: '12px', marginBottom: '1.8rem', background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(250,244,235,0.9) 100%)' }}>
@@ -104,30 +168,35 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
             <div>
               <span className="page-kicker">City Executive Command · Super Admin</span>
               <h1 className="page-title" style={{ marginTop: '0.3rem' }}>
-                Santa Rosa City SK Executive Dashboard
-                {selectedBarangay && (
-                  <span style={{ fontSize: '0.9rem', color: 'var(--maroon)', fontWeight: 700, marginLeft: '0.6rem' }}>
-                    · Barangay {selectedBarangay} Mode
-                  </span>
-                )}
+                {selectedBarangay
+                  ? `Barangay ${selectedBarangay} — ABYIP Dashboard`
+                  : 'Santa Rosa City SK Executive Dashboard'}
               </h1>
               <p className="page-subtitle" style={{ marginTop: '0.4rem' }}>
                 {selectedBarangay
-                  ? `Viewing official financial breakdown, projects, and transactions for Barangay ${selectedBarangay}.`
-                  : 'Financial and operational oversight across all 18 barangays of Santa Rosa City, Laguna. Data updated for FY 2025.'}
+                  ? `Annual Barangay Youth Investment Program (ABYIP) — full financial breakdown, projects, and transactions for Barangay ${selectedBarangay}.`
+                  : 'Financial and operational oversight across all 18 barangays of Santa Rosa City, Laguna. Click a barangay card below to manage its ABYIP.'}
               </p>
             </div>
-            <button className="btn btn-gold btn-sm" onClick={openBudgetModal} style={{ alignSelf: 'flex-start', marginTop: '0.4rem' }}>
-              + Post Approved Annual Budget
-            </button>
+            {/* Post Approved ABYIP button ONLY when a specific barangay is selected */}
+            {selectedBarangay && (
+              <button
+                className="btn btn-gold btn-sm"
+                onClick={openBudgetModal}
+                style={{ alignSelf: 'flex-start', marginTop: '0.4rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14"/></svg>
+                Post Approved ABYIP
+              </button>
+            )}
           </div>
         </div>
 
-        {/* ── Stat Cards ── */}
-        <div className="card-grid card-grid-4 reveal" style={{ marginBottom: '1.5rem' }}>
+        {/* ── Stat Cards (always show, data changes by context) ── */}
+        <div className="card-grid card-grid-4" style={{ marginBottom: '1.5rem' }}>
           <div className="stat-card card-accent">
             <div className="stat-value">{displayBudget === 0 ? '₱0' : `₱${(displayBudget / 1_000_000).toFixed(2)}M`}</div>
-            <div className="stat-label">{selectedBarangay ? `Barangay ${selectedBarangay} Budget` : 'Total SK Budget FY 2025'}</div>
+            <div className="stat-label">{selectedBarangay ? `Barangay ${selectedBarangay} ABYIP Budget` : 'Total SK Budget FY 2025'}</div>
             <div className="stat-sub">{selectedBarangay ? 'FY 2025 Allocation' : '18 Barangays combined'}</div>
           </div>
           <div className="stat-card" style={{ borderLeft: '3px solid #b45309' }}>
@@ -147,102 +216,266 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
           </div>
         </div>
 
-        {/* ── City-wide utilization bar + chart ── */}
-        <div className="card-grid card-grid-2 reveal" style={{ marginBottom: '1.5rem' }}>
-          <div className="chart-card" style={{ flexDirection: 'row', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
-            <DonutChart value={usagePct} size={110} stroke={14} label={`${usagePct}%`} sublabel="used" />
-            <div style={{ flex: 1 }}>
-              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.88rem', marginBottom: '0.5rem' }}>City-Wide SK Fund Utilization</div>
-              {[
-                { label: 'Total Budget', val: totalBudget === 0 ? '₱0' : `₱${(totalBudget / 1_000_000).toFixed(1)}M`, color: 'var(--maroon)' },
-                { label: 'Disbursed', val: totalSpent === 0 ? '₱0' : `₱${(totalSpent / 1_000_000).toFixed(1)}M`, color: '#b45309' },
-                { label: 'Remaining', val: (totalBudget - totalSpent) === 0 ? '₱0' : `₱${((totalBudget - totalSpent) / 1_000_000).toFixed(1)}M`, color: '#166534' },
-              ].map(item => (
-                <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontFamily: 'var(--font-display)', marginBottom: '0.25rem' }}>
-                  <span style={{ color: 'var(--muted)' }}>{item.label}</span>
-                  <span style={{ fontWeight: 700, color: item.color }}>{item.val}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="chart-card">
-            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.88rem', marginBottom: '0.75rem' }}>Project Status Breakdown</div>
-            {[
-              { label: 'Ongoing', count: projects.filter(p => p.status === 'ongoing').length, color: 'var(--maroon)' },
-              { label: 'Upcoming', count: projects.filter(p => p.status === 'upcoming').length, color: '#1d4ed8' },
-              { label: 'Completed', count: projects.filter(p => p.status === 'completed').length, color: '#166534' },
-            ].map(s => (
-              <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.6rem' }}>
-                <div style={{ fontSize: '1.6rem', fontFamily: 'var(--font-display)', fontWeight: 900, color: s.color, lineHeight: 1, minWidth: '2rem' }}>{s.count}</div>
-                <div style={{ fontSize: '0.82rem', color: 'var(--muted)', fontFamily: 'var(--font-display)' }}>{s.label} projects</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* ── View Tabs ── */}
-        <div className="filter-tabs">
-          <button className={`filter-tab${view === 'city' ? ' active' : ''}`} onClick={() => setView('city')}>City Overview</button>
-          <button className={`filter-tab${view === 'barangay' ? ' active' : ''}`} onClick={() => setView('barangay')}>Barangay Detail</button>
-        </div>
-
-        {/* ── VIEW: City Overview ── */}
-        {view === 'city' && (
-          <div className="page-cols page-cols-sidebar">
-
-            {/* Left — Barangay Budget Cards */}
-            <div>
-              <div style={{ marginBottom: '1rem' }}>
-                <div className="page-kicker">Barangay Breakdown</div>
-                <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1rem', color: 'var(--ink)', marginTop: '0.2rem' }}>Budget Utilization by Barangay</h2>
-              </div>
-              <div className="card-grid card-grid-2">
-                {barangayList.map(b => {
-                  const pct = b.annualBudget > 0 ? Math.round((b.spent / b.annualBudget) * 100) : 0
-                  return (
-                    <div key={b.barangay} className="card" style={{ padding: '1rem 1.1rem', cursor: 'pointer' }}
-                      onClick={() => { setSelectedBarangay(b.barangay); setView('barangay') }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem', gap: '0.5rem' }}>
-                        <div>
-                          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.88rem', color: 'var(--ink)', marginBottom: '0.15rem' }}>{b.barangay}</div>
-                          <div style={{ fontFamily: 'var(--font-display)', fontSize: '0.72rem', color: 'var(--muted)', fontWeight: 600 }}>{b.projects} Projects</div>
-                        </div>
-                        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: '1.1rem', color: pct >= 70 ? '#b45309' : 'var(--maroon)', letterSpacing: '-0.02em' }}>
-                          {pct}%
-                        </div>
-                      </div>
-                      <div className="progress-bar">
-                        <div className="progress-fill" style={{ width: `${pct}%`, background: pct >= 70 ? 'linear-gradient(90deg, #b45309, #f59e0b)' : undefined }} />
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.4rem', fontSize: '0.72rem', color: 'var(--muted)', fontFamily: 'var(--font-display)' }}>
-                        <span>{b.spent === 0 ? '₱0' : `₱${(b.spent / 1_000_000).toFixed(2)}M`}</span>
-                        <span>{b.annualBudget === 0 ? '₱0' : `₱${(b.annualBudget / 1_000_000).toFixed(2)}M`}</span>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* Right — Recent News + Activity */}
-            <div style={{ display: 'grid', gap: '1.5rem', alignContent: 'start' }}>
-              <div>
-                <div className="page-kicker" style={{ marginBottom: '0.75rem' }}>City News</div>
-                <div style={{ display: 'grid', gap: '0.65rem' }}>
-                  {news.slice(0, 5).map(n => (
-                    <div key={n.id} className="news-card">
-                      <span className="news-cat">{n.category}</span>
-                      <div className="news-title" style={{ fontSize: '0.88rem' }}>{n.title}</div>
-                      <span className="news-date">{n.date}</span>
+        {/* ════════════════════════════════════════════════════════
+            CITY-WIDE VIEW (no barangay selected)
+        ════════════════════════════════════════════════════════ */}
+        {!selectedBarangay && (
+          <>
+            {/* City-wide utilization + project breakdown */}
+            <div className="card-grid card-grid-2" style={{ marginBottom: '1.5rem' }}>
+              <div className="chart-card" style={{ flexDirection: 'row', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
+                <DonutChart value={usagePct} size={110} stroke={14} label={`${usagePct}%`} sublabel="used" />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.88rem', marginBottom: '0.5rem' }}>City-Wide SK Fund Utilization</div>
+                  {[
+                    { label: 'Total Budget', val: totalBudget === 0 ? '₱0' : `₱${(totalBudget/1_000_000).toFixed(1)}M`, color: 'var(--maroon)' },
+                    { label: 'Disbursed',    val: totalSpent === 0 ? '₱0' : `₱${(totalSpent/1_000_000).toFixed(1)}M`,  color: '#b45309' },
+                    { label: 'Remaining',   val: (totalBudget-totalSpent) === 0 ? '₱0' : `₱${((totalBudget-totalSpent)/1_000_000).toFixed(1)}M`, color: '#166534' },
+                  ].map(item => (
+                    <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontFamily: 'var(--font-display)', marginBottom: '0.25rem' }}>
+                      <span style={{ color: 'var(--muted)' }}>{item.label}</span>
+                      <span style={{ fontWeight: 700, color: item.color }}>{item.val}</span>
                     </div>
                   ))}
                 </div>
               </div>
+              <div className="chart-card">
+                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.88rem', marginBottom: '0.75rem' }}>Project Status Breakdown</div>
+                {[
+                  { label: 'Ongoing',   count: projects.filter(p => p.status === 'ongoing').length,   color: 'var(--maroon)' },
+                  { label: 'Upcoming',  count: projects.filter(p => p.status === 'upcoming').length,  color: '#1d4ed8' },
+                  { label: 'Completed', count: projects.filter(p => p.status === 'completed').length, color: '#166534' },
+                ].map(s => (
+                  <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.6rem' }}>
+                    <div style={{ fontSize: '1.6rem', fontFamily: 'var(--font-display)', fontWeight: 900, color: s.color, lineHeight: 1, minWidth: '2rem' }}>{s.count}</div>
+                    <div style={{ fontSize: '0.82rem', color: 'var(--muted)', fontFamily: 'var(--font-display)' }}>{s.label} projects</div>
+                  </div>
+                ))}
+              </div>
+            </div>
 
+            {/* View tabs + barangay/activity columns */}
+            <div className="page-cols page-cols-sidebar">
+              {/* Left — Barangay Budget Cards (clickable to drill in) */}
               <div>
-                <div className="page-kicker" style={{ marginBottom: '0.75rem' }}>System Activity</div>
+                <div style={{ marginBottom: '1rem' }}>
+                  <div className="page-kicker">Barangay Breakdown</div>
+                  <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1rem', color: 'var(--ink)', marginTop: '0.2rem' }}>
+                    Budget Utilization by Barangay — click to view ABYIP
+                  </h2>
+                </div>
+                <div className="card-grid card-grid-2">
+                  {barangayList.map(b => {
+                    const pct = b.annualBudget > 0 ? Math.round((b.spent / b.annualBudget) * 100) : 0
+                    return (
+                      <div key={b.barangay} className="card" style={{ padding: '1rem 1.1rem', cursor: 'pointer' }}
+                        onClick={() => { setSelectedBarangay(b.barangay); setView('barangay') }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem', gap: '0.5rem' }}>
+                          <div>
+                            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.88rem', color: 'var(--ink)', marginBottom: '0.15rem' }}>{b.barangay}</div>
+                            <div style={{ fontFamily: 'var(--font-display)', fontSize: '0.72rem', color: 'var(--muted)', fontWeight: 600 }}>{b.projects} Projects</div>
+                          </div>
+                          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: '1.1rem', color: pct >= 70 ? '#b45309' : 'var(--maroon)', letterSpacing: '-0.02em' }}>
+                            {pct}%
+                          </div>
+                        </div>
+                        <div className="progress-bar">
+                          <div className="progress-fill" style={{ width: `${pct}%`, background: pct >= 70 ? 'linear-gradient(90deg, #b45309, #f59e0b)' : undefined }} />
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.4rem', fontSize: '0.72rem', color: 'var(--muted)', fontFamily: 'var(--font-display)' }}>
+                          <span>{b.spent === 0 ? '₱0' : `₱${(b.spent / 1_000_000).toFixed(2)}M`}</span>
+                          <span>{b.annualBudget === 0 ? '₱0' : `₱${(b.annualBudget / 1_000_000).toFixed(2)}M`}</span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Right — City News + System Activity */}
+              <div style={{ display: 'grid', gap: '1.5rem', alignContent: 'start' }}>
+                <div>
+                  <div className="page-kicker" style={{ marginBottom: '0.75rem' }}>City News</div>
+                  <div style={{ display: 'grid', gap: '0.65rem' }}>
+                    {news.slice(0, 5).map(n => (
+                      <div key={n.id} className="news-card">
+                        <span className="news-cat">{n.category}</span>
+                        <div className="news-title" style={{ fontSize: '0.88rem' }}>{n.title}</div>
+                        <span className="news-date">{n.date}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="page-kicker" style={{ marginBottom: '0.75rem' }}>System Activity</div>
+                  <div style={{ display: 'grid', gap: '0.5rem' }}>
+                    {recentLogs.map(log => (
+                      <div key={log.id} className="card" style={{ padding: '0.72rem 0.9rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <div>
+                            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.82rem', color: 'var(--ink)' }}>{log.action}</div>
+                            <div style={{ fontSize: '0.76rem', color: 'var(--muted)', marginTop: '0.1rem' }}>{log.actor} · {log.barangay}</div>
+                          </div>
+                          <span style={{ fontFamily: 'var(--font-display)', fontSize: '0.72rem', color: 'var(--muted-light)', flexShrink: 0 }}>{log.date}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* ════════════════════════════════════════════════════════
+            BARANGAY-SPECIFIC VIEW (a barangay is selected)
+            Shows ONLY that barangay's data — no city-wide info
+        ════════════════════════════════════════════════════════ */}
+        {selectedBarangay && (
+          <>
+            {bSummary ? (
+              <>
+                {/* ── Barangay ABYIP Header Banner ── */}
+                <div style={{
+                  marginBottom: '1.5rem',
+                  padding: '1.1rem 1.4rem',
+                  background: 'linear-gradient(135deg, var(--maroon), var(--maroon-dark))',
+                  color: '#fff',
+                  borderRadius: '10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '1rem',
+                  flexWrap: 'wrap',
+                }}>
+                  <div>
+                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: '1.25rem', letterSpacing: '-0.02em' }}>
+                      Barangay {selectedBarangay}
+                    </div>
+                    <div style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.7)', marginTop: '0.2rem' }}>
+                      {bSummary.projects} project{bSummary.projects !== 1 ? 's' : ''} · ABYIP Allocation: {bSummary.annualBudget === 0 ? '₱0' : `₱${(bSummary.annualBudget / 1_000_000).toFixed(2)}M`}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                    {[
+                      { label: 'Budget', val: bSummary.annualBudget === 0 ? '₱0' : `₱${(bSummary.annualBudget/1_000_000).toFixed(2)}M`, color: '#fef3c7' },
+                      { label: 'Disbursed', val: bSummary.spent === 0 ? '₱0' : `₱${(bSummary.spent/1_000_000).toFixed(2)}M`, color: '#fed7aa' },
+                      { label: 'Remaining', val: bSummary.remaining === 0 ? '₱0' : `₱${(bSummary.remaining/1_000_000).toFixed(2)}M`, color: '#bbf7d0' },
+                    ].map(item => (
+                      <div key={item.label} style={{ textAlign: 'center', background: 'rgba(255,255,255,0.12)', padding: '0.5rem 0.9rem', borderRadius: '8px' }}>
+                        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: '1rem', color: item.color }}>{item.val}</div>
+                        <div style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.6)', fontFamily: 'var(--font-display)', fontWeight: 600 }}>{item.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* ── Barangay Utilization Bar ── */}
+                <div className="chart-card" style={{ marginBottom: '1.5rem', flexDirection: 'row', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap', display: 'flex' }}>
+                  <DonutChart
+                    value={bSummary.annualBudget > 0 ? Math.min(Math.round((bSummary.spent / bSummary.annualBudget) * 100), 100) : 0}
+                    size={100}
+                    stroke={13}
+                    label={`${bSummary.annualBudget > 0 ? Math.min(Math.round((bSummary.spent / bSummary.annualBudget) * 100), 100) : 0}%`}
+                    sublabel="used"
+                  />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.88rem', marginBottom: '0.5rem' }}>
+                      ABYIP Fund Utilization — Barangay {selectedBarangay}
+                    </div>
+                    {[
+                      { label: 'ABYIP Budget', val: bSummary.annualBudget === 0 ? '₱0' : `₱${(bSummary.annualBudget/1_000_000).toFixed(2)}M`, color: 'var(--maroon)' },
+                      { label: 'Disbursed',    val: bSummary.spent === 0 ? '₱0' : `₱${(bSummary.spent/1_000_000).toFixed(2)}M`, color: '#b45309' },
+                      { label: 'Remaining',   val: bSummary.remaining === 0 ? '₱0' : `₱${(bSummary.remaining/1_000_000).toFixed(2)}M`, color: '#166534' },
+                    ].map(item => (
+                      <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontFamily: 'var(--font-display)', marginBottom: '0.25rem' }}>
+                        <span style={{ color: 'var(--muted)' }}>{item.label}</span>
+                        <span style={{ fontWeight: 700, color: item.color }}>{item.val}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* ── Barangay Projects (v-card style) ── */}
+                <div style={{ marginBottom: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div>
+                    <div className="page-kicker">Projects</div>
+                    <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1rem', color: 'var(--ink)', marginTop: '0.2rem' }}>
+                      Barangay {selectedBarangay} — All Projects ({bProjects.length})
+                    </h2>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    {(['ongoing', 'upcoming', 'completed'] as const).map(s => (
+                      <span key={s} className={`badge badge-${s}`} style={{ fontSize: '0.72rem', padding: '0.2rem 0.55rem' }}>
+                        {projects.filter(p => p.barangay === selectedBarangay && p.status === s).length} {s}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {bProjects.length > 0 ? (
+                  <div className="card-grid card-grid-3" style={{ marginBottom: '2rem' }}>
+                    {bProjects.map(p => (
+                      <div key={p.id} className="v-card" style={{ cursor: 'pointer' }} onClick={() => setSelectedProject(p)}>
+                        <div className="v-card-img-wrap">
+                          <img
+                            src={getCover(p.category)}
+                            alt={p.category}
+                            className="v-card-img"
+                            onError={e => {
+                              (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1532629345422-7515f3d16bb6?w=640&q=75'
+                            }}
+                          />
+                          <div className="v-card-img-overlay" />
+                          <div className="v-card-badge-pin">
+                            <span className={`badge badge-${p.status}`}>{p.status}</span>
+                          </div>
+                        </div>
+                        <div className="v-card-body">
+                          <div className="v-card-kicker">{p.category}</div>
+                          <div className="v-card-title">{p.title}</div>
+                          <div className="v-card-date">{p.startDate} — {p.endDate}</div>
+                          {p.description && <p className="v-card-desc">{p.description}</p>}
+
+                          <div style={{ marginTop: '0.4rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                              <span style={{ fontSize: '0.72rem', color: 'var(--muted)', fontFamily: 'var(--font-display)', fontWeight: 600 }}>Progress</span>
+                              <span style={{ fontSize: '0.72rem', fontFamily: 'var(--font-display)', fontWeight: 800, color: 'var(--maroon)' }}>{p.progress}%</span>
+                            </div>
+                            <div className="progress-bar">
+                              <div className="progress-fill" style={{ width: `${p.progress}%` }} />
+                            </div>
+                          </div>
+
+                          <div className="v-card-footer">
+                            <div>
+                              <div className="v-card-budget">₱{(p.proposedBudget / 1000).toFixed(0)}K</div>
+                              <div className="v-card-budget-label">Budget</div>
+                            </div>
+                            <div style={{ textAlign: 'right', fontSize: '0.72rem', color: 'var(--muted)', fontFamily: 'var(--font-display)' }}>
+                              <div>Spent: <strong style={{ color: '#b45309' }}>₱{(p.spent / 1000).toFixed(0)}K</strong></div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="card" style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--muted)', marginBottom: '2rem' }}>
+                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700 }}>No projects found for Barangay {selectedBarangay}</div>
+                  </div>
+                )}
+
+                {/* ── Barangay-specific Activity Log ── */}
+                <div style={{ marginBottom: '0.75rem' }}>
+                  <div className="page-kicker">Activity Log</div>
+                  <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1rem', color: 'var(--ink)', marginTop: '0.2rem' }}>
+                    Barangay {selectedBarangay} — Recent Activity
+                  </h2>
+                </div>
                 <div style={{ display: 'grid', gap: '0.5rem' }}>
-                  {recentLogs.map(log => (
+                  {barangayLogs.length > 0 ? barangayLogs.map(log => (
                     <div key={log.id} className="card" style={{ padding: '0.72rem 0.9rem' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
                         <div>
@@ -252,148 +485,67 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
                         <span style={{ fontFamily: 'var(--font-display)', fontSize: '0.72rem', color: 'var(--muted-light)', flexShrink: 0 }}>{log.date}</span>
                       </div>
                     </div>
-                  ))}
+                  )) : (
+                    <div className="card" style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--muted)' }}>
+                      <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: '0.85rem' }}>No activity recorded for this barangay yet.</div>
+                    </div>
+                  )}
                 </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ── VIEW: Barangay Detail ── */}
-        {view === 'barangay' && (
-          <div>
-            {bSummary ? (
-              <>
-                {/* Banner */}
-                <div style={{ marginBottom: '1rem', padding: '0.85rem 1rem', background: 'linear-gradient(135deg, var(--maroon), var(--maroon-dark))', color: '#fff' }}>
-                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: '1.2rem', letterSpacing: '-0.02em' }}>Barangay {selectedBarangay}</div>
-                  <div style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.65)', marginTop: '0.1rem' }}>{bSummary.projects} projects · {bSummary.annualBudget === 0 ? '₱0' : `₱${(bSummary.annualBudget / 1_000_000).toFixed(2)}M`} allocated</div>
-                </div>
-
-                {/* Barangay Stats */}
-                <div className="card-grid card-grid-4" style={{ marginBottom: '1.2rem' }}>
-                  <div className="stat-card card-accent">
-                    <div className="stat-value">{bSummary.annualBudget === 0 ? '₱0' : `₱${(bSummary.annualBudget / 1_000_000).toFixed(2)}M`}</div>
-                    <div className="stat-label">Annual Budget</div>
-                  </div>
-                  <div className="stat-card" style={{ borderLeft: '3px solid #b45309' }}>
-                    <div className="stat-value" style={{ color: '#b45309' }}>{bSummary.spent === 0 ? '₱0' : `₱${(bSummary.spent / 1_000_000).toFixed(2)}M`}</div>
-                    <div className="stat-label">Disbursed</div>
-                    <div className="stat-sub">{bSummary.annualBudget > 0 ? Math.round((bSummary.spent / bSummary.annualBudget) * 100) : 0}% utilized</div>
-                  </div>
-                  <div className="stat-card" style={{ borderLeft: '3px solid #166534' }}>
-                    <div className="stat-value" style={{ color: '#166534' }}>{bSummary.remaining === 0 ? '₱0' : `₱${(bSummary.remaining / 1_000_000).toFixed(2)}M`}</div>
-                    <div className="stat-label">Remaining</div>
-                  </div>
-                  <div className="stat-card">
-                    <div className="stat-value">{bSummary.projects}</div>
-                    <div className="stat-label">Projects</div>
-                  </div>
-                </div>
-
-                {/* Projects list */}
-                <div className="page-kicker" style={{ marginBottom: '0.75rem' }}>Projects · {selectedBarangay}</div>
-                {bProjects.length > 0 ? (
-                  <div className="card-grid card-grid-2">
-                    {bProjects.map(p => (
-                      <div key={p.id} className="project-card">
-                        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.75rem', marginBottom: '0.45rem', flexWrap: 'wrap' }}>
-                          <div style={{ flex: 1 }}>
-                            <span className={`badge badge-${p.status}`} style={{ marginBottom: '0.3rem', display: 'inline-flex' }}>{p.status}</span>
-                            <div className="project-title">{p.title}</div>
-                            <div className="project-meta">
-                              <span className="project-meta-item">{p.category}</span>
-                            </div>
-                          </div>
-                          <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: '1.4rem', color: 'var(--maroon)', lineHeight: 1 }}>{p.progress}%</div>
-                          </div>
-                        </div>
-                        <div className="progress-bar">
-                          <div className="progress-fill" style={{ width: `${p.progress}%` }} />
-                        </div>
-                        <div className="project-budget-row">
-                          <span>Budget: <span className="project-budget-val">₱{p.proposedBudget.toLocaleString()}</span></span>
-                          <span>Spent: <span className="project-budget-val">₱{p.spent.toLocaleString()}</span></span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="card" style={{ textAlign: 'center', padding: '2rem', color: 'var(--muted)' }}>
-                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700 }}>No projects found for {selectedBarangay}</div>
-                  </div>
-                )}
               </>
             ) : (
               <div className="card" style={{ textAlign: 'center', padding: '3rem', color: 'var(--muted)' }}>
                 <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700 }}>Select a barangay from the header dropdown to view its details</div>
               </div>
             )}
-          </div>
+          </>
         )}
 
+        {/* ── Project Detail Modal ── */}
+        {selectedProject && (
+          <ProjectDetailModal project={selectedProject} onClose={() => setSelectedProject(null)} />
+        )}
 
-        {/* ── Submit Budget Modal ── */}
-        {showBudgetModal && (
+        {/* ── Post Approved ABYIP Modal ── */}
+        {showBudgetModal && selectedBarangay && (
+          <Portal>
           <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) handleCloseBudgetModal() }}>
-            <div className="modal" style={{ maxWidth: '500px' }}>
+            <div className="modal" style={{ maxWidth: '520px' }}>
               <div className="modal-header">
-                <span className="modal-title">Submit Annual Budget</span>
+                <span className="modal-title">Post Approved ABYIP — Barangay {selectedBarangay}</span>
                 <button className="modal-close" onClick={handleCloseBudgetModal}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12" /></svg>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
                 </button>
               </div>
               <form onSubmit={handleSubmitBudget}>
                 <div className="modal-body">
-                  {successMessage && (
-                    <div className="notice success" style={{ marginBottom: '0.5rem' }}>
-                      {successMessage}
+                  {/* Context banner */}
+                  {!successMessage && (
+                    <div className="notice info" style={{ fontSize: '0.82rem' }}>
+                      Annual Barangay Youth Investment Program (ABYIP) for <strong>Barangay {selectedBarangay}</strong>.
+                      Upload the official approved document first — budget details will then appear.
                     </div>
                   )}
+
+                  {successMessage && (
+                    <div className="notice success">{successMessage}</div>
+                  )}
                   {errorMessage && (
-                    <div className="notice error" style={{ marginBottom: '0.5rem' }}>
-                      {errorMessage}
-                    </div>
+                    <div className="notice error">{errorMessage}</div>
                   )}
 
                   {!successMessage && (
                     <>
+                      {/* ── STEP 1: Upload Document (always visible) ── */}
                       <div className="field-group">
-                        <label className="field-label">Annual Year *</label>
-                        <select
-                          className="input"
-                          value={annualYear}
-                          onChange={e => setAnnualYear(e.target.value)}
-                          required
-                        >
-                          <option value="2023">2023</option>
-                          <option value="2024">2024</option>
-                          <option value="2025">2025</option>
-                          <option value="2026">2026</option>
-                        </select>
-                      </div>
-
-                      <div className="field-group">
-                        <label className="field-label">Approved SK Budget (₱) *</label>
-                        <input
-                          type="number"
-                          className="input"
-                          placeholder="e.g. 2500000"
-                          value={approvedBudget}
-                          onChange={e => setApprovedBudget(e.target.value)}
-                          min="1"
-                          required
-                        />
-                      </div>
-
-                      <div className="field-group">
-                        <label className="field-label">Supporting Documents (Attachment Upload) *</label>
+                        <label className="field-label">
+                          Step 1 — Upload Approved ABYIP Document *
+                        </label>
                         {selectedFile ? (
                           <div style={{
                             border: '1.5px dashed var(--maroon)',
                             background: 'rgba(118, 0, 49, 0.03)',
                             padding: '1rem',
+                            borderRadius: '8px',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
@@ -403,7 +555,7 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
                               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--maroon)" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
                               <div style={{ textAlign: 'left' }}>
                                 <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.85rem', color: 'var(--ink)' }}>{selectedFile.name}</div>
-                                <div style={{ fontSize: '0.74rem', color: 'var(--muted)' }}>{(selectedFile.size / 1024).toFixed(1)} KB</div>
+                                <div style={{ fontSize: '0.74rem', color: 'var(--muted)' }}>{(selectedFile.size / 1024).toFixed(1)} KB — Document attached ✓</div>
                               </div>
                             </div>
                             <button type="button" className="btn btn-secondary btn-sm" style={{ padding: '0.3rem 0.6rem' }} onClick={() => setSelectedFile(null)}>
@@ -421,16 +573,59 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
                                   setSelectedFile(e.target.files[0])
                                 }
                               }}
-                              required
                             />
                             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--maroon)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
                             <div>
-                              <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.85rem', color: 'var(--maroon)' }}>Click to upload</span> or drag and drop
+                              <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.85rem', color: 'var(--maroon)' }}>Click to upload ABYIP document</span> or drag and drop
                             </div>
-                            <span style={{ fontSize: '0.72rem', color: 'var(--muted)' }}>PDF, DOCX, XLSX, or Images up to 10MB</span>
+                            <span style={{ fontSize: '0.72rem', color: 'var(--muted)' }}>PDF, DOCX, XLSX, or Image — up to 10MB</span>
                           </label>
                         )}
                       </div>
+
+                      {/* ── STEP 2: Budget details — ONLY visible after file is uploaded ── */}
+                      {selectedFile && (
+                        <>
+                          <div className="field-group">
+                            <label className="field-label">Target Barangay</label>
+                            <input
+                              type="text"
+                              className="input"
+                              value={`Barangay ${selectedBarangay}`}
+                              disabled
+                              style={{ background: 'rgba(0,0,0,0.04)', fontWeight: 700, color: 'var(--maroon)' }}
+                            />
+                          </div>
+
+                          <div className="field-group">
+                            <label className="field-label">Step 2 — Fiscal Year (FY) *</label>
+                            <select
+                              className="input"
+                              value={annualYear}
+                              onChange={e => setAnnualYear(e.target.value)}
+                              required
+                            >
+                              <option value="2023">2023</option>
+                              <option value="2024">2024</option>
+                              <option value="2025">2025</option>
+                              <option value="2026">2026</option>
+                            </select>
+                          </div>
+
+                          <div className="field-group">
+                            <label className="field-label">Step 3 — Approved ABYIP Budget Amount (₱) *</label>
+                            <input
+                              type="number"
+                              className="input"
+                              placeholder="e.g. 2500000"
+                              value={approvedBudget}
+                              onChange={e => setApprovedBudget(e.target.value)}
+                              min="1"
+                              required
+                            />
+                          </div>
+                        </>
+                      )}
                     </>
                   )}
                 </div>
@@ -444,8 +639,8 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
                       <button type="button" className="btn btn-secondary" onClick={handleCloseBudgetModal} disabled={isSubmitting}>
                         Cancel
                       </button>
-                      <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-                        {isSubmitting ? 'Submitting...' : 'Submit Budget'}
+                      <button type="submit" className="btn btn-primary" disabled={isSubmitting || !selectedFile}>
+                        {isSubmitting ? 'Posting ABYIP...' : 'Post Approved ABYIP'}
                       </button>
                     </>
                   )}
@@ -453,6 +648,7 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
               </form>
             </div>
           </div>
+          </Portal>
         )}
 
       </div>
