@@ -26,6 +26,7 @@ BARANGAYS = [
 
 @router.get("/consolidated", response_model=CityConsolidatedReport,
             summary="City-wide financial and project summary (public)")
+@router.get("/summary", response_model=CityConsolidatedReport, include_in_schema=False)
 def get_consolidated_report(db: Session = Depends(get_db)):
     barangay_summaries = []
     total_budget = 0.0
@@ -66,20 +67,25 @@ def get_consolidated_report(db: Session = Depends(get_db)):
         spent = sum(float(p.projectBreakdown or 0) for p in posted_projects)
 
         # Classify projects
-        from datetime import datetime as dt
-        now = dt.utcnow()
+        from datetime import datetime as dt, timezone
+        now = dt.now(timezone.utc)
+
+        def _make_utc(d):
+          if d is None: return None
+          return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+
         barangay_ongoing = sum(
             1 for p in posted_projects
             if p.projectStartTime and p.projectEndTime
-            and p.projectStartTime <= now <= p.projectEndTime
+            and _make_utc(p.projectStartTime) <= now <= _make_utc(p.projectEndTime)
         )
         barangay_completed = sum(
             1 for p in posted_projects
-            if p.projectEndTime and p.projectEndTime < now
+            if p.projectEndTime and _make_utc(p.projectEndTime) < now
         )
         barangay_upcoming = sum(
             1 for p in posted_projects
-            if p.projectStartTime and p.projectStartTime > now
+            if p.projectStartTime and _make_utc(p.projectStartTime) > now
         )
 
         barangay_summaries.append(BarangaySummary(

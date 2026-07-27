@@ -55,7 +55,7 @@ class User(Base):
     userDateCreated     = Column(DateTime, default=func.now())
     userUpdatedAt       = Column(DateTime, default=func.now(), onupdate=func.now())
     userProfilePicture  = Column(String(500), default="profile_picture.png")
-    userRole            = Column(Enum(UserRole), nullable=False, default=UserRole.GUEST)
+    userRole            = Column(Enum(UserRole, values_callable=lambda obj: [e.value for e in obj]), nullable=False, default=UserRole.GUEST)
     userIsSK            = Column(Boolean, default=False)
     userSKTermStart     = Column(Date, nullable=True)
     userSKTermEnd       = Column(Date, nullable=True)
@@ -86,7 +86,7 @@ class Project(Base):
     projectBudget       = Column(Numeric(12, 2), nullable=True)  # Proposed budget from proposal
     projectProgress     = Column(Integer, default=0)             # 0-100%
     projectCategory     = Column(String(100), nullable=True)     # e.g. Health, Education
-    projectStatus       = Column(Enum(ProjectStatus), nullable=False, default=ProjectStatus.DRAFTED)
+    projectStatus       = Column(Enum(ProjectStatus, values_callable=lambda obj: [e.value for e in obj]), nullable=False, default=ProjectStatus.DRAFTED)
     isDeleted           = Column(Boolean, default=False)
     createdAt           = Column(DateTime, default=func.now())
     updatedAt           = Column(DateTime, default=func.now(), onupdate=func.now())
@@ -107,7 +107,7 @@ class PurchaseOrder(Base):
     orderID             = Column(String(100), primary_key=True, index=True)
     projectID           = Column(Integer, ForeignKey("projects.projectID", ondelete="CASCADE"), nullable=False)
     orderName           = Column(String(255), nullable=False)
-    orderType           = Column(Enum(OrderType), nullable=False, default=OrderType.PHYSICAL)
+    orderType           = Column(Enum(OrderType, values_callable=lambda obj: [e.value for e in obj]), nullable=False, default=OrderType.PHYSICAL)
     orderQty            = Column(Numeric(10, 2), nullable=False, default=1.0)
     orderPrice          = Column(Numeric(12, 2), nullable=False, default=0.00)
     orderTotalPrice     = Column(Numeric(12, 2), nullable=True)  # Computed: qty × price
@@ -155,7 +155,7 @@ class Comment(Base):
     authorID            = Column(Integer, ForeignKey("users.userID", ondelete="CASCADE"), nullable=False)
     commentName         = Column(String(150), nullable=False)      # Author display name
     commentDetails      = Column(Text, nullable=False)
-    commentType         = Column(Enum(CommentType), default=CommentType.COMMENT)
+    commentType         = Column(Enum(CommentType, values_callable=lambda obj: [e.value for e in obj]), default=CommentType.COMMENT)
     votesCount          = Column(Integer, default=0)
     commentTimestamp    = Column(DateTime, default=func.now())
 

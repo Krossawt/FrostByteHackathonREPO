@@ -252,6 +252,13 @@ class NewsletterResponse(BaseModel):
 
 # ─── ANNUAL BUDGET REPORTS ────────────────────────────────────────────────────
 
+class BudgetReportCreate(BaseModel):
+    budgetBarangay: str
+    budgetYear: int
+    budgetValue: float = Field(..., ge=0)
+    budgetFileURL: Optional[str] = None
+
+
 class BudgetReportResponse(BaseModel):
     budgetID: int
     budgetBarangay: str

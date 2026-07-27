@@ -9,6 +9,8 @@ newsletter entries, comments, budget reports, and audit logs.
 
 import sys
 import os
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from datetime import datetime, date, timedelta
@@ -25,28 +27,32 @@ Base.metadata.create_all(bind=engine)
 def seed():
     db = SessionLocal()
     try:
-        # Skip if already seeded
-        if db.query(User).count() > 0:
-            print("✅ Database already seeded. Skipping.")
+        # Skip if already fully seeded (more than 10 users exist)
+        if db.query(User).count() > 10:
+            print("✅ Database already fully seeded. Skipping.")
             return
 
         print("🌱 Seeding eSKala database...")
 
         # ─── SUPER ADMIN ───────────────────────────────────────────────────────
-        super_admin = User(
-            userName="SCC Super Admin",
-            userEmail="superadmin@eskala.ph",
-            userHashedPassword=hash_password("Admin2026!"),
-            userRole=UserRole.SUPER_ADMIN,
-            userLocation="Santa Rosa City",
-            userIsStaRosa=True,
-            userIsSK=False,
-            userIsActive=True,
-            userIsDeleted=False,
-        )
-        db.add(super_admin)
-        db.flush()
-        print(f"  ✔ Super Admin: superadmin@eskala.ph / Admin2026!")
+        super_admin = db.query(User).filter(User.userEmail == "superadmin@eskala.ph").first()
+        if not super_admin:
+            super_admin = User(
+                userName="SCC Super Admin",
+                userEmail="superadmin@eskala.ph",
+                userHashedPassword=hash_password("Admin2026!"),
+                userRole=UserRole.SUPER_ADMIN,
+                userLocation="Santa Rosa City",
+                userIsStaRosa=True,
+                userIsSK=False,
+                userIsActive=True,
+                userIsDeleted=False,
+            )
+            db.add(super_admin)
+            db.flush()
+            print(f"  ✔ Super Admin: superadmin@eskala.ph / Admin2026!")
+        else:
+            print(f"  ✔ Super Admin already present.")
 
         # ─── SK OFFICIALS (all 18 barangays × 3 roles each = 54) ───────────────
         sk_data = [
@@ -127,24 +133,28 @@ def seed():
 
         sk_user_map = {}  # email -> User object
         for barangay, name, role, email, term_start, term_end in sk_data:
-            u = User(
-                userName=name,
-                userEmail=email,
-                userHashedPassword=hash_password("Sk2026!"),
-                userRole=role,
-                userLocation=barangay,
-                userIsStaRosa=True,
-                userIsSK=True,
-                userSKTermStart=date.fromisoformat(term_start),
-                userSKTermEnd=date.fromisoformat(term_end),
-                userIsActive=True,
-                userIsDeleted=False,
-            )
-            db.add(u)
-            db.flush()
-            sk_user_map[email] = u
+            existing_u = db.query(User).filter(User.userEmail == email).first()
+            if existing_u:
+                sk_user_map[email] = existing_u
+            else:
+                u = User(
+                    userName=name,
+                    userEmail=email,
+                    userHashedPassword=hash_password("Sk2026!"),
+                    userRole=role,
+                    userLocation=barangay,
+                    userIsStaRosa=True,
+                    userIsSK=True,
+                    userSKTermStart=date.fromisoformat(term_start),
+                    userSKTermEnd=date.fromisoformat(term_end),
+                    userIsActive=True,
+                    userIsDeleted=False,
+                )
+                db.add(u)
+                db.flush()
+                sk_user_map[email] = u
 
-        print(f"  ✔ {len(sk_data)} SK officials seeded across all 18 barangays")
+        print(f"  ✔ SK officials verified/seeded across all 18 barangays")
 
         # ─── CITIZEN ACCOUNTS ─────────────────────────────────────────────────
         citizens_data = [

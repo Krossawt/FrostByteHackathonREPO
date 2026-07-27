@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile
 from sqlalchemy.orm import Session
 from database import get_db
 from models import User, AnnualBudgetReport, AuditLog
-from schemas import BudgetReportResponse, BudgetReportOverride, MessageResponse
+from schemas import BudgetReportResponse, BudgetReportOverride, BudgetReportCreate, MessageResponse
 from auth import require_sk_officer, require_authenticated, log_action
 
 router = APIRouter(prefix="/api/v1/budget-reports", tags=["Annual Budget Reports"])
@@ -27,6 +27,36 @@ BARANGAYS = [
     "Market Area", "Pooc", "Pulong Santa Cruz", "Santo Domingo",
     "Sinalhan", "Tagapo"
 ]
+
+
+@router.post("", response_model=BudgetReportResponse, status_code=status.HTTP_201_CREATED,
+             summary="Post/Create Annual Budget Report (ABYIP)")
+def create_budget_report(
+    payload: BudgetReportCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_sk_officer),
+):
+    if payload.budgetBarangay not in BARANGAYS:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                            detail=f"'{payload.budgetBarangay}' is not a valid Santa Rosa City barangay")
+
+    report = AnnualBudgetReport(
+        budgetBarangay=payload.budgetBarangay,
+        budgetUploadedBy=current_user.userID,
+        budgetYear=payload.budgetYear,
+        budgetValue=payload.budgetValue,
+        budgetFileURL=payload.budgetFileURL,
+        isOCRScanned=False,
+        isManuallyOverridden=True,
+    )
+    db.add(report)
+    db.commit()
+    db.refresh(report)
+
+    log_action(db, current_user, "Posted Approved ABYIP", "annual_budget_reports", str(report.budgetID),
+               f"Approved ABYIP posted for {payload.budgetBarangay} FY{payload.budgetYear} — ₱{payload.budgetValue:,.2f}")
+
+    return BudgetReportResponse.model_validate(report)
 
 
 @router.get("", response_model=List[BudgetReportResponse], summary="List annual budget reports")
