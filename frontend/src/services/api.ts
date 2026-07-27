@@ -184,7 +184,7 @@ export async function postApprovedAbyipApi(payload: {
   budgetValue: number
   budgetFileURL?: string
 }): Promise<any> {
-  return request('/annual-budget-reports', {
+  return request('/budget-reports', {
     method: 'POST',
     body: JSON.stringify(payload),
   })
@@ -268,11 +268,63 @@ export async function fetchSKOfficialsApi(barangay?: string): Promise<any[]> {
   const query = barangay ? `?barangay=${encodeURIComponent(barangay)}` : ''
   return request<any[]>(`/reports/sk-officials${query}`)
 }
+// ─── PROJECT WORKFLOW TRANSITIONS ────────────────────────────────────────────
+
+export async function submitProjectToFinanceApi(projectId: number): Promise<ReportProject> {
+  return request<ReportProject>(`/projects/${projectId}/submit-to-finance`, {
+    method: 'PATCH',
+  })
+}
+
+export async function updateProjectBreakdownApi(projectId: number, projectBreakdown: number): Promise<ReportProject> {
+  return request<ReportProject>(`/projects/${projectId}/update-breakdown`, {
+    method: 'PATCH',
+    body: JSON.stringify({ projectBreakdown }),
+  })
+}
+
+export async function submitProjectForApprovalApi(projectId: number): Promise<ReportProject> {
+  return request<ReportProject>(`/projects/${projectId}/submit-for-approval`, {
+    method: 'PATCH',
+  })
+}
+
+export async function approveAndPostProjectApi(projectId: number): Promise<ReportProject> {
+  return request<ReportProject>(`/projects/${projectId}/approve-post`, {
+    method: 'PATCH',
+  })
+}
+
+export async function rejectProjectApi(projectId: number): Promise<ReportProject> {
+  return request<ReportProject>(`/projects/${projectId}/reject`, {
+    method: 'PATCH',
+  })
+}
+
+// ─── PURCHASE ORDERS (FINANCE MIS) ───────────────────────────────────────────
+
+export async function fetchPurchaseOrdersApi(projectId?: number): Promise<any[]> {
+  const query = projectId ? `?project_id=${projectId}` : ''
+  return request<any[]>(`/purchase-orders${query}`)
+}
+
+export async function createPurchaseOrderApi(payload: {
+  projectID: number
+  supplierName: string
+  orderItemsDescription: string
+  orderAmount: number
+  orderType?: string
+}): Promise<any> {
+  return request('/purchase-orders', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
 
 // ─── COMMENTS & SUGGESTIONS ──────────────────────────────────────────────────
 
 export async function fetchCommentsApi(projectId: number): Promise<any[]> {
-  return request<any[]>(`/comments/project/${projectId}`)
+  return request<any[]>(`/projects/${projectId}/comments`)
 }
 
 export async function postCommentApi(payload: {
@@ -281,7 +333,7 @@ export async function postCommentApi(payload: {
   commentType?: 'comment' | 'suggestion'
   parentCommentID?: number
 }): Promise<any> {
-  return request('/comments', {
+  return request(`/projects/${payload.commentFor}/comments`, {
     method: 'POST',
     body: JSON.stringify(payload),
   })
@@ -297,4 +349,16 @@ export async function voteCommentApi(commentId: number): Promise<any> {
 
 export async function fetchNewsApi(): Promise<NewsItem[]> {
   return request<NewsItem[]>('/newsletter')
+}
+
+export async function createNewsletterApi(payload: {
+  title: string
+  summary: string
+  category?: string
+  projectLocation?: string
+}): Promise<any> {
+  return request('/newsletter', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
 }
