@@ -5,11 +5,7 @@
 
 import type { UserAccount, ReportProject, NewsItem } from '../types'
 
-const API_BASE_URL =
-  (import.meta as any).env?.VITE_API_URL ||
-  (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-    ? 'http://localhost:8000/api/v1'
-    : 'https://frostbytehackathonrepo.onrender.com/api/v1')
+const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'https://frostbytehackathonrepo.onrender.com/api/v1'
 const TOKEN_KEY = 'eskala_access_token'
 
 export function getStoredToken(): string | null {
