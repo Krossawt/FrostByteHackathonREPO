@@ -131,9 +131,10 @@ export default function ProjectDetailModal({ project, user, onClose }: ProjectDe
   }
 
   return (
-    <Portal>
-      <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="modal project-modal">
+    <>
+      <Portal>
+        <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+          <div className="modal project-modal">
 
         {/* ── Cover ── */}
         <div className="project-modal-cover">
@@ -464,102 +465,103 @@ export default function ProjectDetailModal({ project, user, onClose }: ProjectDe
           )}
         </div>
       </div>
+    </div>
+  </Portal>
 
       {/* ── Receipt Image Lightbox Modal ── */}
       {viewingReceipt && (
-        <div className="modal-overlay" style={{ zIndex: 3000 }} onClick={() => setViewingReceipt(null)}>
-          <div className="modal" style={{ width: 'min(480px, 90vw)', padding: '1.25rem' }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
-              <div>
-                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1rem', color: 'var(--ink)' }}>
-                  Receipt Document — {viewingReceipt.vendor}
+        <Portal>
+          <div className="modal-overlay" style={{ zIndex: 3000 }} onClick={() => setViewingReceipt(null)}>
+            <div className="modal" style={{ width: 'min(480px, 90vw)', padding: '1.25rem' }} onClick={e => e.stopPropagation()}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
+                <div>
+                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1rem', color: 'var(--ink)' }}>
+                    Receipt Document — {viewingReceipt.vendor}
+                  </div>
+                  <div style={{ fontSize: '0.76rem', color: 'var(--muted)' }}>
+                    Date: {viewingReceipt.date} · Amount: ₱{viewingReceipt.amount.toLocaleString()}
+                  </div>
                 </div>
-                <div style={{ fontSize: '0.76rem', color: 'var(--muted)' }}>
-                  Date: {viewingReceipt.date} · Amount: ₱{viewingReceipt.amount.toLocaleString()}
+                <button className="modal-close-btn" onClick={() => setViewingReceipt(null)}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                </button>
+              </div>
+
+              {/* Authentic Mock Receipt Document Card */}
+              <div style={{
+                background: '#FAF8F5',
+                border: '2px dashed rgba(118,0,49,0.3)',
+                padding: '1.25rem',
+                borderRadius: '6px',
+                fontFamily: 'Courier New, monospace',
+                color: '#111',
+                boxShadow: 'inset 0 0 20px rgba(0,0,0,0.02), 0 8px 24px rgba(0,0,0,0.08)',
+                marginBottom: '1rem',
+                position: 'relative',
+                overflow: 'hidden'
+              }}>
+                {/* Official Stamp */}
+                <div style={{
+                  position: 'absolute',
+                  top: '1rem',
+                  right: '1rem',
+                  border: '2px solid #166534',
+                  color: '#166534',
+                  padding: '0.2rem 0.5rem',
+                  fontSize: '0.68rem',
+                  fontWeight: 800,
+                  transform: 'rotate(-8deg)',
+                  letterSpacing: '0.08em',
+                  background: 'rgba(240,253,244,0.85)'
+                }}>
+                  ✓ AUDITED &amp; VERIFIED
+                </div>
+
+                <div style={{ textAlign: 'center', borderBottom: '1px dashed #aaa', paddingBottom: '0.75rem', marginBottom: '0.85rem' }}>
+                  <div style={{ fontWeight: 800, fontSize: '0.78rem', textTransform: 'uppercase' }}>Republic of the Philippines · City of Santa Rosa</div>
+                  <div style={{ fontWeight: 900, fontSize: '0.92rem', color: 'var(--maroon)', marginTop: '0.15rem' }}>BARANGAY {project.barangay.toUpperCase()} SANGGUNIANG KABATAAN</div>
+                  <div style={{ fontSize: '0.72rem', color: '#555', marginTop: '0.15rem' }}>OFFICIAL DISBURSEMENT RECEIPT · O.R. #OR-2025-0{Math.abs(viewingReceipt.id.charCodeAt(0)) % 9000 + 1000}</div>
+                </div>
+
+                <div style={{ display: 'grid', gap: '0.35rem', fontSize: '0.78rem', marginBottom: '0.85rem' }}>
+                  <div><strong>PAYEE / VENDOR:</strong> {viewingReceipt.vendor}</div>
+                  <div><strong>DATE FILED:</strong> {viewingReceipt.date}</div>
+                  <div><strong>PROJECT:</strong> {viewingReceipt.projectTitle || project.title}</div>
+                  <div><strong>PARTICULARS:</strong> {viewingReceipt.description || 'Disbursement for youth initiative'}</div>
+                </div>
+
+                <table style={{ width: '100%', fontSize: '0.75rem', borderCollapse: 'collapse', borderTop: '1px dashed #aaa', borderBottom: '1px dashed #aaa', margin: '0.5rem 0 0.85rem' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid #ddd' }}>
+                      <th style={{ textAlign: 'left', padding: '0.3rem 0' }}>DESCRIPTION</th>
+                      <th style={{ textAlign: 'right', padding: '0.3rem 0' }}>AMOUNT</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td style={{ padding: '0.3rem 0' }}>Procurement &amp; Supplies</td>
+                      <td style={{ textAlign: 'right' }}>₱{(viewingReceipt.amount * 0.7).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                    </tr>
+                    <tr>
+                      <td style={{ padding: '0.3rem 0' }}>Logistics &amp; Services</td>
+                      <td style={{ textAlign: 'right' }}>₱{(viewingReceipt.amount * 0.3).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 900, fontSize: '0.95rem', color: 'var(--maroon)' }}>
+                  <span>TOTAL AMOUNT PAID:</span>
+                  <span>₱{viewingReceipt.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                 </div>
               </div>
-              <button className="modal-close-btn" onClick={() => setViewingReceipt(null)}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+
+              <button className="btn btn-primary btn-sm" style={{ width: '100%', marginTop: '1rem', justifyContent: 'center' }} onClick={() => setViewingReceipt(null)}>
+                Done Viewing
               </button>
             </div>
-
-            {/* Authentic Mock Receipt Document Card */}
-            <div style={{
-              background: '#FAF8F5',
-              border: '2px dashed rgba(118,0,49,0.3)',
-              padding: '1.25rem',
-              borderRadius: '6px',
-              fontFamily: 'Courier New, monospace',
-              color: '#111',
-              boxShadow: 'inset 0 0 20px rgba(0,0,0,0.02), 0 8px 24px rgba(0,0,0,0.08)',
-              marginBottom: '1rem',
-              position: 'relative',
-              overflow: 'hidden'
-            }}>
-              {/* Official Stamp */}
-              <div style={{
-                position: 'absolute',
-                top: '1rem',
-                right: '1rem',
-                border: '2px solid #166534',
-                color: '#166534',
-                padding: '0.2rem 0.5rem',
-                fontSize: '0.68rem',
-                fontWeight: 800,
-                transform: 'rotate(-8deg)',
-                letterSpacing: '0.08em',
-                background: 'rgba(240,253,244,0.85)'
-              }}>
-                ✓ AUDITED &amp; VERIFIED
-              </div>
-
-              <div style={{ textAlign: 'center', borderBottom: '1px dashed #aaa', paddingBottom: '0.75rem', marginBottom: '0.85rem' }}>
-                <div style={{ fontWeight: 800, fontSize: '0.78rem', textTransform: 'uppercase' }}>Republic of the Philippines · City of Santa Rosa</div>
-                <div style={{ fontWeight: 900, fontSize: '0.92rem', color: 'var(--maroon)', marginTop: '0.15rem' }}>BARANGAY {project.barangay.toUpperCase()} SANGGUNIANG KABATAAN</div>
-                <div style={{ fontSize: '0.72rem', color: '#555', marginTop: '0.15rem' }}>OFFICIAL DISBURSEMENT RECEIPT · O.R. #OR-2025-0{Math.abs(viewingReceipt.id.charCodeAt(0)) % 9000 + 1000}</div>
-              </div>
-
-              <div style={{ display: 'grid', gap: '0.35rem', fontSize: '0.78rem', marginBottom: '0.85rem' }}>
-                <div><strong>PAYEE / VENDOR:</strong> {viewingReceipt.vendor}</div>
-                <div><strong>DATE FILED:</strong> {viewingReceipt.date}</div>
-                <div><strong>PROJECT:</strong> {viewingReceipt.projectTitle || project.title}</div>
-                <div><strong>PARTICULARS:</strong> {viewingReceipt.description || 'Disbursement for youth initiative'}</div>
-              </div>
-
-              <table style={{ width: '100%', fontSize: '0.75rem', borderCollapse: 'collapse', borderTop: '1px dashed #aaa', borderBottom: '1px dashed #aaa', margin: '0.5rem 0 0.85rem' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid #ddd' }}>
-                    <th style={{ textAlign: 'left', padding: '0.3rem 0' }}>DESCRIPTION</th>
-                    <th style={{ textAlign: 'right', padding: '0.3rem 0' }}>AMOUNT</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td style={{ padding: '0.3rem 0' }}>Procurement &amp; Supplies</td>
-                    <td style={{ textAlign: 'right' }}>₱{(viewingReceipt.amount * 0.7).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                  </tr>
-                  <tr>
-                    <td style={{ padding: '0.3rem 0' }}>Logistics &amp; Services</td>
-                    <td style={{ textAlign: 'right' }}>₱{(viewingReceipt.amount * 0.3).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                  </tr>
-                </tbody>
-              </table>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 900, fontSize: '0.95rem', color: 'var(--maroon)' }}>
-                <span>TOTAL AMOUNT PAID:</span>
-                <span>₱{viewingReceipt.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
-              </div>
-            </div>
-
-            <button className="btn btn-primary btn-sm" style={{ width: '100%', marginTop: '1rem', justifyContent: 'center' }} onClick={() => setViewingReceipt(null)}>
-              Done Viewing
-            </button>
           </div>
-        </div>
+        </Portal>
       )}
-
-      </div>
-    </div>
-    </Portal>
+    </>
   )
 }
