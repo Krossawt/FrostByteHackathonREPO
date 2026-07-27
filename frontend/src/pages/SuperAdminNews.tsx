@@ -1,8 +1,8 @@
-import { useState, useEffect, FormEvent } from 'react'
+import { useState, useEffect, FormEvent, ChangeEvent } from 'react'
 import type { NewsItem } from '../types'
 import ConfirmDialog from '../components/ConfirmDialog'
 import Portal from '../components/Portal'
-import { fetchNewsApi } from '../services/api'
+import { fetchNewsApi, createNewsletterApi, deleteNewsletterApi, uploadNewsImageApi } from '../services/api'
 
 const CATEGORIES = ['Transparency', 'Youth Programs', 'SK Update', 'Health', 'Education', 'Environment', 'Sports', 'City News', 'Emergency']
 
@@ -18,26 +18,30 @@ export default function SuperAdminNews() {
   const [formCat, setFormCat]         = useState('SK Update')
   const [formSummary, setFormSummary] = useState('')
   const [formDate, setFormDate]       = useState('')
+  const [imageFile, setImageFile]     = useState<File | null>(null)
+  const [imageUrl, setImageUrl]       = useState('')
+  const [uploading, setUploading]     = useState(false)
   const [formError, setFormError]     = useState('')
 
-  useEffect(() => {
-    async function loadNews() {
-      try {
-        const res = await fetchNewsApi()
-        if (Array.isArray(res)) {
-          setArticles(res.map((n: any) => ({
-            id: String(n.newsletterID || n.id),
-            title: n.title,
-            category: n.category || 'City News',
-            summary: n.summary || n.fullContent || '',
-            date: n.publishedAt ? new Date(n.publishedAt).toLocaleDateString() : 'Today',
-            image: n.imageURL || undefined,
-          })))
-        }
-      } catch (err) {
-        console.warn('API error fetching news:', err)
+  async function loadNews() {
+    try {
+      const res = await fetchNewsApi()
+      if (Array.isArray(res)) {
+        setArticles(res.map((n: any) => ({
+          id: String(n.newsletterID || n.id),
+          title: n.title,
+          category: n.category || 'City News',
+          summary: n.summary || n.fullContent || '',
+          date: n.publishedAt ? new Date(n.publishedAt).toLocaleDateString() : 'Today',
+          image: n.imageURL || undefined,
+        })))
       }
+    } catch (err) {
+      console.warn('API error fetching news:', err)
     }
+  }
+
+  useEffect(() => {
     loadNews()
   }, [])
 
@@ -57,36 +61,70 @@ export default function SuperAdminNews() {
       setFormCat(item.category)
       setFormSummary(item.summary ?? '')
       setFormDate(item.date)
+      setImageUrl(item.image ?? '')
+      setImageFile(null)
     } else {
       setEditTarget(null)
-      setFormTitle(''); setFormCat('SK Update'); setFormSummary(''); setFormDate(''); setFormError('')
+      setFormTitle(''); setFormCat('SK Update'); setFormSummary(''); setFormDate(''); setImageUrl(''); setImageFile(null); setFormError('')
     }
     setShowModal(true)
   }
 
-  const handleSave = (e: FormEvent) => {
-    e.preventDefault(); setFormError('')
-    if (!formTitle.trim() || !formDate) { setFormError('Title and date are required.'); return }
-    if (editTarget) {
-      setArticles(prev => prev.map(a => a.id === editTarget.id
-        ? { ...a, title: formTitle.trim(), category: formCat, summary: formSummary.trim(), date: formDate }
-        : a
-      ))
-    } else {
-      const newArticle: NewsItem = {
-        id: `n-${Math.random().toString(36).slice(2, 8)}`,
-        title: formTitle.trim(), category: formCat,
-        summary: formSummary.trim(), date: formDate,
+  const handleImageChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0]
+      setImageFile(file)
+      try {
+        setUploading(true)
+        const uploaded = await uploadNewsImageApi(file)
+        setImageUrl(uploaded.imageURL)
+      } catch (err: any) {
+        setFormError(`Image upload failed: ${err.message}`)
+      } finally {
+        setUploading(false)
       }
-      setArticles(prev => [newArticle, ...prev])
     }
-    setShowModal(false)
   }
 
-  const confirmDelete = () => {
+  const handleSave = async (e: FormEvent) => {
+    e.preventDefault()
+    setFormError('')
+    if (!formTitle.trim()) { setFormError('Article Title is required.'); return }
+
+    try {
+      let finalImg = imageUrl
+      if (imageFile && !finalImg) {
+        setUploading(true)
+        const uploaded = await uploadNewsImageApi(imageFile)
+        finalImg = uploaded.imageURL
+      }
+
+      await createNewsletterApi({
+        title: formTitle.trim(),
+        summary: formSummary.trim(),
+        category: formCat,
+        imageURL: finalImg || undefined,
+      })
+
+      await loadNews()
+      setShowModal(false)
+    } catch (err: any) {
+      setFormError(`Failed to publish news: ${err.message}`)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const confirmDelete = async () => {
     if (!deleteTarget) return
-    setArticles(prev => prev.filter(a => a.id !== deleteTarget.id))
-    setDeleteTarget(null)
+    try {
+      await deleteNewsletterApi(Number(deleteTarget.id))
+      await loadNews()
+    } catch (err) {
+      setArticles(prev => prev.filter(a => a.id !== deleteTarget.id))
+    } finally {
+      setDeleteTarget(null)
+    }
   }
 
   return (
@@ -207,6 +245,17 @@ export default function SuperAdminNews() {
                   </div>
 
                   <div className="form-group">
+                    <label className="form-label">Article Banner Image (Optional)</label>
+                    <input className="form-input" type="file" accept="image/*" onChange={handleImageChange} />
+                    {uploading && <div style={{ fontSize: '0.78rem', color: 'var(--maroon)', marginTop: '0.25rem' }}>Uploading image to backend static storage…</div>}
+                    {imageUrl && (
+                      <div style={{ marginTop: '0.4rem', fontSize: '0.78rem', color: '#166534' }}>
+                        Image attached: <a href={imageUrl} target="_blank" rel="noreferrer" style={{ textDecoration: 'underline' }}>{imageUrl}</a>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="form-group">
                     <label className="form-label">Summary / Body</label>
                     <textarea className="form-input" value={formSummary} onChange={e => setFormSummary(e.target.value)}
                       placeholder="Brief description of the announcement…" style={{ minHeight: '110px', resize: 'vertical' }} />
@@ -214,7 +263,9 @@ export default function SuperAdminNews() {
                 </div>
                 <div className="modal-footer">
                   <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-                  <button type="submit" className="btn btn-primary">{editTarget ? 'Save Changes' : 'Publish Article'}</button>
+                  <button type="submit" className="btn btn-primary" disabled={uploading}>
+                    {uploading ? 'Uploading Image…' : editTarget ? 'Save Changes' : 'Publish Article'}
+                  </button>
                 </div>
               </form>
             </div>

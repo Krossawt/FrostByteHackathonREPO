@@ -382,3 +382,9 @@ export async function uploadNewsImageApi(file: File): Promise<{ imageURL: string
   }
   return res.json()
 }
+
+export async function deleteNewsletterApi(newsletterId: number): Promise<any> {
+  return request(`/newsletter/${newsletterId}`, {
+    method: 'DELETE',
+  })
+}
