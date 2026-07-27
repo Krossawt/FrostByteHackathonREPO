@@ -8,20 +8,20 @@ const CATEGORIES = ['Transparency', 'Youth Programs', 'SK Update', 'Health', 'Ed
 
 export default function SuperAdminNews() {
   const [articles, setArticles] = useState<NewsItem[]>([])
-  const [showModal, setShowModal]   = useState(false)
+  const [showModal, setShowModal] = useState(false)
   const [editTarget, setEditTarget] = useState<NewsItem | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<NewsItem | null>(null)
-  const [search, setSearch]         = useState('')
-  const [filterCat, setFilterCat]   = useState('All')
+  const [search, setSearch] = useState('')
+  const [filterCat, setFilterCat] = useState('All')
 
-  const [formTitle, setFormTitle]     = useState('')
-  const [formCat, setFormCat]         = useState('SK Update')
+  const [formTitle, setFormTitle] = useState('')
+  const [formCat, setFormCat] = useState('SK Update')
   const [formSummary, setFormSummary] = useState('')
-  const [formDate, setFormDate]       = useState('')
-  const [imageFile, setImageFile]     = useState<File | null>(null)
-  const [imageUrl, setImageUrl]       = useState('')
-  const [uploading, setUploading]     = useState(false)
-  const [formError, setFormError]     = useState('')
+  const [formDate, setFormDate] = useState('')
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imageUrl, setImageUrl] = useState('')
+  const [uploading, setUploading] = useState(false)
+  const [formError, setFormError] = useState('')
 
   async function loadNews() {
     try {
@@ -173,7 +173,7 @@ export default function SuperAdminNews() {
         <div className="toolbar">
           <div className="search-wrap">
             <svg className="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+              <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
             </svg>
             <input className="search-input" type="text" placeholder="Search articles by title or content…"
               value={search} onChange={e => setSearch(e.target.value)} />
@@ -213,63 +213,63 @@ export default function SuperAdminNews() {
         {/* ── Publish / Edit Modal ── */}
         {showModal && (
           <Portal>
-          <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowModal(false) }}>
-            <div className="modal">
-              <div className="modal-header">
-                <span className="modal-title">{editTarget ? 'Edit Article' : 'Publish New Article'}</span>
-                <button className="modal-close" onClick={() => setShowModal(false)}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
-                </button>
-              </div>
-              <form onSubmit={handleSave}>
-                <div className="modal-body">
-                  {formError && <div className="alert-error">{formError}</div>}
-
-                  <div className="form-group">
-                    <label className="form-label">Article Title *</label>
-                    <input className="form-input" type="text" value={formTitle} onChange={e => setFormTitle(e.target.value)}
-                      placeholder="e.g., SK Federation General Assembly — Q3 2025" required />
-                  </div>
-
-                  <div className="form-row-2">
-                    <div className="form-group">
-                      <label className="form-label">Category *</label>
-                      <select className="form-input" value={formCat} onChange={e => setFormCat(e.target.value)}>
-                        {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                      </select>
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">Date Published *</label>
-                      <input className="form-input" type="date" value={formDate} onChange={e => setFormDate(e.target.value)} required />
-                    </div>
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">Article Banner Image</label>
-                    <input className="form-input" type="file" accept="image/*" onChange={handleImageChange} />
-                    {uploading && <div style={{ fontSize: '0.78rem', color: 'var(--maroon)', marginTop: '0.25rem' }}>Uploading image to backend storage…</div>}
-                    {imageUrl && (
-                      <div style={{ marginTop: '0.4rem', fontSize: '0.78rem', color: '#166534' }}>
-                        Uploaded image: <a href={imageUrl.startsWith('http') ? imageUrl : `https://frostbytehackathonrepo.onrender.com${imageUrl}`} target="_blank" rel="noreferrer" style={{ textDecoration: 'underline' }}>{imageUrl}</a>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">Summary / Body</label>
-                    <textarea className="form-input" value={formSummary} onChange={e => setFormSummary(e.target.value)}
-                      placeholder="Brief description of the announcement…" style={{ minHeight: '110px', resize: 'vertical' }} />
-                  </div>
-                </div>
-                <div className="modal-footer">
-                  <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-                  <button type="submit" className="btn btn-primary" disabled={uploading}>
-                    {uploading ? 'Uploading Image…' : editTarget ? 'Save Changes' : 'Publish Article'}
+            <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowModal(false) }}>
+              <div className="modal">
+                <div className="modal-header">
+                  <span className="modal-title">{editTarget ? 'Edit Article' : 'Publish New Article'}</span>
+                  <button className="modal-close" onClick={() => setShowModal(false)}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12" /></svg>
                   </button>
                 </div>
-              </form>
+                <form onSubmit={handleSave}>
+                  <div className="modal-body">
+                    {formError && <div className="alert-error">{formError}</div>}
+
+                    <div className="form-group">
+                      <label className="form-label">Article Title *</label>
+                      <input className="form-input" type="text" value={formTitle} onChange={e => setFormTitle(e.target.value)}
+                        placeholder="e.g., SK Federation General Assembly — Q3 2025" required />
+                    </div>
+
+                    <div className="form-row-2">
+                      <div className="form-group">
+                        <label className="form-label">Category *</label>
+                        <select className="form-input" value={formCat} onChange={e => setFormCat(e.target.value)}>
+                          {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Date Published *</label>
+                        <input className="form-input" type="date" value={formDate} onChange={e => setFormDate(e.target.value)} required />
+                      </div>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">Article Banner Image</label>
+                      <input className="form-input" type="file" accept="image/*" onChange={handleImageChange} />
+                      {uploading && <div style={{ fontSize: '0.78rem', color: 'var(--maroon)', marginTop: '0.25rem' }}>Uploading image to backend storage…</div>}
+                      {imageUrl && (
+                        <div style={{ marginTop: '0.4rem', fontSize: '0.78rem', color: '#166534' }}>
+                          Uploaded image: <a href={imageUrl.startsWith('http') ? imageUrl : `https://frostbytehackathonrepo.onrender.com${imageUrl}`} target="_blank" rel="noreferrer" style={{ textDecoration: 'underline' }}>{imageUrl}</a>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">Summary / Body</label>
+                      <textarea className="form-input" value={formSummary} onChange={e => setFormSummary(e.target.value)}
+                        placeholder="Brief description of the announcement…" style={{ minHeight: '110px', resize: 'vertical' }} />
+                    </div>
+                  </div>
+                  <div className="modal-footer">
+                    <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
+                    <button type="submit" className="btn btn-primary" disabled={uploading}>
+                      {uploading ? 'Uploading Image…' : editTarget ? 'Save Changes' : 'Publish Article'}
+                    </button>
+                  </div>
+                </form>
+              </div>
             </div>
-          </div>
           </Portal>
         )}
 
