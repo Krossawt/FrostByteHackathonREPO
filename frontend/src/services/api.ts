@@ -5,7 +5,11 @@
 
 import type { UserAccount, ReportProject, NewsItem } from '../types'
 
-const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000/api/v1'
+const API_BASE_URL =
+  (import.meta as any).env?.VITE_API_URL ||
+  (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+    ? 'http://localhost:8000/api/v1'
+    : 'https://frostbytehackathonrepo.onrender.com/api/v1')
 const TOKEN_KEY = 'eskala_access_token'
 
 export function getStoredToken(): string | null {
@@ -25,8 +29,13 @@ export function setStoredToken(token: string | null, remember = false): void {
   }
 }
 
+const IS_DEV = true
+
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = getStoredToken()
+  const method = options.method || 'GET'
+  const fullUrl = `${API_BASE_URL}${endpoint}`
+
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string>),
@@ -36,25 +45,63 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     headers['Authorization'] = `Bearer ${token}`
   }
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers,
-  })
-
-  if (!response.ok) {
-    let errorDetail = `Request failed with status ${response.status}`
-    try {
-      const errJson = await response.json()
-      if (errJson.detail) {
-        errorDetail = typeof errJson.detail === 'string' ? errJson.detail : JSON.stringify(errJson.detail)
-      }
-    } catch {
-      // ignore json parse error
-    }
-    throw new Error(errorDetail)
+  if (IS_DEV) {
+    console.log(
+      `%c[API REQUEST] %c${method} %c${endpoint}`,
+      'background: #760031; color: #fff; font-weight: bold; padding: 2px 6px; border-radius: 3px;',
+      'color: #b45309; font-weight: bold;',
+      'color: #1d4ed8;',
+      { fullUrl, payload: options.body ? JSON.parse(options.body as string) : null }
+    )
   }
 
-  return response.json() as Promise<T>
+  try {
+    const response = await fetch(fullUrl, {
+      ...options,
+      headers,
+    })
+
+    if (!response.ok) {
+      let errorDetail = `HTTP ${response.status}: ${response.statusText}`
+      try {
+        const errJson = await response.json()
+        if (errJson.detail) {
+          errorDetail = typeof errJson.detail === 'string' ? errJson.detail : JSON.stringify(errJson.detail)
+        }
+      } catch {
+        // fallback to HTTP status
+      }
+
+      console.error(
+        `%c[API ERROR ${response.status}] %c${method} ${endpoint}`,
+        'background: #b91c1c; color: #fff; font-weight: bold; padding: 2px 6px; border-radius: 3px;',
+        'color: #991b1b; font-weight: bold;',
+        errorDetail
+      )
+      throw new Error(errorDetail)
+    }
+
+    const data = await response.json()
+    if (IS_DEV) {
+      console.log(
+        `%c[API SUCCESS] %c${method} ${endpoint}`,
+        'background: #166534; color: #fff; font-weight: bold; padding: 2px 6px; border-radius: 3px;',
+        'color: #15803d;',
+        data
+      )
+    }
+    return data as T
+  } catch (err: any) {
+    if (err.name === 'TypeError' || err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError') || err.message?.includes('failed with status')) {
+      console.error(
+        `%c[NETWORK ERROR 🚨] %cFastAPI Backend is Offline at ${API_BASE_URL}`,
+        'background: #7f1d1d; color: #fef2f2; font-weight: bold; padding: 4px 8px; border-radius: 4px; font-size: 12px;',
+        'color: #b91c1c; font-weight: bold;',
+        'Make sure the FastAPI backend is running! Start it with: python -m uvicorn main:app --reload --port 8000'
+      )
+    }
+    throw err
+  }
 }
 
 // ─── AUTH ENDPOINTS ─────────────────────────────────────────────────────────

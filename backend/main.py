@@ -71,13 +71,27 @@ app.add_middleware(
         FRONTEND_URL,
         "http://localhost:5173",
         "http://localhost:3000",
+        "http://localhost:4173",
         "https://eskala.ph",
         "https://www.eskala.ph",
     ],
+    allow_origin_regex=r"https://.*\.vercel\.app|https://.*\.railway\.app|http://localhost:.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ─── Request Logging Middleware (Development Diagnostics) ──────────────────────
+import time
+from fastapi import Request
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start_time = time.time()
+    response = await call_next(request)
+    duration = round((time.time() - start_time) * 1000, 2)
+    print(f"-> [API] {request.method} {request.url.path} -> {response.status_code} ({duration}ms)")
+    return response
 
 # ─── Static Files (uploaded receipts, budget docs) ────────────────────────────
 app.mount("/static", StaticFiles(directory="static"), name="static")
