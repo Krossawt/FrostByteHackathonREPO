@@ -1,12 +1,12 @@
 import { FormEvent, useState } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { Menu, X } from 'lucide-react'
-import { BARANGAYS } from '../data/mockData'
+import { BARANGAYS } from '../constants'
 import type { UserAccount } from '../types'
 import NewsTicker from '../components/NewsTicker'
 
 interface RegisterPageProps {
-  onRegister: (name: string, email: string, password: string, barangay: string, isStaRosa: boolean, username?: string) => UserAccount | void
+  onRegister: (name: string, email: string, password: string, barangay: string, isStaRosa: boolean, username?: string) => Promise<UserAccount> | UserAccount | void
 }
 
 export default function RegisterPage({ onRegister }: RegisterPageProps) {
@@ -21,6 +21,7 @@ export default function RegisterPage({ onRegister }: RegisterPageProps) {
   const [agreed, setAgreed] = useState(false)
   const [showPw, setShowPw] = useState(false)
   const [error, setError] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [showSuccessModal, setShowSuccessModal] = useState(false)
   const [createdUser, setCreatedUser] = useState<UserAccount | null>(null)
   const [navOpen, setNavOpen] = useState(false)
@@ -28,7 +29,7 @@ export default function RegisterPage({ onRegister }: RegisterPageProps) {
   const pwStrength = password.length >= 12 ? 'Strong' : password.length >= 8 ? 'Good' : password.length >= 4 ? 'Weak' : ''
   const pwColor = pwStrength === 'Strong' ? '#166534' : pwStrength === 'Good' ? '#b45309' : '#b91c1c'
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault(); setError('')
     if (!name.trim() || !email.trim() || !password) { setError('Please complete all required fields.'); return }
     if (!isStaRosa) { setError('Registration is strictly restricted to Santa Rosa City, Laguna residents.'); return }
@@ -36,13 +37,15 @@ export default function RegisterPage({ onRegister }: RegisterPageProps) {
     if (password.length < 6) { setError('Password must be at least 6 characters.'); return }
     if (!agreed) { setError('You must agree to the Terms & Conditions and Privacy Policy.'); return }
 
-    const result = onRegister(name.trim(), email.trim(), password, barangay, true, username.trim() || undefined)
-    const storedUser: UserAccount = (result as UserAccount) || {
-      id: `u-${Math.random().toString(36).slice(2, 10)}`,
-      name: name.trim(),
-      email: email.trim(),
-      username: username.trim() || email.trim().split('@')[0],
-      password,
+    setIsSubmitting(true)
+    try {
+      const result = await onRegister(name.trim(), email.trim(), password, barangay, true, username.trim() || undefined)
+      const storedUser: UserAccount = (result as UserAccount) || {
+        id: `u-${Date.now()}`,
+        name: name.trim(),
+        email: email.trim(),
+        username: username.trim() || email.trim().split('@')[0],
+        password,
       role: 'citizen',
       barangay,
       isStaRosa: true,
@@ -50,6 +53,11 @@ export default function RegisterPage({ onRegister }: RegisterPageProps) {
     }
     setCreatedUser(storedUser)
     setShowSuccessModal(true)
+    } catch (err: any) {
+      setError(err.message || 'Registration failed. Please check your details.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (

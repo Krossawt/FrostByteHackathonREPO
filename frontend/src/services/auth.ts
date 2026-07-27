@@ -1,92 +1,20 @@
 import type { UserAccount } from '../types'
+import { loginApi, registerCitizenApi } from './api'
 
 const STORAGE_KEY = 'eskala-user'
 const SESSION_KEY = 'eskala-user-session'
-
-const initialUsers: UserAccount[] = [
-  {
-    id: 'u-admin',
-    name: 'SCC Super Admin',
-    email: 'superadmin@eskala.ph',
-    username: 'superadmin',
-    password: 'Admin2026!',
-    role: 'superadmin',
-    isStaRosa: true,
-    isActive: true,
-  },
-  {
-    id: 'u-sk-bal-c',
-    name: 'Patricia Ann C. Dizon',
-    email: 'padizon.balibago@sk.gov.ph',
-    username: 'skchair_bal',
-    password: 'Sk2026!',
-    role: 'sk',
-    barangay: 'Balibago',
-    skPosition: 'Chairperson',
-    isStaRosa: true,
-    isActive: true,
-  },
-  {
-    id: 'u-sk-bal-s',
-    name: 'Marco D. Villanueva',
-    email: 'mvillanueva.balibago@sk.gov.ph',
-    username: 'sksec_bal',
-    password: 'Sk2026!',
-    role: 'sk',
-    barangay: 'Balibago',
-    skPosition: 'Secretary',
-    isStaRosa: true,
-    isActive: true,
-  },
-  {
-    id: 'u-sk-bal-t',
-    name: 'Kristine P. Lim',
-    email: 'klim.balibago@sk.gov.ph',
-    username: 'sktreasurer_bal',
-    password: 'Sk2026!',
-    role: 'sk',
-    barangay: 'Balibago',
-    skPosition: 'Treasurer',
-    isStaRosa: true,
-    isActive: true,
-  },
-  {
-    id: 'u-sk-cai-c',
-    name: 'Diego A. Mercado',
-    email: 'dmercado.caingin@sk.gov.ph',
-    username: 'skchair_cai',
-    password: 'Sk2026!',
-    role: 'sk',
-    barangay: 'Caingin',
-    skPosition: 'Chairperson',
-    isStaRosa: true,
-    isActive: true,
-  },
-  {
-    id: 'u-citizen',
-    name: 'Juan dela Cruz',
-    email: 'citizen@eskala.ph',
-    username: 'citizen',
-    password: 'Citizen2026!',
-    role: 'citizen',
-    barangay: 'Balibago',
-    isStaRosa: true,
-    isActive: true,
-  },
-]
 
 const USERS_DB_KEY = 'eskala-users-db'
 
 export function getUsersDB(): UserAccount[] {
   const raw = window.localStorage.getItem(USERS_DB_KEY)
   if (!raw) {
-    window.localStorage.setItem(USERS_DB_KEY, JSON.stringify(initialUsers))
-    return initialUsers
+    return []
   }
   try {
     return JSON.parse(raw) as UserAccount[]
   } catch {
-    return initialUsers
+    return []
   }
 }
 
@@ -120,14 +48,82 @@ function storeUser(user: UserAccount | null, rememberMe: boolean) {
   }
 }
 
+export async function loginAsync(emailOrUsername: string, password: string, rememberMe = false): Promise<UserAccount | null> {
+  try {
+    const res: any = await loginApi(emailOrUsername, password)
+    const userRoleStr = (res.user?.userRole || 'Guest').toLowerCase()
+    const mappedRole = userRoleStr.includes('admin') ? 'superadmin' : userRoleStr.includes('sk') ? 'sk' : 'citizen'
+
+    const user: UserAccount = {
+      id: String(res.user?.userID || '1'),
+      name: res.user?.userName || 'User',
+      email: res.user?.userEmail || emailOrUsername,
+      username: (res.user?.userName || emailOrUsername).toLowerCase().replace(/\s+/g, ''),
+      role: mappedRole as any,
+      barangay: res.user?.userLocation !== 'Santa Rosa City' ? res.user?.userLocation : undefined,
+      skPosition: res.user?.userRole?.includes('Chairperson') ? 'Chairperson' : res.user?.userRole?.includes('Secretary') ? 'Secretary' : res.user?.userRole?.includes('Treasurer') ? 'Treasurer' : undefined,
+      isStaRosa: res.user?.userIsStaRosa ?? true,
+      isActive: res.user?.userIsActive ?? true,
+    }
+    storeUser(user, rememberMe)
+    return user
+  } catch (err) {
+    console.warn('API login failed, checking fallback:', err)
+    return login(emailOrUsername, password, rememberMe)
+  }
+}
+
 export function login(emailOrUsername: string, password: string, rememberMe = false): UserAccount | null {
   const key = emailOrUsername.trim().toLowerCase()
+
+  // Pre-set Super Admin Account Fallback
+  if ((key === 'superadmin@eskala.ph' || key === 'superadmin') && password === 'Admin2026!') {
+    const admin: UserAccount = {
+      id: '1',
+      name: 'SCC Super Admin',
+      email: 'superadmin@eskala.ph',
+      username: 'superadmin',
+      role: 'superadmin',
+      isStaRosa: true,
+      isActive: true,
+    }
+    storeUser(admin, rememberMe)
+    return admin
+  }
+
   const users = getUsersDB()
   const match = users.find(
     (u) => (u.email.toLowerCase() === key || u.username?.toLowerCase() === key) && u.password === password
   )
   if (match) { storeUser(match, rememberMe); return match }
   return null
+}
+
+export async function registerAsync(name: string, email: string, password: string, barangay: string, isStaRosa: boolean, username?: string): Promise<UserAccount> {
+  try {
+    const created = await registerCitizenApi({
+      userName: name,
+      userEmail: email,
+      userPassword: password,
+      userLocation: barangay,
+      userIsStaRosa: isStaRosa,
+    })
+
+    const user: UserAccount = {
+      id: String(created.userID),
+      name: created.userName,
+      email: created.userEmail,
+      username: username || email.split('@')[0],
+      role: 'citizen',
+      barangay: created.userLocation,
+      isStaRosa: created.userIsStaRosa,
+      isActive: true,
+    }
+    storeUser(user, true)
+    return user
+  } catch (err) {
+    return register(name, email, password, barangay, isStaRosa, username)
+  }
 }
 
 export function register(name: string, email: string, password: string, barangay: string, isStaRosa: boolean, username?: string): UserAccount {
@@ -150,6 +146,4 @@ export function register(name: string, email: string, password: string, barangay
 }
 
 export function logout() { storeUser(null, false) }
-
-export { initialUsers }
 

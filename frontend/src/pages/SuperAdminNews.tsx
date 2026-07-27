@@ -1,13 +1,13 @@
-import { useState, FormEvent } from 'react'
-import { news as initialNews } from '../data/mockData'
+import { useState, useEffect, FormEvent } from 'react'
 import type { NewsItem } from '../types'
 import ConfirmDialog from '../components/ConfirmDialog'
 import Portal from '../components/Portal'
+import { fetchNewsApi } from '../services/api'
 
 const CATEGORIES = ['Transparency', 'Youth Programs', 'SK Update', 'Health', 'Education', 'Environment', 'Sports', 'City News', 'Emergency']
 
 export default function SuperAdminNews() {
-  const [articles, setArticles] = useState<NewsItem[]>(initialNews)
+  const [articles, setArticles] = useState<NewsItem[]>([])
   const [showModal, setShowModal]   = useState(false)
   const [editTarget, setEditTarget] = useState<NewsItem | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<NewsItem | null>(null)
@@ -19,6 +19,27 @@ export default function SuperAdminNews() {
   const [formSummary, setFormSummary] = useState('')
   const [formDate, setFormDate]       = useState('')
   const [formError, setFormError]     = useState('')
+
+  useEffect(() => {
+    async function loadNews() {
+      try {
+        const res = await fetchNewsApi()
+        if (Array.isArray(res)) {
+          setArticles(res.map((n: any) => ({
+            id: String(n.newsletterID || n.id),
+            title: n.title,
+            category: n.category || 'City News',
+            summary: n.summary || n.fullContent || '',
+            date: n.publishedAt ? new Date(n.publishedAt).toLocaleDateString() : 'Today',
+            image: n.imageURL || undefined,
+          })))
+        }
+      } catch (err) {
+        console.warn('API error fetching news:', err)
+      }
+    }
+    loadNews()
+  }, [])
 
   const allCats = ['All', ...Array.from(new Set(articles.map(a => a.category)))]
 

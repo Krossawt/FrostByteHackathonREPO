@@ -1,12 +1,13 @@
 import { Link } from 'react-router-dom'
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { Menu, X } from 'lucide-react'
-import { news, projects, barangaySummary, receipts, BARANGAYS } from '../data/mockData'
+import { BARANGAYS } from '../constants'
 import { DonutChart, HBarChart } from '../components/MiniChart'
 import ProjectDetailModal from '../components/ProjectDetailModal'
 import BarangayTransactionsModal from '../components/BarangayTransactionsModal'
 import NewsTicker from '../components/NewsTicker'
-import type { ReportProject } from '../types'
+import type { ReportProject, NewsItem } from '../types'
+import { fetchExecutiveSummaryApi, fetchNewsApi, fetchProjectsApi } from '../services/api'
 
 
 const NEWS_IMAGES: Record<string, string> = {
@@ -45,66 +46,90 @@ function useScrollReveal() {
   }, [])
 }
 
-const totalBudget = barangaySummary.reduce((s, b) => s + b.annualBudget, 0)
-const totalSpent = barangaySummary.reduce((s, b) => s + b.spent, 0)
-const utilizationPct = totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0
-const totalProjects = projects.length
-const totalBarangays = 18
 
-const STAT_CARDS = [
-  {
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" />
-      </svg>
-    ),
-    val: `${totalBarangays}`, lbl: 'Barangays Covered',
-  },
-  {
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-        <line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-      </svg>
-    ),
-    val: totalBudget === 0 ? '₱0' : `₱${(totalBudget / 1_000_000).toFixed(1)}M`, lbl: 'Total SK Budget FY 2025',
-  },
-  {
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-      </svg>
-    ),
-    val: `${totalProjects}`, lbl: 'SK Projects Tracked',
-  },
-  {
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
-      </svg>
-    ),
-    val: '54+', lbl: 'SK Officials Serving',
-  },
-]
 
 export default function Landing() {
   useScrollReveal()
 
   const [navOpen, setNavOpen] = useState(false)
 
+  // Live API States
+  const [liveNews, setLiveNews] = useState<NewsItem[]>([])
+  const [liveProjects, setLiveProjects] = useState<ReportProject[]>([])
+  const [summaryData, setSummaryData] = useState<{ totalBudget: number; totalSpent: number; barangays: any[] }>({
+    totalBudget: 0,
+    totalSpent: 0,
+    barangays: []
+  })
+
+  useEffect(() => {
+    async function loadLandingData() {
+      try {
+        const [sumRes, newsRes, projRes] = await Promise.all([
+          fetchExecutiveSummaryApi().catch(() => null),
+          fetchNewsApi().catch(() => []),
+          fetchProjectsApi({ status: 'Posted' }).catch(() => []),
+        ])
+
+        if (sumRes) {
+          setSummaryData({
+            totalBudget: Number(sumRes.totalBudget || 0),
+            totalSpent: Number(sumRes.totalSpent || 0),
+            barangays: Array.isArray(sumRes.barangays) ? sumRes.barangays : [],
+          })
+        }
+
+        if (Array.isArray(newsRes)) {
+          setLiveNews(newsRes.map((n: any) => ({
+            id: String(n.newsletterID || n.id),
+            title: n.title,
+            category: n.category || 'City News',
+            summary: n.summary || n.fullContent || '',
+            date: n.publishedAt ? new Date(n.publishedAt).toLocaleDateString() : 'Today',
+            image: n.imageURL || undefined,
+          })))
+        }
+
+        if (Array.isArray(projRes)) {
+          setLiveProjects(projRes.map((p: any) => ({
+            id: String(p.projectID || p.id),
+            title: p.projectName || p.title,
+            barangay: p.projectLocation,
+            category: p.projectCategory || 'Education',
+            status: p.projectStatus ? p.projectStatus.toLowerCase() as any : 'ongoing',
+            proposedBudget: Number(p.projectBudget || 0),
+            spent: Number(p.projectBreakdown || 0),
+            progress: p.projectProgress || 0,
+            progressPercent: p.projectProgress || 0,
+            startDate: p.projectStartTime ? new Date(p.projectStartTime).toISOString().split('T')[0] : '',
+            endDate: p.projectEndTime ? new Date(p.projectEndTime).toISOString().split('T')[0] : '',
+            description: p.projectDescription || '',
+          })))
+        }
+      } catch (err) {
+        console.warn('API error loading landing data:', err)
+      }
+    }
+    loadLandingData()
+  }, [])
+
   // News carousel
   const [newsIdx, setNewsIdx] = useState(0)
   const autoRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  const nextNews = useCallback(() => setNewsIdx(i => (i + 1) % news.length), [])
-  const prevNews = useCallback(() => setNewsIdx(i => (i - 1 + news.length) % news.length), [])
+  const newsList = liveNews.length > 0 ? liveNews : [
+    { id: '1', title: 'Santa Rosa SK Financial Portal Operational', category: 'City News', summary: 'Live public financial transparency portal initialized.', date: 'Today' }
+  ]
+
+  const nextNews = useCallback(() => setNewsIdx(i => (i + 1) % newsList.length), [newsList.length])
+  const prevNews = useCallback(() => setNewsIdx(i => (i - 1 + newsList.length) % newsList.length), [newsList.length])
+  const pauseAuto = () => { if (autoRef.current) clearInterval(autoRef.current) }
+  const resumeAuto = () => { autoRef.current = setInterval(nextNews, 4000) }
 
   useEffect(() => {
     autoRef.current = setInterval(nextNews, 4000)
     return () => { if (autoRef.current) clearInterval(autoRef.current) }
   }, [nextNews])
-
-  const pauseAuto = () => { if (autoRef.current) clearInterval(autoRef.current) }
-  const resumeAuto = () => { autoRef.current = setInterval(nextNews, 4000) }
 
   // Barangay picker & modals
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -112,22 +137,62 @@ export default function Landing() {
   const [selectedProject, setSelectedProject] = useState<ReportProject | null>(null)
   const [showTxnModal, setShowTxnModal] = useState(false)
 
+  const clearBrgy = () => setSelectedBrgy(null)
+
   const handleSelectBrgy = (b: string) => {
     setSelectedBrgy(b)
     setPickerOpen(false)
     window.scrollTo({ top: 300, behavior: 'smooth' })
   }
-  const clearBrgy = () => setSelectedBrgy(null)
 
   // Barangay-specific data
-  const brgyData = selectedBrgy ? barangaySummary.find(b => b.barangay === selectedBrgy) : null
-  const brgyProj = selectedBrgy ? projects.filter(p => p.barangay === selectedBrgy) : []
-  const brgyTxn = selectedBrgy ? receipts.filter(r => r.barangay === selectedBrgy) : []
-  const brgyUsage = brgyData ? Math.min(Math.round((brgyData.spent / brgyData.annualBudget) * 100), 100) : 0
+  const brgyData = selectedBrgy ? summaryData.barangays.find((b: any) => b.barangay === selectedBrgy) : null
+  const brgyProj = selectedBrgy ? liveProjects.filter(p => p.barangay === selectedBrgy) : liveProjects
+  const brgyUsage = brgyData && brgyData.annualBudget > 0 ? Math.min(Math.round((brgyData.spent / brgyData.annualBudget) * 100), 100) : 0
 
-  const barData = barangaySummary.slice(0, 9).map(b => ({
-    label: b.barangay.length > 10 ? b.barangay.slice(0, 9) + '…' : b.barangay,
-    value: b.spent, max: totalBudget / 18,
+  const totalBudget = summaryData.totalBudget
+  const totalSpent = summaryData.totalSpent
+  const utilizationPct = totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0
+  const brgyTxn = brgyProj
+
+  const STAT_CARDS = [
+    {
+      icon: (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" />
+        </svg>
+      ),
+      val: '18', lbl: 'Barangays Covered',
+    },
+    {
+      icon: (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+        </svg>
+      ),
+      val: totalBudget === 0 ? '₱0' : `₱${(totalBudget / 1_000_000).toFixed(1)}M`, lbl: 'Total SK Budget FY 2025',
+    },
+    {
+      icon: (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+        </svg>
+      ),
+      val: `${liveProjects.length}`, lbl: 'SK Projects Tracked',
+    },
+    {
+      icon: (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
+        </svg>
+      ),
+      val: '54+', lbl: 'SK Officials Serving',
+    },
+  ]
+
+  const barData = summaryData.barangays.slice(0, 9).map((b: any) => ({
+    label: String(b.barangay || '').length > 10 ? String(b.barangay).slice(0, 9) + '…' : String(b.barangay),
+    value: Number(b.spent || 0), max: (totalBudget || 1) / 18,
   }))
 
   return (
@@ -524,9 +589,9 @@ export default function Landing() {
           {/* Project status row */}
           <div className="card-grid card-grid-3 reveal" style={{ marginTop: '1.5rem' }}>
             {[
-              { label: 'Ongoing Projects', count: projects.filter(p => p.status === 'ongoing').length, color: 'var(--maroon)', badge: 'badge-ongoing' },
-              { label: 'Upcoming Projects', count: projects.filter(p => p.status === 'upcoming').length, color: '#1d4ed8', badge: 'badge-upcoming' },
-              { label: 'Completed Projects', count: projects.filter(p => p.status === 'completed').length, color: '#166534', badge: 'badge-completed' },
+              { label: 'Ongoing Projects', count: liveProjects.filter((p: any) => p.status === 'ongoing').length, color: 'var(--maroon)', badge: 'badge-ongoing' },
+              { label: 'Upcoming Projects', count: liveProjects.filter((p: any) => p.status === 'upcoming').length, color: '#1d4ed8', badge: 'badge-upcoming' },
+              { label: 'Completed Projects', count: liveProjects.filter((p: any) => p.status === 'completed').length, color: '#166534', badge: 'badge-completed' },
             ].map((s, i) => (
               <div key={s.label} className={`city-stat-card reveal reveal-delay-${i + 1}`}>
                 <div style={{ fontSize: '2.6rem', fontFamily: 'var(--font-display)', fontWeight: 900, color: s.color, lineHeight: 1, minWidth: '3rem' }}>{s.count}</div>
@@ -571,7 +636,7 @@ export default function Landing() {
               className="news-carousel-track"
               style={{ transform: `translateX(calc(-${newsIdx * (320 + 20)}px))` }}
             >
-              {[...news, ...news].map((item, i) => (
+              {[...newsList, ...newsList].map((item: any, i: number) => (
                 <div key={`${item.id}-${i}`} className="news-carousel-item">
                   <img
                     src={NEWS_IMAGES[item.id] ?? NEWS_IMAGES['N-01']}
@@ -595,8 +660,8 @@ export default function Landing() {
           </div>
 
           <div className="news-carousel-dots">
-            {news.map((_, i) => (
-              <button key={i} className={`news-carousel-dot${newsIdx % news.length === i ? ' active' : ''}`}
+            {newsList.map((_: any, i: number) => (
+              <button key={i} className={`news-carousel-dot${newsIdx % newsList.length === i ? ' active' : ''}`}
                 onClick={() => { pauseAuto(); setNewsIdx(i); resumeAuto() }} />
             ))}
           </div>

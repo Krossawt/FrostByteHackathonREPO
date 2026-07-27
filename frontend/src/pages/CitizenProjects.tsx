@@ -1,8 +1,8 @@
-import { useState } from 'react'
-import { projects } from '../data/mockData'
+import { useState, useEffect } from 'react'
 import type { UserAccount } from '../types'
 import ProjectDetailModal from '../components/ProjectDetailModal'
 import type { ReportProject } from '../types'
+import { fetchProjectsApi } from '../services/api'
 
 interface CitizenProjectsProps { user?: UserAccount | null }
 
@@ -48,11 +48,40 @@ const FILTER_OPTIONS = [
 ]
 
 export default function CitizenProjects({ user }: CitizenProjectsProps) {
+  const userBarangay = user?.barangay || 'Balibago'
   const [statusFilter, setStatusFilter] = useState('all')
   const [search, setSearch] = useState('')
   const [selectedProject, setSelectedProject] = useState<ReportProject | null>(null)
+  const [liveProjects, setLiveProjects] = useState<ReportProject[]>([])
 
-  const filtered = projects.filter(p => {
+  useEffect(() => {
+    async function loadCitizenProjects() {
+      try {
+        const res = await fetchProjectsApi({ status: 'Posted' })
+        if (Array.isArray(res)) {
+          setLiveProjects(res.map((p: any) => ({
+            id: String(p.projectID || p.id),
+            title: p.projectName || p.title,
+            barangay: p.projectLocation || userBarangay,
+            category: p.projectCategory || 'Education',
+            status: p.projectStatus ? p.projectStatus.toLowerCase() as any : 'ongoing',
+            proposedBudget: Number(p.projectBudget || 0),
+            spent: Number(p.projectBreakdown || 0),
+            progress: p.projectProgress || 0,
+            progressPercent: p.projectProgress || 0,
+            startDate: p.projectStartTime ? new Date(p.projectStartTime).toISOString().split('T')[0] : '',
+            endDate: p.projectEndTime ? new Date(p.projectEndTime).toISOString().split('T')[0] : '',
+            description: p.projectDescription || '',
+          })))
+        }
+      } catch (err) {
+        console.warn('API error fetching citizen projects:', err)
+      }
+    }
+    loadCitizenProjects()
+  }, [userBarangay])
+
+  const filtered = liveProjects.filter(p => {
     const matchStatus = statusFilter === 'all' || p.status === statusFilter
     const q = search.toLowerCase()
     const matchQ = !q || p.title.toLowerCase().includes(q) || p.barangay.toLowerCase().includes(q) || (p.category?.toLowerCase() ?? '').includes(q)
@@ -60,10 +89,10 @@ export default function CitizenProjects({ user }: CitizenProjectsProps) {
   })
 
   const counts = {
-    all: projects.length,
-    ongoing: projects.filter(p => p.status === 'ongoing').length,
-    upcoming: projects.filter(p => p.status === 'upcoming').length,
-    completed: projects.filter(p => p.status === 'completed').length,
+    all: liveProjects.length,
+    ongoing: liveProjects.filter((p: any) => p.status === 'ongoing').length,
+    upcoming: liveProjects.filter((p: any) => p.status === 'upcoming').length,
+    completed: liveProjects.filter((p: any) => p.status === 'completed').length,
   }
 
   return (

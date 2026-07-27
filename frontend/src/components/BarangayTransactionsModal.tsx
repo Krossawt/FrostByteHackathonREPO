@@ -1,5 +1,4 @@
 import { useState, useMemo } from 'react'
-import { receipts as allReceipts } from '../data/mockData'
 import type { Receipt } from '../types'
 import Portal from './Portal'
 
@@ -11,16 +10,17 @@ const SAMPLE_RECEIPT_IMAGES = [
 
 interface BarangayTransactionsModalProps {
   barangay: string
+  receipts?: Receipt[]
   onClose: () => void
 }
 
-export default function BarangayTransactionsModal({ barangay, onClose }: BarangayTransactionsModalProps) {
+export default function BarangayTransactionsModal({ barangay, receipts = [], onClose }: BarangayTransactionsModalProps) {
   const [search, setSearch] = useState('')
   const [viewingReceipt, setViewingReceipt] = useState<Receipt | null>(null)
 
   // Filter and sort transactions strictly from latest to oldest
   const filteredReceipts = useMemo(() => {
-    return allReceipts
+    return receipts
       .filter(r => r.barangay === barangay)
       .filter(r => {
         const q = search.toLowerCase()

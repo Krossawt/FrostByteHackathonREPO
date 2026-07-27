@@ -47,10 +47,22 @@ def run_suite():
     assert_test("Super Admin JWT Login", admin_ok, f"Status: {admin_login.status_code}, Body: {admin_login.text}")
     admin_token = admin_login.json().get("accessToken") if admin_ok else None
 
-    # 3. SK Chairperson Login
+    # 3. SK Chairperson Account Provisioning & Login
+    if admin_token:
+        # Create test SK Chairperson account if not existing
+        res_acct = client.post("/api/v1/admin/accounts", headers={"Authorization": f"Bearer {admin_token}"}, json={
+            "userName": "Patricia Dizon",
+            "userEmail": "padizon.balibago@sk.gov.ph",
+            "password": "Sk20262026!",
+            "userRole": "SK Chairperson",
+            "userLocation": "Balibago",
+            "userIsSK": True,
+            "userIsStaRosa": True
+        })
+
     chair_login = client.post("/api/v1/auth/login", json={
         "credential": "padizon.balibago@sk.gov.ph",
-        "password": "Sk2026!"
+        "password": "Sk20262026!"
     })
     chair_ok = chair_login.status_code == 200 and "accessToken" in chair_login.json()
     assert_test("SK Chairperson JWT Login", chair_ok, f"Status: {chair_login.status_code}")

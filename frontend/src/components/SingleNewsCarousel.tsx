@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import type { NewsItem } from '../types'
-import { news as defaultNews } from '../data/mockData'
 
 const NEWS_IMAGES: Record<string, string> = {
   'N-01': 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=700&q=80',
@@ -13,12 +12,16 @@ const NEWS_IMAGES: Record<string, string> = {
   'N-08': 'https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?w=700&q=80',
 }
 
+const FALLBACK_ITEMS: NewsItem[] = [
+  { id: '1', title: 'Santa Rosa SK Transparency System Operational', category: 'City News', summary: 'Live public financial portal active across 18 barangays.', date: 'Today' }
+]
+
 interface SingleNewsCarouselProps {
   items?: NewsItem[]
   autoPlayInterval?: number
 }
 
-export default function SingleNewsCarousel({ items = defaultNews, autoPlayInterval = 4000 }: SingleNewsCarouselProps) {
+export default function SingleNewsCarousel({ items = FALLBACK_ITEMS, autoPlayInterval = 4000 }: SingleNewsCarouselProps) {
   const [index, setIndex] = useState(0)
   const [animating, setAnimating] = useState(false)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)

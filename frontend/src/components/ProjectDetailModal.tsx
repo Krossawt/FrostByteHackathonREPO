@@ -3,11 +3,11 @@
  * Opens when any project card is clicked.
  * Tabs: Overview | Finance & Receipts | Citizen Comments
  */
-import { useState, FormEvent } from 'react'
-import { receipts as allReceipts, citizenComments as allComments } from '../data/mockData'
+import { useState, useEffect, FormEvent } from 'react'
 import type { ReportProject, Receipt, UserAccount } from '../types'
 import CameraCaptureModal from './CameraCaptureModal'
 import Portal from './Portal'
+import { fetchCommentsApi, postCommentApi, voteCommentApi } from '../services/api'
 
 const CATEGORY_IMAGES: Record<string, string> = {
   'Education':            'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=800&q=80',
@@ -61,20 +61,40 @@ export default function ProjectDetailModal({ project, user, onClose }: ProjectDe
 
   const handleCameraSnap = () => {
     setShowCameraModal(false)
-    handleScanOcr()
   }
 
-  const [localReceipts, setLocalReceipts] = useState(
-    allReceipts.filter(r => r.projectId === project?.id)
-  )
+  const [localReceipts, setLocalReceipts] = useState<Receipt[]>([])
 
   // Comment form state
   const [cText, setCText] = useState('')
   const [cType, setCType] = useState<'comment'|'suggestion'>('comment')
   const [cError, setCError] = useState('')
-  const [localComments, setLocalComments] = useState(
-    allComments.filter(c => c.barangay === project?.barangay)
-  )
+  const [localComments, setLocalComments] = useState<any[]>([])
+
+  useEffect(() => {
+    if (!project?.id) return
+    async function loadProjectComments() {
+      try {
+        const pId = Number(project?.id)
+        if (!isNaN(pId)) {
+          const res = await fetchCommentsApi(pId)
+          if (Array.isArray(res)) {
+            setLocalComments(res.map((c: any) => ({
+              id: String(c.commentID || c.id),
+              author: c.authorName || 'Citizen',
+              text: c.commentDetails,
+              type: c.commentType || 'comment',
+              upvotes: c.upvotes || 0,
+              date: c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'Just now',
+            })))
+          }
+        }
+      } catch (err) {
+        console.warn('API fetch project comments warning:', err)
+      }
+    }
+    loadProjectComments()
+  }, [project?.id])
 
   if (!project) return null
 

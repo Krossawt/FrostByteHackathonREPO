@@ -159,6 +159,97 @@ export async function fetchAuditLogsApi(limit = 50): Promise<any[]> {
   return request<any[]>(`/audit-logs?limit=${limit}`)
 }
 
+export async function registerCitizenApi(payload: {
+  userName: string
+  userEmail: string
+  userPassword: string
+  userLocation: string
+  userIsStaRosa?: boolean
+}): Promise<any> {
+  const res = await request<AuthResponse>('/auth/register', {
+    method: 'POST',
+    body: JSON.stringify({
+      userName: payload.userName,
+      userEmail: payload.userEmail,
+      password: payload.userPassword,
+      userLocation: payload.userLocation,
+      userIsStaRosa: payload.userIsStaRosa ?? true,
+    }),
+  })
+  setStoredToken(res.accessToken, true)
+  return res.user
+}
+
+export async function fetchBarangayReportApi(barangayName: string): Promise<any> {
+  return request(`/reports/barangay/${encodeURIComponent(barangayName)}`)
+}
+
+// ─── USER ACCOUNTS (SUPER ADMIN) ────────────────────────────────────────────
+
+export async function fetchUserAccountsApi(): Promise<any[]> {
+  return request<any[]>('/admin/accounts')
+}
+
+export async function createUserAccountApi(payload: {
+  userName: string
+  userEmail: string
+  userPassword: string
+  userRole: string
+  userLocation: string
+  userIsSK?: boolean
+  userSKTermStart?: string
+  userSKTermEnd?: string
+}): Promise<any> {
+  return request('/admin/accounts', {
+    method: 'POST',
+    body: JSON.stringify({
+      userName: payload.userName,
+      userEmail: payload.userEmail,
+      password: payload.userPassword,
+      userRole: payload.userRole,
+      userLocation: payload.userLocation,
+      userIsSK: payload.userIsSK ?? true,
+      userIsStaRosa: true,
+    }),
+  })
+}
+
+export async function toggleUserStatusApi(userId: number, isActive: boolean): Promise<any> {
+  return request(`/admin/accounts/${userId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ userIsActive: isActive }),
+  })
+}
+
+export async function fetchSKOfficialsApi(barangay?: string): Promise<any[]> {
+  const query = barangay ? `?barangay=${encodeURIComponent(barangay)}` : ''
+  return request<any[]>(`/reports/sk-officials${query}`)
+}
+
+// ─── COMMENTS & SUGGESTIONS ──────────────────────────────────────────────────
+
+export async function fetchCommentsApi(projectId: number): Promise<any[]> {
+  return request<any[]>(`/comments/project/${projectId}`)
+}
+
+export async function postCommentApi(payload: {
+  commentFor: number
+  commentDetails: string
+  commentType?: 'comment' | 'suggestion'
+  parentCommentID?: number
+}): Promise<any> {
+  return request('/comments', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function voteCommentApi(commentId: number): Promise<any> {
+  return request(`/comments/${commentId}/vote`, {
+    method: 'POST',
+  })
+}
+
 // ─── NEWSLETTER / CITY NEWS ──────────────────────────────────────────────────
 
 export async function fetchNewsApi(): Promise<NewsItem[]> {

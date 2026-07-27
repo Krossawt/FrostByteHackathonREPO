@@ -1,6 +1,7 @@
-import { useState } from 'react'
-import { skOfficials } from '../data/mockData'
-import type { SKPosition } from '../types'
+import { useState, useEffect } from 'react'
+import { BARANGAYS } from '../constants'
+import type { SKOfficial, SKPosition } from '../types'
+import { fetchSKOfficialsApi } from '../services/api'
 
 const POSITIONS: (SKPosition | 'All')[] = ['All', 'Chairperson', 'Secretary', 'Treasurer', 'Kagawad']
 
@@ -11,12 +12,9 @@ const positionBadgeClass: Record<string, string> = {
   Kagawad:     'badge-kagawad',
 }
 
-// Deterministic portrait photos from randomuser.me — indexed by SK ID suffix
-// Male / female based on name heuristics
 const FEMALE_NAMES = ['Carmela','Kristine','Alyssa','Maria','Hannah','Sophia','Bianca','Lea','Nicole','Ria','Pamela','Diana','Jessa','Mika','Lorraine','Aileen','Roselyn','Liza','Joy','Angelica','Mariz','Leilanie','Trisha','Vanessa','Christine']
 
 function getPortrait(name: string, id: string): string {
-  // Extract numeric suffix from SK ID for determinism
   const num = parseInt(id.replace(/\D/g, '')) % 50 || 1
   const firstName = name.split(' ')[0]
   const isFemale  = FEMALE_NAMES.includes(firstName)
@@ -35,10 +33,31 @@ export default function SKsPage() {
   const [brgy, setBarangay]     = useState('All')
   const [position, setPosition] = useState<SKPosition | 'All'>('All')
   const [imgErrors, setImgErrors] = useState<Record<string, boolean>>({})
+  const [officials, setOfficials] = useState<SKOfficial[]>([])
 
-  const allBarangays = ['All', ...Array.from(new Set(skOfficials.map(o => o.barangay))).sort()]
+  useEffect(() => {
+    async function loadSKs() {
+      try {
+        const res = await fetchSKOfficialsApi()
+        if (Array.isArray(res)) {
+          setOfficials(res.map((o: any) => ({
+            id: String(o.userID || o.id),
+            barangay: o.userLocation,
+            name: o.userName,
+            position: (o.userRole ? o.userRole.replace('SK ', '') : 'Chairperson') as SKPosition,
+            email: o.userEmail,
+          })))
+        }
+      } catch (err) {
+        console.warn('API error fetching SK officials:', err)
+      }
+    }
+    loadSKs()
+  }, [])
 
-  const filtered = skOfficials.filter(o => {
+  const allBarangays = ['All', ...BARANGAYS]
+
+  const filtered = officials.filter(o => {
     const matchBrgy = brgy === 'All' || o.barangay === brgy
     const matchPos  = position === 'All' || o.position === position
     const q = search.toLowerCase()
@@ -66,7 +85,7 @@ export default function SKsPage() {
               { l: 'Election', v: 'October 30, 2023 (BSKE)' },
               { l: 'Term',     v: '2023 – 2025' },
               { l: 'Coverage', v: '18 Barangays' },
-              { l: 'Officials',v: `${skOfficials.length}+ Elected` },
+              { l: 'Officials',v: `${officials.length}+ Elected` },
             ].map(s => (
               <div key={s.l}>
                 <div style={{ fontFamily: 'var(--font-display)', fontSize: '0.72rem', fontWeight: 700, color: 'var(--maroon)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>{s.l}</div>

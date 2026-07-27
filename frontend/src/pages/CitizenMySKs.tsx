@@ -1,6 +1,6 @@
-import { useState } from 'react'
-import { skOfficials, citizenComments } from '../data/mockData'
-import type { UserAccount, SKPosition } from '../types'
+import { useState, useEffect } from 'react'
+import type { UserAccount, SKOfficial, SKPosition } from '../types'
+import { fetchSKOfficialsApi } from '../services/api'
 
 interface CitizenMySKsProps { user?: UserAccount | null }
 
@@ -27,13 +27,33 @@ const posBadge: Record<string, string> = {
 
 export default function CitizenMySKs({ user }: CitizenMySKsProps) {
   const barangay = user?.barangay || 'Balibago'
-  const myOfficials = skOfficials.filter(o => o.barangay === barangay)
-  const myComments  = citizenComments.filter(c => c.barangay === barangay)
+  const [officials, setOfficials] = useState<SKOfficial[]>([])
+  const [myComments, setMyComments] = useState<any[]>([])
   const [activeTab, setActiveTab] = useState<'officials' | 'feedback'>('officials')
   const [search, setSearch] = useState('')
   const [imgErrors, setImgErrors] = useState<Record<string, boolean>>({})
 
-  const filteredOfficials = myOfficials.filter(o =>
+  useEffect(() => {
+    async function loadSKs() {
+      try {
+        const res = await fetchSKOfficialsApi(barangay)
+        if (Array.isArray(res)) {
+          setOfficials(res.map((o: any) => ({
+            id: String(o.userID || o.id),
+            barangay: o.userLocation,
+            name: o.userName,
+            position: (o.userRole ? o.userRole.replace('SK ', '') : 'Chairperson') as SKPosition,
+            email: o.userEmail,
+          })))
+        }
+      } catch (err) {
+        console.warn('API error fetching citizen SK officials:', err)
+      }
+    }
+    loadSKs()
+  }, [barangay])
+
+  const filteredOfficials = officials.filter(o =>
     !search || o.name.toLowerCase().includes(search.toLowerCase()) || o.position.toLowerCase().includes(search.toLowerCase())
   )
 
@@ -59,7 +79,7 @@ export default function CitizenMySKs({ user }: CitizenMySKsProps) {
             </div>
             <div>
               <div style={{ fontFamily: 'var(--font-display)', fontSize: '0.72rem', fontWeight: 700, color: 'var(--maroon)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>SK Council Size</div>
-              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.1rem', color: 'var(--ink)' }}>{myOfficials.length} Officials</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1.1rem', color: 'var(--ink)' }}>{officials.length} Officials</div>
             </div>
             <div>
               <div style={{ fontFamily: 'var(--font-display)', fontSize: '0.72rem', fontWeight: 700, color: 'var(--maroon)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>BSKE Term</div>
@@ -78,7 +98,7 @@ export default function CitizenMySKs({ user }: CitizenMySKsProps) {
         {/* ── Tabs ── */}
         <div className="filter-tabs">
           <button className={`filter-tab${activeTab === 'officials' ? ' active' : ''}`} onClick={() => setActiveTab('officials')}>
-            SK Officials ({myOfficials.length})
+            SK Officials ({officials.length})
           </button>
           <button className={`filter-tab${activeTab === 'feedback' ? ' active' : ''}`} onClick={() => setActiveTab('feedback')}>
             Community Feedback ({myComments.length})
@@ -172,7 +192,7 @@ export default function CitizenMySKs({ user }: CitizenMySKsProps) {
 
         {activeTab === 'feedback' && (
           <div style={{ display: 'grid', gap: '0.85rem', marginTop: '0.25rem' }}>
-            {myComments.length > 0 ? myComments.map(c => (
+            {myComments.length > 0 ? myComments.map((c: any) => (
               <div key={c.id} className="comment-card">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
                   <span className="comment-author">{c.author}</span>

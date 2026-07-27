@@ -1,10 +1,10 @@
-import { useState, FormEvent } from 'react'
-import { projects } from '../data/mockData'
+import { useState, useEffect, FormEvent } from 'react'
 import type { UserAccount } from '../types'
 import ProjectDetailModal from '../components/ProjectDetailModal'
 import ConfirmDialog from '../components/ConfirmDialog'
 import type { ReportProject } from '../types'
 import Portal from '../components/Portal'
+import { fetchProjectsApi, createProjectApi } from '../services/api'
 
 interface SKProjectsProps { user?: UserAccount | null }
 
@@ -44,13 +44,42 @@ export default function SKProjects({ user }: SKProjectsProps) {
   const position  = user?.skPosition || 'Chairperson'
   const canEdit   = position === 'Chairperson' || position === 'Secretary'
 
-  const myProjects = projects.filter(p => p.barangay === barangay)
   const [filterStatus, setFilterStatus] = useState<'all' | 'ongoing' | 'upcoming' | 'completed' | 'cancelled'>('all')
   const [search, setSearch] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [selectedProject, setSelectedProject] = useState<ReportProject | null>(null)
   const [projectToDelete, setProjectToDelete] = useState<ReportProject | null>(null)
-  const [localProjects, setLocalProjects] = useState(myProjects)
+  const [localProjects, setLocalProjects] = useState<ReportProject[]>([])
+
+  // Load live API projects
+  useEffect(() => {
+    async function loadProjects() {
+      try {
+        const res = await fetchProjectsApi({ barangay })
+        if (Array.isArray(res)) {
+          const mapped: ReportProject[] = res.map((p: any) => ({
+            id: String(p.projectID || p.id),
+            title: p.projectName || p.title,
+            barangay: p.projectLocation || barangay,
+            category: p.projectCategory || 'Education',
+            status: p.projectStatus ? p.projectStatus.toLowerCase() as any : 'ongoing',
+            proposedBudget: Number(p.projectBudget || 0),
+            spent: Number(p.projectBreakdown || 0),
+            remainingBudget: Math.max(0, Number(p.projectBudget || 0) - Number(p.projectBreakdown || 0)),
+            progress: p.projectProgress || 0,
+            progressPercent: p.projectProgress || 0,
+            startDate: p.projectStartTime ? new Date(p.projectStartTime).toISOString().split('T')[0] : '',
+            endDate: p.projectEndTime ? new Date(p.projectEndTime).toISOString().split('T')[0] : '',
+            description: p.projectDescription || '',
+          }))
+          setLocalProjects(mapped)
+        }
+      } catch (err) {
+        console.warn('API error fetching projects:', err)
+      }
+    }
+    loadProjects()
+  }, [barangay])
 
   // New project form
   const [newTitle, setNewTitle] = useState('')
@@ -82,21 +111,49 @@ export default function SKProjects({ user }: SKProjectsProps) {
   const totalBudget = localProjects.reduce((s, p) => s + p.proposedBudget, 0)
   const totalSpent  = localProjects.reduce((s, p) => s + p.spent, 0)
 
-  const handleAddProject = (e: FormEvent) => {
+  const handleAddProject = async (e: FormEvent) => {
     e.preventDefault()
     if (!newTitle.trim() || !newBudget || !newStart || !newEnd) { setFormError('Please fill in all required fields.'); return }
-    const np: ReportProject = {
-      id: `p-${Math.random().toString(36).slice(2, 8)}`,
-      title: newTitle.trim(), barangay, category: newCat as any,
-      status: 'upcoming', description: newDesc.trim(),
-      proposedBudget: parseFloat(newBudget.replace(/,/g, '')) || 0,
-      spent: 0, progress: 0, startDate: newStart, endDate: newEnd,
+
+    try {
+      const created = await createProjectApi({
+        projectName: newTitle.trim(),
+        projectDescription: newDesc.trim(),
+        projectStartTime: new Date(newStart).toISOString(),
+        projectEndTime: new Date(newEnd).toISOString(),
+        projectLocation: barangay,
+        projectBudget: parseFloat(newBudget),
+        projectCategory: newCat,
+      })
+      const res: any = created
+      const np: ReportProject = {
+        id: String(res.projectID || res.id),
+        title: res.projectName || newTitle.trim(),
+        barangay: res.projectLocation || barangay,
+        category: res.projectCategory || newCat,
+        status: 'upcoming',
+        proposedBudget: Number(res.projectBudget || newBudget),
+        spent: 0,
+        remainingBudget: Number(res.projectBudget || newBudget),
+        progress: 0,
+        progressPercent: 0,
+        startDate: newStart,
+        endDate: newEnd,
+        description: res.projectDescription || newDesc.trim(),
+      }
+
+      setLocalProjects(prev => [np, ...prev])
+      setShowModal(false)
+      setNewTitle('')
+      setNewDesc('')
+      setNewBudget('')
+      setNewStart('')
+      setNewEnd('')
+      setProposalFile(null)
+      setFormError('')
+    } catch (err: any) {
+      setFormError(err.message || 'Failed to create project draft')
     }
-    projects.unshift(np)
-    setLocalProjects(prev => [np, ...prev])
-    setNewTitle(''); setNewCat('Education'); setNewDesc(''); setNewBudget(''); setNewStart(''); setNewEnd(''); setFormError('')
-    setProposalFile(null)
-    setShowModal(false)
   }
 
   const handleDeleteProject = (p: ReportProject) => setProjectToDelete(p)

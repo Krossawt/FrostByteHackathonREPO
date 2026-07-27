@@ -21,8 +21,10 @@ export interface ReportProject {
   title: string
   status: 'upcoming' | 'ongoing' | 'completed' | 'cancelled'
   progress: number
+  progressPercent?: number
   proposedBudget: number
   spent: number
+  remainingBudget?: number
   startDate: string
   endDate: string
   description: string

@@ -2,7 +2,7 @@ import './App.css'
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Link, NavLink, Navigate, Route, Routes, useNavigate, useLocation } from 'react-router-dom'
 import { Menu, X } from 'lucide-react'
-import { login as loginService, logout as logoutService, register as registerService, getStoredUser } from './services/auth'
+import { login as loginService, loginAsync, logout as logoutService, register as registerService, registerAsync, getStoredUser } from './services/auth'
 import type { Role, UserAccount } from './types'
 import Landing from './pages/Landing'
 import LoginPage from './pages/Login'
@@ -18,7 +18,7 @@ import SuperAdminActivity from './pages/SuperAdminActivity'
 import SuperAdminNews from './pages/SuperAdminNews'
 import SKHome from './pages/SKHome'
 import SKProjects from './pages/SKProjects'
-import { BARANGAYS } from './data/mockData'
+import { BARANGAYS } from './constants'
 import ConfirmDialog from './components/ConfirmDialog'
 
 
@@ -115,8 +115,8 @@ function App() {
 
   const nav = useMemo(() => getRoleNav(user), [user])
 
-  const handleLogin = (emailOrUsername: string, password: string, rememberMe: boolean) => {
-    const result = loginService(emailOrUsername, password, rememberMe)
+  const handleLogin = async (emailOrUsername: string, password: string, rememberMe: boolean) => {
+    const result = await loginAsync(emailOrUsername, password, rememberMe)
     if (result) {
       setUser(result)
       const next = result.role === 'superadmin' ? '/superadmin/home' : result.role === 'sk' ? '/sk/home' : '/citizen/home'
@@ -126,8 +126,8 @@ function App() {
     return false
   }
 
-  const handleRegister = (name: string, email: string, password: string, barangay: string, isStaRosa: boolean, username?: string): UserAccount => {
-    const result = registerService(name, email, password, barangay, isStaRosa, username)
+  const handleRegister = async (name: string, email: string, password: string, barangay: string, isStaRosa: boolean, username?: string): Promise<UserAccount> => {
+    const result = await registerAsync(name, email, password, barangay, isStaRosa, username)
     setUser(result)
     return result
   }

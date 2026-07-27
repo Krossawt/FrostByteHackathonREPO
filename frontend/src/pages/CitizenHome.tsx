@@ -1,10 +1,10 @@
-import { useState, FormEvent } from 'react'
-import { barangaySummary, projects, citizenComments } from '../data/mockData'
+import { useState, useEffect, FormEvent } from 'react'
 import type { UserAccount, ReportProject } from '../types'
 import ProjectDetailModal from '../components/ProjectDetailModal'
 import BarangayTransactionsModal from '../components/BarangayTransactionsModal'
 import { DonutChart } from '../components/MiniChart'
 import SingleNewsCarousel from '../components/SingleNewsCarousel'
+import { fetchProjectsApi, fetchBarangayReportApi } from '../services/api'
 
 interface CitizenHomeProps { user?: UserAccount | null }
 
@@ -32,10 +32,50 @@ const getGrad = (cat?: string) => CATEGORY_GRAD[cat ?? 'default'] ?? CATEGORY_GR
 
 export default function CitizenHome({ user }: CitizenHomeProps) {
   const barangay = user?.barangay || 'Balibago'
-  const summary = barangaySummary.find(b => b.barangay === barangay)
-  const localProjects = projects.filter(p => p.barangay === barangay)
-  const [localComments, setLocalComments] = useState(citizenComments.filter(c => c.barangay === barangay))
+  const [summary, setSummary] = useState({ spent: 0, annualBudget: 0, remaining: 0 })
+  const [localProjects, setLocalProjects] = useState<ReportProject[]>([])
+  const [localComments, setLocalComments] = useState<any[]>([])
   const [votedIds, setVotedIds] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    async function loadCitizenData() {
+      try {
+        const [projRes, repRes] = await Promise.all([
+          fetchProjectsApi({ barangay }).catch(() => []),
+          fetchBarangayReportApi(barangay).catch(() => null),
+        ])
+
+        if (Array.isArray(projRes)) {
+          setLocalProjects(projRes.map((p: any) => ({
+            id: String(p.projectID || p.id),
+            title: p.projectName || p.title,
+            barangay: p.projectLocation || barangay,
+            category: p.projectCategory || 'Education',
+            status: p.projectStatus ? p.projectStatus.toLowerCase() as any : 'ongoing',
+            proposedBudget: Number(p.projectBudget || 0),
+            spent: Number(p.projectBreakdown || 0),
+            remainingBudget: Math.max(0, Number(p.projectBudget || 0) - Number(p.projectBreakdown || 0)),
+            progress: p.projectProgress || 0,
+            progressPercent: p.projectProgress || 0,
+            startDate: p.projectStartTime ? new Date(p.projectStartTime).toISOString().split('T')[0] : '',
+            endDate: p.projectEndTime ? new Date(p.projectEndTime).toISOString().split('T')[0] : '',
+            description: p.projectDescription || '',
+          })))
+        }
+
+        if (repRes) {
+          setSummary({
+            spent: Number(repRes.spent || 0),
+            annualBudget: Number(repRes.annualBudget || 0),
+            remaining: Number(repRes.remaining || 0),
+          })
+        }
+      } catch (err) {
+        console.warn('API load warning:', err)
+      }
+    }
+    loadCitizenData()
+  }, [barangay])
 
   const [comment, setComment] = useState('')
   const [suggestionCat, setSuggestionCat] = useState('Sports Facilities')
@@ -43,10 +83,10 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
   const [selectedProject, setSelectedProject] = useState<ReportProject | null>(null)
   const [showTxnModal, setShowTxnModal] = useState(false)
 
-  const spent = summary?.spent ?? 0
-  const budget = summary?.annualBudget ?? 1
-  const remain = summary?.remaining ?? 0
-  const usagePct = Math.min(Math.round((spent / budget) * 100), 100)
+  const spent = summary.spent
+  const budget = summary.annualBudget || 1
+  const remain = summary.remaining
+  const usagePct = budget > 0 ? Math.min(Math.round((spent / budget) * 100), 100) : 0
 
   const handleComment = (e: FormEvent) => {
     e.preventDefault()
@@ -60,7 +100,7 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
         type: 'suggestion' as const,
         votes: 1,
       }
-      setLocalComments(prev => [newC, ...prev])
+      setLocalComments((prev: any[]) => [newC, ...prev])
       setSubmitted(true)
       setComment('')
       setTimeout(() => setSubmitted(false), 4000)
@@ -68,7 +108,7 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
   }
 
   const handleVote = (id: string) => {
-    setLocalComments(prev => prev.map(c => {
+    setLocalComments((prev: any[]) => prev.map((c: any) => {
       if (c.id !== id) return c
       const alreadyVoted = votedIds.has(id)
       return { ...c, votes: (c.votes ?? 0) + (alreadyVoted ? -1 : 1) }
@@ -124,7 +164,7 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
             <div className="stat-sub">Available for projects</div>
           </div>
           <div className="stat-card">
-            <div className="stat-value">{summary?.projects ?? 0}</div>
+            <div className="stat-value">{localProjects.length}</div>
             <div className="stat-label">Total Projects</div>
             <div className="stat-sub">{localProjects.filter(p => p.status === 'ongoing').length} currently active</div>
           </div>
@@ -282,7 +322,7 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
               {/* Feed of Recent Citizen Suggestion Posts */}
               <div style={{ marginTop: '1.8rem', borderTop: '1px solid rgba(118,0,49,0.08)', paddingTop: '1.2rem', display: 'grid', gap: '0.9rem' }}>
                 <div className="page-kicker">Barangay {barangay} Community Posts</div>
-                {localComments.map(c => (
+                {localComments.map((c: any) => (
                   <div key={c.id} className="comment-card" style={{ background: 'rgba(255,255,255,0.95)', border: '1.5px solid rgba(118,0,49,0.1)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>

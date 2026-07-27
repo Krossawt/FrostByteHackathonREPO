@@ -1,9 +1,9 @@
-import { useState } from 'react'
-import { barangaySummary, projects, news, activityLogs } from '../data/mockData'
+import { useState, useEffect } from 'react'
 import { DonutChart } from '../components/MiniChart'
 import ProjectDetailModal from '../components/ProjectDetailModal'
 import type { ReportProject } from '../types'
 import Portal from '../components/Portal'
+import { fetchProjectsApi, fetchExecutiveSummaryApi, fetchAuditLogsApi, postApprovedAbyipApi } from '../services/api'
 
 // ── Category cover images (same palette as SKProjects) ──────────────────────
 const CATEGORY_IMAGES: Record<string, string> = {
@@ -35,8 +35,9 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
   const [view, setView] = useState<'city' | 'barangay'>(selectedBarangay ? 'barangay' : 'city')
 
   // Dynamic States
-  const [barangayList, setBarangayList] = useState(barangaySummary)
-  const [logs, setLogs] = useState(activityLogs)
+  const [barangayList, setBarangayList] = useState<any[]>([])
+  const [logs, setLogs] = useState<any[]>([])
+  const [cityNews, setCityNews] = useState<any[]>([])
 
   // Project detail modal
   const [selectedProject, setSelectedProject] = useState<ReportProject | null>(null)
@@ -61,7 +62,51 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
     setErrorMessage('')
   }
 
-  const handleSubmitBudget = (e: React.FormEvent) => {
+  // Live API State
+  const [liveProjects, setLiveProjects] = useState<ReportProject[]>([])
+
+  useEffect(() => {
+    async function loadLiveData() {
+      try {
+        const [sumRes, projRes, logsRes] = await Promise.all([
+          fetchExecutiveSummaryApi().catch(() => null),
+          fetchProjectsApi().catch(() => []),
+          fetchAuditLogsApi().catch(() => []),
+        ])
+
+        if (sumRes && sumRes.barangays) {
+          setBarangayList(sumRes.barangays.map((b: any) => ({
+            barangay: b.barangay,
+            annualBudget: b.annualBudget || 0,
+            spent: b.spent || 0,
+            projects: b.projectCount || 0,
+            remaining: b.remaining || 0,
+          })))
+        }
+
+        if (Array.isArray(projRes)) {
+          setLiveProjects(projRes)
+        }
+
+        if (Array.isArray(logsRes) && logsRes.length > 0) {
+          setLogs(logsRes.map((l: any) => ({
+            id: String(l.logID || l.id),
+            user: l.actorName || 'System',
+            actor: l.actorName || 'System',
+            barangay: l.barangay || 'City',
+            action: `${l.actionType}: ${l.details || ''}`,
+            date: l.timestamp ? new Date(l.timestamp).toLocaleDateString() : 'Today',
+            when: 'Recently'
+          })))
+        }
+      } catch (err) {
+        console.warn('API fetch warning:', err)
+      }
+    }
+    loadLiveData()
+  }, [])
+
+  const handleSubmitBudget = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedBarangay) {
       setErrorMessage('Please select a specific barangay first.')
@@ -79,41 +124,40 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
     setIsSubmitting(true)
     setErrorMessage('')
 
-    setTimeout(() => {
-      const budgetVal = parseFloat(approvedBudget)
+    const budgetVal = parseFloat(approvedBudget)
 
-      setBarangayList(prev =>
-        prev.map(b =>
+    try {
+      await postApprovedAbyipApi({
+        budgetBarangay: selectedBarangay,
+        budgetYear: parseInt(annualYear) || 2026,
+        budgetValue: budgetVal,
+        budgetFileURL: `/static/uploads/${selectedFile.name}`
+      })
+
+      setBarangayList((prev: any[]) =>
+        prev.map((b: any) =>
           b.barangay === selectedBarangay
             ? { ...b, annualBudget: budgetVal, remaining: Math.max(0, budgetVal - b.spent) }
             : b
         )
       )
 
-      const newLog = {
-        id: `log-${Date.now()}`,
-        user: 'SCC Super Admin',
-        actor: 'SCC Super Admin',
-        barangay: selectedBarangay,
-        action: `Posted Approved ABYIP (FY ${annualYear}) for Barangay ${selectedBarangay} — ₱${budgetVal.toLocaleString()}`,
-        date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-        when: 'Just now'
-      }
-      setLogs(prev => [newLog, ...prev])
-
       setIsSubmitting(false)
-      setSuccessMessage(`ABYIP (FY ${annualYear}) for Barangay ${selectedBarangay} — ₱${budgetVal.toLocaleString()} has been successfully posted!`)
-    }, 1000)
+      setSuccessMessage(`ABYIP (FY ${annualYear}) for Barangay ${selectedBarangay} — ₱${budgetVal.toLocaleString()} has been successfully posted to live database!`)
+    } catch (err: any) {
+      setIsSubmitting(false)
+      setErrorMessage(err.message || 'Failed to post approved ABYIP to backend')
+    }
   }
 
   // ── Computed values ──────────────────────────────────────────────────────
-  const totalBudget = barangayList.reduce((s, b) => s + b.annualBudget, 0)
-  const totalSpent  = barangayList.reduce((s, b) => s + b.spent, 0)
-  const totalProj   = projects.length
+  const totalBudget = barangayList.reduce((s: number, b: any) => s + (b.annualBudget || 0), 0)
+  const totalSpent  = barangayList.reduce((s: number, b: any) => s + (b.spent || 0), 0)
+  const totalProj   = liveProjects.length
   const usagePct    = totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0
 
-  const bSummary  = selectedBarangay ? barangayList.find(b => b.barangay === selectedBarangay) : null
-  const bProjects = selectedBarangay ? projects.filter(p => p.barangay === selectedBarangay) : []
+  const bSummary  = selectedBarangay ? barangayList.find((b: any) => b.barangay === selectedBarangay) : null
+  const bProjects = selectedBarangay ? liveProjects.filter((p: any) => p.barangay === selectedBarangay || p.projectLocation === selectedBarangay) : []
 
   const displayBudget = selectedBarangay && bSummary ? bSummary.annualBudget : totalBudget
   const displaySpent  = selectedBarangay && bSummary ? bSummary.spent : totalSpent
@@ -124,7 +168,7 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
 
   // ── Barangay-filtered logs ───────────────────────────────────────────────
   const barangayLogs = selectedBarangay
-    ? logs.filter(l => l.barangay === selectedBarangay)
+    ? logs.filter((l: any) => l.barangay === selectedBarangay)
     : recentLogs
 
   return (
@@ -207,7 +251,7 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
           <div className="stat-card">
             <div className="stat-value">{displayProj}</div>
             <div className="stat-label">Total Projects</div>
-            <div className="stat-sub">{(selectedBarangay ? bProjects : projects).filter(p => p.status === 'ongoing').length} ongoing</div>
+            <div className="stat-sub">{(selectedBarangay ? bProjects : liveProjects).filter((p: any) => p.status === 'ongoing').length} ongoing</div>
           </div>
           <div className="stat-card" style={{ borderLeft: '3px solid #1d4ed8' }}>
             <div className="stat-value" style={{ color: '#1d4ed8' }}>{selectedBarangay ? '1' : '18'}</div>
@@ -242,9 +286,9 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
               <div className="chart-card">
                 <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.88rem', marginBottom: '0.75rem' }}>Project Status Breakdown</div>
                 {[
-                  { label: 'Ongoing',   count: projects.filter(p => p.status === 'ongoing').length,   color: 'var(--maroon)' },
-                  { label: 'Upcoming',  count: projects.filter(p => p.status === 'upcoming').length,  color: '#1d4ed8' },
-                  { label: 'Completed', count: projects.filter(p => p.status === 'completed').length, color: '#166534' },
+                  { label: 'Ongoing',   count: liveProjects.filter((p: any) => p.status === 'ongoing').length,   color: 'var(--maroon)' },
+                  { label: 'Upcoming',  count: liveProjects.filter((p: any) => p.status === 'upcoming').length,  color: '#1d4ed8' },
+                  { label: 'Completed', count: liveProjects.filter((p: any) => p.status === 'completed').length, color: '#166534' },
                 ].map(s => (
                   <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.6rem' }}>
                     <div style={{ fontSize: '1.6rem', fontFamily: 'var(--font-display)', fontWeight: 900, color: s.color, lineHeight: 1, minWidth: '2rem' }}>{s.count}</div>
@@ -297,7 +341,7 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
                 <div>
                   <div className="page-kicker" style={{ marginBottom: '0.75rem' }}>City News</div>
                   <div style={{ display: 'grid', gap: '0.65rem' }}>
-                    {news.slice(0, 5).map(n => (
+                    {cityNews.slice(0, 5).map((n: any) => (
                       <div key={n.id} className="news-card">
                         <span className="news-cat">{n.category}</span>
                         <div className="news-title" style={{ fontSize: '0.88rem' }}>{n.title}</div>
@@ -310,7 +354,7 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
                 <div>
                   <div className="page-kicker" style={{ marginBottom: '0.75rem' }}>System Activity</div>
                   <div style={{ display: 'grid', gap: '0.5rem' }}>
-                    {recentLogs.map(log => (
+                    {recentLogs.map((log: any) => (
                       <div key={log.id} className="card" style={{ padding: '0.72rem 0.9rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
                           <div>
@@ -408,7 +452,7 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
                   <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                     {(['ongoing', 'upcoming', 'completed'] as const).map(s => (
                       <span key={s} className={`badge badge-${s}`} style={{ fontSize: '0.72rem', padding: '0.2rem 0.55rem' }}>
-                        {projects.filter(p => p.barangay === selectedBarangay && p.status === s).length} {s}
+                        {bProjects.filter((p: any) => p.status === s).length} {s}
                       </span>
                     ))}
                   </div>
@@ -475,7 +519,7 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
                   </h2>
                 </div>
                 <div style={{ display: 'grid', gap: '0.5rem' }}>
-                  {barangayLogs.length > 0 ? barangayLogs.map(log => (
+                  {barangayLogs.length > 0 ? barangayLogs.map((log: any) => (
                     <div key={log.id} className="card" style={{ padding: '0.72rem 0.9rem' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
                         <div>

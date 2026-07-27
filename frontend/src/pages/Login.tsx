@@ -4,16 +4,8 @@ import { Menu, X } from 'lucide-react'
 import NewsTicker from '../components/NewsTicker'
 
 interface LoginPageProps {
-  onLogin: (emailOrUsername: string, password: string, rememberMe: boolean) => boolean
+  onLogin: (emailOrUsername: string, password: string, rememberMe: boolean) => Promise<boolean> | boolean
 }
-
-const DEMO_ACCOUNTS = [
-  { role: 'Super Admin', sub: 'City-wide oversight', email: 'superadmin@eskala.ph', password: 'Admin2026!', color: '#760031' },
-  { role: 'SK Chairperson', sub: 'Balibago · Manage & Approve', email: 'padizon.balibago@sk.gov.ph', password: 'Sk2026!', color: '#b45309' },
-  { role: 'SK Secretary', sub: 'Balibago · Add Projects (Proposal Upload & OCR)', email: 'mvillanueva.balibago@sk.gov.ph', password: 'Sk2026!', color: '#7c3aed' },
-  { role: 'SK Treasurer', sub: 'Balibago · Add Receipts (Upload & OCR)', email: 'klim.balibago@sk.gov.ph', password: 'Sk2026!', color: '#1d4ed8' },
-  { role: 'Citizen', sub: 'Balibago resident', email: 'citizen@eskala.ph', password: 'Citizen2026!', color: '#166534' },
-]
 
 export default function LoginPage({ onLogin }: LoginPageProps) {
   const [credential, setCredential] = useState('')
@@ -21,16 +13,26 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   const [showPw, setShowPw] = useState(false)
   const [error, setError] = useState('')
   const [resetNotice, setResetNotice] = useState('')
-  const [showDemo, setShowDemo] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [navOpen, setNavOpen] = useState(false)
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setError('')
     setResetNotice('')
     if (!credential.trim() || !password) { setError('Please enter your username/email and password.'); return }
-    const ok = onLogin(credential.trim(), password, true)
-    if (!ok) setError('Invalid credentials. Use "Show Demo Accounts" below to test the portal.')
+
+    setIsSubmitting(true)
+    try {
+      const ok = await onLogin(credential.trim(), password, true)
+      if (!ok) {
+        setError('Invalid email/username or password. Please verify your credentials.')
+      }
+    } catch (err: any) {
+      setError(err.message || 'Login failed. Please check your credentials.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -197,42 +199,12 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
             {error && <div className="notice error">{error}</div>}
             {resetNotice && <div className="notice info">{resetNotice}</div>}
 
-            <button type="submit" className="btn-login-submit">
-              Sign In to Portal &rarr;
+            <button type="submit" className="btn-login-submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Signing In...' : 'Sign In to Portal →'}
             </button>
           </form>
 
-          {/* Demo accounts */}
-          <div style={{ borderTop: '1px solid rgba(118,0,49,0.1)', paddingTop: '1rem' }}>
-            <button type="button" className="link-button"
-              style={{ width: '100%', textAlign: 'center', fontSize: '0.8rem', color: '#7A0C2E', textDecoration: 'underline', marginBottom: '0.6rem', display: 'block' }}
-              onClick={() => setShowDemo(d => !d)}>
-              {showDemo ? 'Hide Demo Accounts' : 'Show Sample Accounts (Demo)'}
-            </button>
-
-            {showDemo && (
-              <div style={{ display: 'grid', gap: '0.45rem' }}>
-                {DEMO_ACCOUNTS.map(d => (
-                  <button key={d.email} type="button"
-                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.65rem 0.85rem', border: '1.5px solid rgba(118,0,49,0.1)', background: 'rgba(255,255,255,0.9)', cursor: 'pointer', transition: 'border-color 0.15s, background 0.15s', textAlign: 'left', gap: '0.75rem' }}
-                    onMouseEnter={e => { (e.currentTarget).style.borderColor = d.color; (e.currentTarget).style.background = `${d.color}10` }}
-                    onMouseLeave={e => { (e.currentTarget).style.borderColor = 'rgba(118,0,49,0.1)'; (e.currentTarget).style.background = 'rgba(255,255,255,0.9)' }}
-                    onClick={() => { setCredential(d.email); setPassword(d.password); setShowDemo(false) }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                      <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: d.color, flexShrink: 0 }} />
-                      <div>
-                        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.85rem', color: d.color }}>{d.role}</div>
-                        <div style={{ fontSize: '0.78rem', color: 'var(--muted)' }}>{d.sub}</div>
-                      </div>
-                    </div>
-                    <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.72rem', color: 'var(--muted-light)', letterSpacing: '0.06em' }}>USE →</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <p style={{ textAlign: 'center', fontSize: '0.86rem', color: 'var(--muted)' }}>
+          <p style={{ textAlign: 'center', fontSize: '0.86rem', color: 'var(--muted)', marginTop: '1.25rem' }}>
             No account?{' '}
             <Link to="/register" style={{ color: '#7A0C2E', fontWeight: 700, fontFamily: 'var(--font-display)' }}>
               Register as a Citizen

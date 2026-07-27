@@ -1,11 +1,11 @@
-import { useState, FormEvent } from 'react'
-import { barangaySummary, projects, citizenComments, activityLogs } from '../data/mockData'
+import { useState, useEffect, FormEvent } from 'react'
 import type { UserAccount, ReportProject } from '../types'
 import ProjectDetailModal from '../components/ProjectDetailModal'
 import CameraCaptureModal from '../components/CameraCaptureModal'
 import { DonutChart } from '../components/MiniChart'
 import SingleNewsCarousel from '../components/SingleNewsCarousel'
 import Portal from '../components/Portal'
+import { fetchBarangayReportApi, createProjectApi } from '../services/api'
 
 interface SKHomeProps { user?: UserAccount | null }
 
@@ -38,20 +38,53 @@ export default function SKHome({ user }: SKHomeProps) {
   const position = user?.skPosition || 'Chairperson'
   const canAddProject = position === 'Chairperson' || position === 'Secretary'
 
-  const summary    = barangaySummary.find(b => b.barangay === barangay)
-  const myProjects = projects.filter(p => p.barangay === barangay)
-  const myComments = citizenComments.filter(c => c.barangay === barangay)
-  const myLogs     = activityLogs.filter(l => l.barangay === barangay).slice(0, 6)
+  const [summary, setSummary] = useState({ spent: 0, annualBudget: 0, remaining: 0 })
+  const [localProjects, setLocalProjects] = useState<ReportProject[]>([])
+  const [myComments, setMyComments] = useState<any[]>([])
+  const [myLogs, setMyLogs] = useState<any[]>([])
 
-  const spent  = summary?.spent ?? 0
-  const budget = summary?.annualBudget ?? 1
-  const remain = summary?.remaining ?? 0
-  const usePct = Math.min(Math.round((spent / budget) * 100), 100)
+  useEffect(() => {
+    async function loadSKHomeData() {
+      try {
+        const rep = await fetchBarangayReportApi(barangay)
+        if (rep) {
+          setSummary({
+            spent: Number(rep.spent || 0),
+            annualBudget: Number(rep.annualBudget || 0),
+            remaining: Number(rep.remaining || 0),
+          })
+          if (Array.isArray(rep.projects)) {
+            setLocalProjects(rep.projects.map((p: any) => ({
+              id: String(p.projectID || p.id),
+              title: p.projectName || p.title,
+              barangay,
+              category: p.projectCategory || 'Education',
+              status: p.projectStatus ? p.projectStatus.toLowerCase() as any : 'ongoing',
+              proposedBudget: Number(p.projectBudget || 0),
+              spent: Number(p.projectBreakdown || 0),
+              progress: p.projectProgress || 0,
+              progressPercent: p.projectProgress || 0,
+              startDate: p.projectStartTime ? new Date(p.projectStartTime).toISOString().split('T')[0] : '',
+              endDate: p.projectEndTime ? new Date(p.projectEndTime).toISOString().split('T')[0] : '',
+              description: p.projectDescription || '',
+            })))
+          }
+        }
+      } catch (err) {
+        console.warn('API fetch warning in SKHome:', err)
+      }
+    }
+    loadSKHomeData()
+  }, [barangay])
+
+  const spent  = summary.spent
+  const budget = summary.annualBudget || 1
+  const remain = summary.remaining
+  const usePct = budget > 0 ? Math.min(Math.round((spent / budget) * 100), 100) : 0
 
   const [activeTab, setActiveTab] = useState<'overview' | 'comments'>('overview')
   const [selectedProject, setSelectedProject] = useState<ReportProject | null>(null)
   const [showAddModal, setShowAddModal] = useState(false)
-  const [localProjects, setLocalProjects] = useState(myProjects)
 
   // New project form state
   const [newTitle, setNewTitle] = useState('')
@@ -100,8 +133,7 @@ export default function SKHome({ user }: SKHomeProps) {
       proposedBudget: parseFloat(newBudget.replace(/,/g, '')) || 0,
       spent: 0, progress: 0, startDate: newStart, endDate: newEnd,
     }
-    projects.unshift(np)
-    setLocalProjects(prev => [np, ...prev])
+    setLocalProjects((prev: any[]) => [np, ...prev])
     setNewTitle(''); setNewCat('Education'); setNewDesc(''); setNewBudget(''); setNewStart(''); setNewEnd(''); setFormError('')
     setProposalFile(null); setProposalOcrMsg('')
     setShowAddModal(false)
@@ -145,9 +177,9 @@ export default function SKHome({ user }: SKHomeProps) {
             <div className="stat-sub">Available for projects</div>
           </div>
           <div className="stat-card">
-            <div className="stat-value">{myProjects.length}</div>
+            <div className="stat-value">{localProjects.length}</div>
             <div className="stat-label">Projects</div>
-            <div className="stat-sub">{myProjects.filter(p => p.status === 'ongoing').length} ongoing</div>
+            <div className="stat-sub">{localProjects.filter((p: any) => p.status === 'ongoing').length} ongoing</div>
           </div>
         </div>
 
@@ -202,9 +234,9 @@ export default function SKHome({ user }: SKHomeProps) {
                 </h2>
               </div>
 
-              {myProjects.length > 0 ? (
+              {localProjects.length > 0 ? (
                 <div className="card-grid card-grid-2" style={{ gap: '1.1rem' }}>
-                  {myProjects.map(p => (
+                  {localProjects.map((p: any) => (
                     <div key={p.id} className="v-card" onClick={() => setSelectedProject(p)}>
                       <div className="v-card-img-wrap" style={{ height: 140 }}>
                         <img
@@ -266,7 +298,7 @@ export default function SKHome({ user }: SKHomeProps) {
               <div>
                 <div className="page-kicker" style={{ marginBottom: '0.75rem' }}>Recent Activity</div>
                 <div style={{ display: 'grid', gap: '0.5rem' }}>
-                  {myLogs.map(log => (
+                  {myLogs.map((log: any) => (
                     <div key={log.id} className="card" style={{ padding: '0.75rem 1rem' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.15rem', flexWrap: 'wrap' }}>
                         <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.82rem', color: 'var(--ink)' }}>{log.action}</span>

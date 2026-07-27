@@ -1,9 +1,9 @@
-import { useState } from 'react'
-import { getUsersDB } from '../services/auth'
-import { BARANGAYS } from '../data/mockData'
+import { useState, useEffect, FormEvent } from 'react'
+import { BARANGAYS } from '../constants'
 import type { Role, UserAccount } from '../types'
 import ConfirmDialog from '../components/ConfirmDialog'
 import Portal from '../components/Portal'
+import { fetchUserAccountsApi, createUserAccountApi, toggleUserStatusApi } from '../services/api'
 
 const ROLE_OPTIONS: (Role | 'all')[] = ['all', 'superadmin', 'sk', 'citizen']
 
@@ -12,12 +12,51 @@ interface SuperAdminAccountsProps {
 }
 
 export default function SuperAdminAccounts({ selectedBarangay }: SuperAdminAccountsProps) {
-  const [users, setUsers] = useState(() => getUsersDB())
+  const [users, setUsers] = useState<UserAccount[]>([])
   const [filterRole, setFilterRole] = useState<Role | 'all'>('all')
   const [filterBrgy, setFilterBrgy] = useState('All')
   const [search, setSearch] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [suspendTarget, setSuspendTarget] = useState<UserAccount | null>(null)
+
+  // New SK form states
+  const [newFullName, setNewFullName] = useState('')
+  const [newEmail, setNewEmail] = useState('')
+  const [newBrgy, setNewBrgy] = useState('Balibago')
+  const [newPosition, setNewPosition] = useState('Chairperson')
+  const [newPassword, setNewPassword] = useState('Sk2026!')
+  const [formError, setFormError] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Load live user accounts from backend
+  useEffect(() => {
+    async function loadAccounts() {
+      try {
+        const res = await fetchUserAccountsApi()
+        if (Array.isArray(res)) {
+          const mapped: UserAccount[] = res.map((u: any) => {
+            const roleStr = String(u.userRole || '').toLowerCase()
+            const role: Role = roleStr.includes('admin') ? 'superadmin' : roleStr.includes('sk') ? 'sk' : 'citizen'
+            return {
+              id: String(u.userID),
+              name: u.userName,
+              email: u.userEmail,
+              username: u.userName.toLowerCase().replace(/\s+/g, ''),
+              role,
+              barangay: u.userLocation !== 'Santa Rosa City' ? u.userLocation : undefined,
+              skPosition: u.userRole.includes('Chairperson') ? 'Chairperson' : u.userRole.includes('Secretary') ? 'Secretary' : u.userRole.includes('Treasurer') ? 'Treasurer' : 'Kagawad',
+              isStaRosa: u.userIsStaRosa,
+              isActive: u.userIsActive,
+            }
+          })
+          setUsers(mapped)
+        }
+      } catch (err) {
+        console.warn('API error fetching user accounts:', err)
+      }
+    }
+    loadAccounts()
+  }, [])
 
   const activeBrgy = selectedBarangay && selectedBarangay !== '' ? selectedBarangay : filterBrgy
 
@@ -168,7 +207,7 @@ export default function SuperAdminAccounts({ selectedBarangay }: SuperAdminAccou
           </div>
         )}
 
-        {/* ── Create SK Account Modal (placeholder) ── */}
+        {/* ── Create SK Account Modal ── */}
         {showModal && (
           <Portal>
           <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowModal(false) }}>
@@ -179,35 +218,84 @@ export default function SuperAdminAccounts({ selectedBarangay }: SuperAdminAccou
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
                 </button>
               </div>
-              <div className="modal-body">
-                <div className="notice info">
-                  ℹ This form will provision an SK officer account. The system will auto-generate a username and temporary password, and send credentials to the provided email.
-                </div>
-                {(['Full Name', 'Email Address'] as const).map(f => (
-                  <div className="field-group" key={f}>
-                    <label className="field-label">{f} *</label>
-                    <input className="input" type={f === 'Email Address' ? 'email' : 'text'} placeholder={f === 'Full Name' ? 'Maria Santos' : 'msantos@sk.gov.ph'} />
-                  </div>
-                ))}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
+              <form onSubmit={async (e) => {
+                e.preventDefault()
+                if (!newFullName.trim() || !newEmail.trim() || !newPassword) {
+                  setFormError('Please fill in all required fields.')
+                  return
+                }
+                setIsSubmitting(true)
+                setFormError('')
+                try {
+                  const roleStr = `SK ${newPosition}`
+                  const created = await createUserAccountApi({
+                    userName: newFullName.trim(),
+                    userEmail: newEmail.trim(),
+                    userPassword: newPassword,
+                    userRole: roleStr,
+                    userLocation: newBrgy,
+                    userIsSK: true,
+                  })
+
+                  const newAcc: UserAccount = {
+                    id: String(created.userID || Date.now()),
+                    name: created.userName || newFullName.trim(),
+                    email: created.userEmail || newEmail.trim(),
+                    username: newFullName.trim().toLowerCase().replace(/\s+/g, ''),
+                    role: 'sk',
+                    barangay: newBrgy,
+                    skPosition: newPosition as any,
+                    isStaRosa: true,
+                    isActive: true,
+                  }
+
+                  setUsers(prev => [newAcc, ...prev])
+                  setShowModal(false)
+                  setNewFullName('')
+                  setNewEmail('')
+                  setFormError('')
+                } catch (err: any) {
+                  setFormError(err.message || 'Failed to create SK account')
+                } finally {
+                  setIsSubmitting(false)
+                }
+              }}>
+                <div className="modal-body">
+                  {formError && <div className="notice error">{formError}</div>}
                   <div className="field-group">
-                    <label className="field-label">Barangay *</label>
-                    <select className="input">
-                      {BARANGAYS.map(b => <option key={b} value={b}>{b}</option>)}
-                    </select>
+                    <label className="field-label">Full Name *</label>
+                    <input className="input" type="text" value={newFullName} onChange={e => setNewFullName(e.target.value)} placeholder="Maria Santos" required />
                   </div>
                   <div className="field-group">
-                    <label className="field-label">Position *</label>
-                    <select className="input">
-                      {['Chairperson','Secretary','Treasurer','Kagawad'].map(p => <option key={p} value={p}>{p}</option>)}
-                    </select>
+                    <label className="field-label">Email Address *</label>
+                    <input className="input" type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="msantos.balibago@sk.gov.ph" required />
+                  </div>
+                  <div className="field-group">
+                    <label className="field-label">Temporary Password *</label>
+                    <input className="input" type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} required />
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
+                    <div className="field-group">
+                      <label className="field-label">Barangay *</label>
+                      <select className="input" value={newBrgy} onChange={e => setNewBrgy(e.target.value)}>
+                        {BARANGAYS.map(b => <option key={b} value={b}>{b}</option>)}
+                      </select>
+                    </div>
+                    <div className="field-group">
+                      <label className="field-label">Position *</label>
+                      <select className="input" value={newPosition} onChange={e => setNewPosition(e.target.value)}>
+                        {['Chairperson','Secretary','Treasurer','Kagawad'].map(p => <option key={p} value={p}>{p}</option>)}
+                      </select>
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div className="modal-footer">
-                <button className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-                <button className="btn btn-primary" onClick={() => setShowModal(false)}>Create Account</button>
-              </div>
+                <div className="modal-footer">
+                  <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
+                  <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+                    {isSubmitting ? 'Creating...' : 'Create Account'}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
           </Portal>
@@ -223,9 +311,15 @@ export default function SuperAdminAccounts({ selectedBarangay }: SuperAdminAccou
           confirmLabel={suspendTarget?.isActive ? 'Suspend' : 'Reactivate'}
           cancelLabel="Cancel"
           danger={!!suspendTarget?.isActive}
-          onConfirm={() => {
+          onConfirm={async () => {
             if (!suspendTarget) return
-            setUsers(prev => prev.map(u => u.id === suspendTarget.id ? { ...u, isActive: !u.isActive } : u))
+            const newActive = !suspendTarget.isActive
+            try {
+              await toggleUserStatusApi(Number(suspendTarget.id), newActive)
+            } catch (err) {
+              console.warn('API error toggling user status:', err)
+            }
+            setUsers(prev => prev.map(u => u.id === suspendTarget.id ? { ...u, isActive: newActive } : u))
             setSuspendTarget(null)
           }}
           onCancel={() => setSuspendTarget(null)}

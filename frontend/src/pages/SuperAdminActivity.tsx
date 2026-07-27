@@ -1,5 +1,6 @@
-import { useState } from 'react'
-import { activityLogs, BARANGAYS } from '../data/mockData'
+import { useState, useEffect } from 'react'
+import { BARANGAYS } from '../constants'
+import { fetchAuditLogsApi } from '../services/api'
 
 const ACTION_TYPES = ['All', 'Project Created', 'Receipt Uploaded', 'Account Created', 'News Published', 'Login', 'Project Updated', 'Comment Submitted']
 
@@ -54,10 +55,33 @@ export default function SuperAdminActivity({ selectedBarangay }: SuperAdminActiv
   const [search, setSearch]     = useState('')
   const [barangay, setBarangay] = useState('All')
   const [actionType, setActionType] = useState('All')
+  const [logs, setLogs] = useState<any[]>([])
+
+  useEffect(() => {
+    async function loadLogs() {
+      try {
+        const res = await fetchAuditLogsApi(100)
+        if (Array.isArray(res)) {
+          setLogs(res.map((l: any) => ({
+            id: String(l.logID || l.id),
+            user: l.actorName || 'System',
+            actor: l.actorName || 'System',
+            barangay: l.barangay || 'City',
+            action: `${l.actionType}: ${l.details || ''}`,
+            date: l.timestamp ? new Date(l.timestamp).toLocaleString() : 'Today',
+            when: 'Recently'
+          })))
+        }
+      } catch (err) {
+        console.warn('API fetch audit logs warning:', err)
+      }
+    }
+    loadLogs()
+  }, [])
 
   const activeBrgy = selectedBarangay && selectedBarangay !== '' ? selectedBarangay : barangay
 
-  const filtered = activityLogs.filter(l => {
+  const filtered = logs.filter(l => {
     const matchBrgy   = activeBrgy === 'All'     || l.barangay === activeBrgy
     const matchAction = actionType === 'All'   || l.action.includes(actionType)
     const q = search.toLowerCase()
@@ -95,20 +119,20 @@ export default function SuperAdminActivity({ selectedBarangay }: SuperAdminActiv
         {/* ── Stat Cards ── */}
         <div className="card-grid card-grid-4 reveal" style={{ marginBottom: '1.5rem' }}>
           <div className="stat-card card-accent">
-            <div className="stat-value">{activityLogs.length}</div>
+            <div className="stat-value">{logs.length}</div>
             <div className="stat-label">Total Log Entries</div>
             <div className="stat-sub">All-time system activity</div>
           </div>
           <div className="stat-card">
-            <div className="stat-value">{activityLogs.filter(l => l.action.includes('Created') || l.action.includes('Uploaded')).length}</div>
+            <div className="stat-value">{logs.filter((l: any) => l.action.includes('Created') || l.action.includes('Uploaded')).length}</div>
             <div className="stat-label">Creation Events</div>
           </div>
           <div className="stat-card">
-            <div className="stat-value">{activityLogs.filter(l => l.action.includes('Login')).length}</div>
+            <div className="stat-value">{logs.filter((l: any) => l.action.includes('Login')).length}</div>
             <div className="stat-label">Login Events</div>
           </div>
           <div className="stat-card">
-            <div className="stat-value">{new Set(activityLogs.map(l => l.actor)).size}</div>
+            <div className="stat-value">{new Set(logs.map((l: any) => l.actor)).size}</div>
             <div className="stat-label">Unique Actors</div>
           </div>
         </div>
