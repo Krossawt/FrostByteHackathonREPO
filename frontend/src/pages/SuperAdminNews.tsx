@@ -245,12 +245,12 @@ export default function SuperAdminNews() {
                   </div>
 
                   <div className="form-group">
-                    <label className="form-label">Article Banner Image (Optional)</label>
+                    <label className="form-label">Article Banner Image</label>
                     <input className="form-input" type="file" accept="image/*" onChange={handleImageChange} />
-                    {uploading && <div style={{ fontSize: '0.78rem', color: 'var(--maroon)', marginTop: '0.25rem' }}>Uploading image to backend static storage…</div>}
+                    {uploading && <div style={{ fontSize: '0.78rem', color: 'var(--maroon)', marginTop: '0.25rem' }}>Uploading image to backend storage…</div>}
                     {imageUrl && (
                       <div style={{ marginTop: '0.4rem', fontSize: '0.78rem', color: '#166534' }}>
-                        Image attached: <a href={imageUrl} target="_blank" rel="noreferrer" style={{ textDecoration: 'underline' }}>{imageUrl}</a>
+                        Uploaded image: <a href={imageUrl.startsWith('http') ? imageUrl : `https://frostbytehackathonrepo.onrender.com${imageUrl}`} target="_blank" rel="noreferrer" style={{ textDecoration: 'underline' }}>{imageUrl}</a>
                       </div>
                     )}
                   </div>
