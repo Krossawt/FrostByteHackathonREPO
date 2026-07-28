@@ -286,9 +286,9 @@ export async function createUserAccountApi(payload: {
 }
 
 export async function toggleUserStatusApi(userId: number, isActive: boolean): Promise<any> {
-  return request(`/admin/accounts/${userId}`, {
+  void isActive
+  return request(`/admin/accounts/${userId}/toggle-active`, {
     method: 'PATCH',
-    body: JSON.stringify({ userIsActive: isActive }),
   })
 }
 
