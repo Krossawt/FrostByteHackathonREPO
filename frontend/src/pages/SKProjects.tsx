@@ -4,7 +4,7 @@ import ProjectDetailModal from '../components/ProjectDetailModal'
 import ConfirmDialog from '../components/ConfirmDialog'
 import type { ReportProject } from '../types'
 import Portal from '../components/Portal'
-import { fetchProjectsApi, createProjectApi } from '../services/api'
+import { fetchProjectsApi, createProjectApi, fetchProjectByIdApi, deleteProjectApi } from '../services/api'
 
 interface SKProjectsProps { user?: UserAccount | null }
 
@@ -39,6 +39,46 @@ const CATEGORY_GRAD: Record<string, string> = {
 function getCover(cat?: string) { return CATEGORY_IMAGES[cat ?? 'Other'] ?? CATEGORY_IMAGES['Other'] }
 function getGrad(cat?: string)  { return CATEGORY_GRAD[cat ?? 'default']  ?? CATEGORY_GRAD['default'] }
 
+function mapApiProjectToReportProject(project: any, fallbackBarangay: string): ReportProject {
+  const rawStatus = String(project?.projectStatus || project?.status || 'ongoing')
+  const normalizedStatus = rawStatus.toLowerCase()
+  const status: ReportProject['status'] = normalizedStatus.includes('posted') || normalizedStatus.includes('completed')
+    ? 'completed'
+    : normalizedStatus.includes('approval') || normalizedStatus.includes('finance') || normalizedStatus.includes('draft')
+      ? 'upcoming'
+      : 'ongoing'
+
+  const proposedBudget = Number(project?.projectBudget ?? project?.proposedBudget ?? 0)
+  const spent = Number(project?.projectBreakdown ?? project?.spent ?? 0)
+  const startDateValue = project?.projectStartTime || project?.startDate || ''
+  const endDateValue = project?.projectEndTime || project?.endDate || ''
+
+  return {
+    id: String(project?.projectID || project?.id || ''),
+    projectId: project?.projectID ? Number(project.projectID) : undefined,
+    title: project?.projectName || project?.title || 'Untitled Project',
+    barangay: project?.projectLocation || project?.barangay || fallbackBarangay,
+    category: project?.projectCategory || project?.category || 'Education',
+    status,
+    proposedBudget,
+    spent,
+    remainingBudget: Math.max(0, proposedBudget - spent),
+    progress: Number(project?.projectProgress ?? project?.progress ?? 0),
+    progressPercent: Number(project?.projectProgress ?? project?.progress ?? 0),
+    startDate: startDateValue ? new Date(startDateValue).toISOString().split('T')[0] : '',
+    endDate: endDateValue ? new Date(endDateValue).toISOString().split('T')[0] : '',
+    description: project?.projectDescription || project?.description || '',
+    projectStatus: project?.projectStatus || project?.status,
+    projectDescription: project?.projectDescription || project?.description || '',
+    projectCategory: project?.projectCategory || project?.category || 'Education',
+    projectBudget: proposedBudget,
+    projectBreakdown: spent,
+    projectProgress: Number(project?.projectProgress ?? project?.progress ?? 0),
+    projectStartTime: startDateValue,
+    projectEndTime: endDateValue,
+  }
+}
+
 export default function SKProjects({ user }: SKProjectsProps) {
   const barangay  = user?.barangay || 'Balibago'
   const position  = user?.skPosition || 'Chairperson'
@@ -50,32 +90,27 @@ export default function SKProjects({ user }: SKProjectsProps) {
   const [selectedProject, setSelectedProject] = useState<ReportProject | null>(null)
   const [projectToDelete, setProjectToDelete] = useState<ReportProject | null>(null)
   const [localProjects, setLocalProjects] = useState<ReportProject[]>([])
+  const [isLoadingProjects, setIsLoadingProjects] = useState(false)
+  const [projectsError, setProjectsError] = useState('')
+  const [isDeletingProject, setIsDeletingProject] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   // Load live API projects
   useEffect(() => {
     async function loadProjects() {
+      setIsLoadingProjects(true)
+      setProjectsError('')
       try {
         const res = await fetchProjectsApi({ barangay })
         if (Array.isArray(res)) {
-          const mapped: ReportProject[] = res.map((p: any) => ({
-            id: String(p.projectID || p.id),
-            title: p.projectName || p.title,
-            barangay: p.projectLocation || barangay,
-            category: p.projectCategory || 'Education',
-            status: p.projectStatus ? p.projectStatus.toLowerCase() as any : 'ongoing',
-            proposedBudget: Number(p.projectBudget || 0),
-            spent: Number(p.projectBreakdown || 0),
-            remainingBudget: Math.max(0, Number(p.projectBudget || 0) - Number(p.projectBreakdown || 0)),
-            progress: p.projectProgress || 0,
-            progressPercent: p.projectProgress || 0,
-            startDate: p.projectStartTime ? new Date(p.projectStartTime).toISOString().split('T')[0] : '',
-            endDate: p.projectEndTime ? new Date(p.projectEndTime).toISOString().split('T')[0] : '',
-            description: p.projectDescription || '',
-          }))
+          const mapped: ReportProject[] = res.map((p: any) => mapApiProjectToReportProject(p, barangay))
           setLocalProjects(mapped)
         }
-      } catch (err) {
+      } catch (err: any) {
         console.warn('API error fetching projects:', err)
+        setProjectsError(err.message || 'Unable to load projects right now.')
+      } finally {
+        setIsLoadingProjects(false)
       }
     }
     loadProjects()
@@ -126,21 +161,16 @@ export default function SKProjects({ user }: SKProjectsProps) {
         projectCategory: newCat,
       })
       const res: any = created
-      const np: ReportProject = {
-        id: String(res.projectID || res.id),
-        title: res.projectName || newTitle.trim(),
-        barangay: res.projectLocation || barangay,
-        category: res.projectCategory || newCat,
-        status: 'upcoming',
-        proposedBudget: Number(res.projectBudget || newBudget),
-        spent: 0,
-        remainingBudget: Number(res.projectBudget || newBudget),
-        progress: 0,
-        progressPercent: 0,
-        startDate: newStart,
-        endDate: newEnd,
-        description: res.projectDescription || newDesc.trim(),
-      }
+      const np: ReportProject = mapApiProjectToReportProject({
+        ...res,
+        projectName: res.projectName || newTitle.trim(),
+        projectLocation: res.projectLocation || barangay,
+        projectCategory: res.projectCategory || newCat,
+        projectBudget: res.projectBudget || newBudget,
+        projectDescription: res.projectDescription || newDesc.trim(),
+        projectStartTime: newStart,
+        projectEndTime: newEnd,
+      }, barangay)
 
       setLocalProjects(prev => [np, ...prev])
       setShowModal(false)
@@ -157,10 +187,25 @@ export default function SKProjects({ user }: SKProjectsProps) {
   }
 
   const handleDeleteProject = (p: ReportProject) => setProjectToDelete(p)
-  const confirmDelete = () => {
+  const handleProjectUpdated = (updated: ReportProject) => {
+    setSelectedProject(updated)
+    setLocalProjects(prev => prev.map(p => (p.id === updated.id ? updated : p)))
+  }
+
+  const confirmDelete = async () => {
     if (!projectToDelete) return
-    setLocalProjects(prev => prev.filter(p => p.id !== projectToDelete.id))
-    setProjectToDelete(null)
+    setIsDeletingProject(true)
+    setDeleteError('')
+    try {
+      const projectId = projectToDelete.projectId ?? projectToDelete.id
+      await deleteProjectApi(projectId)
+      setLocalProjects(prev => prev.filter(p => p.id !== projectToDelete.id))
+      setProjectToDelete(null)
+    } catch (err: any) {
+      setDeleteError(err.message || 'Unable to delete project right now.')
+    } finally {
+      setIsDeletingProject(false)
+    }
   }
 
   return (
@@ -238,6 +283,8 @@ export default function SKProjects({ user }: SKProjectsProps) {
         {/* ── Project Grid ── */}
         {filtered.length > 0 ? (
           <div className="card-grid card-grid-3">
+            {isLoadingProjects && <div className="card" style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '1.4rem', color: 'var(--muted)' }}>Loading projects…</div>}
+            {!isLoadingProjects && projectsError && <div className="alert-error" style={{ gridColumn: '1 / -1' }}>{projectsError}</div>}
             {filtered.map(p => (
               <div key={p.id} className="v-card" onClick={() => setSelectedProject(p)}>
                 <div className="v-card-img-wrap">
@@ -279,7 +326,7 @@ export default function SKProjects({ user }: SKProjectsProps) {
                     {/* SK actions */}
                     {canEdit && (
                       <div style={{ display: 'flex', gap: '0.35rem' }} onClick={e => e.stopPropagation()}>
-                        <button className="btn btn-secondary btn-sm" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }}>
+                        <button className="btn btn-secondary btn-sm" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }} onClick={e => { e.stopPropagation(); setSelectedProject(p) }}>
                           Edit
                         </button>
                         <button className="btn btn-danger btn-sm" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }}
@@ -385,15 +432,16 @@ export default function SKProjects({ user }: SKProjectsProps) {
 
         {/* ── Project Detail Modal ── */}
         {selectedProject && (
-          <ProjectDetailModal project={selectedProject} user={user} onClose={() => setSelectedProject(null)} />
+          <ProjectDetailModal project={selectedProject} user={user} onClose={() => setSelectedProject(null)} onProjectUpdated={handleProjectUpdated} />
         )}
 
         {/* ── Delete Confirmation ── */}
+        {deleteError && <div className="alert-error" style={{ marginTop: '1rem' }}>{deleteError}</div>}
         <ConfirmDialog
           isOpen={!!projectToDelete}
           title="Delete Project"
           message={`Delete "${projectToDelete?.title}"? This action cannot be undone.`}
-          confirmLabel="Delete"
+          confirmLabel={isDeletingProject ? 'Deleting…' : 'Delete'}
           cancelLabel="Cancel"
           danger={true}
           onConfirm={confirmDelete}

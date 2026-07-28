@@ -176,6 +176,34 @@ export async function createProjectApi(payload: {
   })
 }
 
+export interface UpdateProjectPayload {
+  projectName?: string
+  projectDescription?: string
+  projectStartTime?: string
+  projectEndTime?: string
+  projectLocation?: string
+  projectBudget?: number
+  projectCategory?: string
+  projectProgress?: number
+}
+
+export async function fetchProjectByIdApi(projectId: number | string): Promise<any> {
+  return request<any>(`/projects/${projectId}`)
+}
+
+export async function updateProjectApi(projectId: number | string, payload: UpdateProjectPayload): Promise<any> {
+  return request<any>(`/projects/${projectId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function deleteProjectApi(projectId: number | string): Promise<any> {
+  return request<any>(`/projects/${projectId}`, {
+    method: 'DELETE',
+  })
+}
+
 // ─── ANNUAL BUDGET REPORTS (ABYIP) ──────────────────────────────────────────
 
 export async function postApprovedAbyipApi(payload: {
@@ -308,16 +336,29 @@ export async function fetchPurchaseOrdersApi(projectId?: number): Promise<any[]>
   return request<any[]>(`/purchase-orders${query}`)
 }
 
-export async function createPurchaseOrderApi(payload: {
+export interface CreatePurchaseOrderPayload {
   projectID: number
-  supplierName: string
-  orderItemsDescription: string
-  orderAmount: number
+  orderName?: string
   orderType?: string
-}): Promise<any> {
+  orderQty?: number
+  orderPrice?: number
+  supplierName?: string
+  orderItemsDescription?: string
+  orderAmount?: number
+}
+
+export async function createPurchaseOrderApi(payload: CreatePurchaseOrderPayload): Promise<any> {
+  const normalizedPayload = {
+    projectID: payload.projectID,
+    orderName: payload.orderName ?? payload.supplierName ?? 'Unnamed Order',
+    orderType: payload.orderType ?? 'Physical',
+    orderQty: payload.orderQty ?? 1,
+    orderPrice: payload.orderPrice ?? payload.orderAmount ?? 0,
+  }
+
   return request('/purchase-orders', {
     method: 'POST',
-    body: JSON.stringify(payload),
+    body: JSON.stringify(normalizedPayload),
   })
 }
 

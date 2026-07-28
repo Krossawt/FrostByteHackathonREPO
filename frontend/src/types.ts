@@ -17,6 +17,7 @@ export interface UserAccount {
 
 export interface ReportProject {
   id: string
+  projectId?: number
   barangay: string
   title: string
   status: 'upcoming' | 'ongoing' | 'completed' | 'cancelled'
@@ -32,6 +33,14 @@ export interface ReportProject {
   needsReceiptScan?: boolean
   receipts?: Receipt[]
   isDeleted?: boolean
+  projectStatus?: string
+  projectDescription?: string
+  projectCategory?: string
+  projectBudget?: number
+  projectBreakdown?: number
+  projectProgress?: number
+  projectStartTime?: string
+  projectEndTime?: string
 }
 
 export interface NewsItem {

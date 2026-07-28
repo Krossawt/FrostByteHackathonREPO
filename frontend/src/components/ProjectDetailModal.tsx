@@ -7,7 +7,7 @@ import { useState, useEffect, FormEvent } from 'react'
 import type { ReportProject, Receipt, UserAccount } from '../types'
 import CameraCaptureModal from './CameraCaptureModal'
 import Portal from './Portal'
-import { fetchCommentsApi, postCommentApi, voteCommentApi } from '../services/api'
+import { fetchCommentsApi, fetchProjectByIdApi, updateProjectApi } from '../services/api'
 
 const CATEGORY_IMAGES: Record<string, string> = {
   'Education':            'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=800&q=80',
@@ -38,11 +38,52 @@ interface ProjectDetailModalProps {
   project: ReportProject | null
   user?: UserAccount | null
   onClose: () => void
+  onProjectUpdated?: (project: ReportProject) => void
 }
 
 type ModalTab = 'overview' | 'finance' | 'comments'
 
-export default function ProjectDetailModal({ project, user, onClose }: ProjectDetailModalProps) {
+function mapApiProjectToReportProject(project: any, fallbackBarangay: string): ReportProject {
+  const rawStatus = String(project?.projectStatus || project?.status || 'ongoing')
+  const normalizedStatus = rawStatus.toLowerCase()
+  const status: ReportProject['status'] = normalizedStatus.includes('posted') || normalizedStatus.includes('completed')
+    ? 'completed'
+    : normalizedStatus.includes('approval') || normalizedStatus.includes('finance') || normalizedStatus.includes('draft')
+      ? 'upcoming'
+      : 'ongoing'
+
+  const proposedBudget = Number(project?.projectBudget ?? project?.proposedBudget ?? 0)
+  const spent = Number(project?.projectBreakdown ?? project?.spent ?? 0)
+  const startDateValue = project?.projectStartTime || project?.startDate || ''
+  const endDateValue = project?.projectEndTime || project?.endDate || ''
+
+  return {
+    id: String(project?.projectID || project?.id || ''),
+    projectId: project?.projectID ? Number(project.projectID) : undefined,
+    title: project?.projectName || project?.title || 'Untitled Project',
+    barangay: project?.projectLocation || project?.barangay || fallbackBarangay,
+    category: project?.projectCategory || project?.category || 'Education',
+    status,
+    proposedBudget,
+    spent,
+    remainingBudget: Math.max(0, proposedBudget - spent),
+    progress: Number(project?.projectProgress ?? project?.progress ?? 0),
+    progressPercent: Number(project?.projectProgress ?? project?.progress ?? 0),
+    startDate: startDateValue ? new Date(startDateValue).toISOString().split('T')[0] : '',
+    endDate: endDateValue ? new Date(endDateValue).toISOString().split('T')[0] : '',
+    description: project?.projectDescription || project?.description || '',
+    projectStatus: project?.projectStatus || project?.status,
+    projectDescription: project?.projectDescription || project?.description || '',
+    projectCategory: project?.projectCategory || project?.category || 'Education',
+    projectBudget: proposedBudget,
+    projectBreakdown: spent,
+    projectProgress: Number(project?.projectProgress ?? project?.progress ?? 0),
+    projectStartTime: startDateValue,
+    projectEndTime: endDateValue,
+  }
+}
+
+export default function ProjectDetailModal({ project, user, onClose, onProjectUpdated }: ProjectDetailModalProps) {
   const [tab, setTab] = useState<ModalTab>('overview')
   const [showReceiptForm, setShowReceiptForm] = useState(false)
   const [viewingReceipt, setViewingReceipt] = useState<Receipt | null>(null)
@@ -64,6 +105,18 @@ export default function ProjectDetailModal({ project, user, onClose }: ProjectDe
   }
 
   const [localReceipts, setLocalReceipts] = useState<Receipt[]>([])
+  const [detailProject, setDetailProject] = useState<ReportProject | null>(project)
+  const [isLoadingProject, setIsLoadingProject] = useState(false)
+  const [detailError, setDetailError] = useState('')
+  const [isEditing, setIsEditing] = useState(false)
+  const [isSavingProject, setIsSavingProject] = useState(false)
+  const [editTitle, setEditTitle] = useState(project?.title || '')
+  const [editCategory, setEditCategory] = useState(project?.category || 'Education')
+  const [editBudget, setEditBudget] = useState(String(project?.proposedBudget || ''))
+  const [editStart, setEditStart] = useState(project?.startDate || '')
+  const [editEnd, setEditEnd] = useState(project?.endDate || '')
+  const [editDesc, setEditDesc] = useState(project?.description || '')
+  const [editBarangay, setEditBarangay] = useState(project?.barangay || '')
 
   // Comment form state
   const [cText, setCText] = useState('')
@@ -72,7 +125,48 @@ export default function ProjectDetailModal({ project, user, onClose }: ProjectDe
   const [localComments, setLocalComments] = useState<any[]>([])
 
   useEffect(() => {
-    if (!project?.id) return
+    const currentProject = project
+
+    if (!currentProject?.id) {
+      setDetailProject(null)
+      return
+    }
+
+    const safeProject = currentProject
+    let active = true
+    setDetailProject(safeProject)
+    setEditTitle(safeProject.title || '')
+    setEditCategory(safeProject.category || 'Education')
+    setEditBudget(String(safeProject.proposedBudget || ''))
+    setEditStart(safeProject.startDate || '')
+    setEditEnd(safeProject.endDate || '')
+    setEditDesc(safeProject.description || '')
+    setEditBarangay(safeProject.barangay || '')
+    setIsEditing(false)
+    setIsLoadingProject(true)
+    setDetailError('')
+
+    async function loadProjectDetails() {
+      try {
+        const res = await fetchProjectByIdApi(safeProject.id)
+        if (!active) return
+        const mapped = mapApiProjectToReportProject(res, safeProject.barangay)
+        setDetailProject(mapped)
+        setEditTitle(mapped.title || '')
+        setEditCategory(mapped.category || 'Education')
+        setEditBudget(String(mapped.proposedBudget || ''))
+        setEditStart(mapped.startDate || '')
+        setEditEnd(mapped.endDate || '')
+        setEditDesc(mapped.description || '')
+        setEditBarangay(mapped.barangay || '')
+      } catch (err: any) {
+        if (!active) return
+        setDetailError(err.message || 'Unable to load project details.')
+      } finally {
+        if (active) setIsLoadingProject(false)
+      }
+    }
+
     async function loadProjectComments() {
       try {
         const pId = Number(project?.id)
@@ -93,17 +187,26 @@ export default function ProjectDetailModal({ project, user, onClose }: ProjectDe
         console.warn('API fetch project comments warning:', err)
       }
     }
+    loadProjectDetails()
     loadProjectComments()
+    return () => {
+      active = false
+    }
   }, [project?.id])
 
-  if (!project) return null
+  const activeProject = detailProject ?? project
+  if (!activeProject) return null
 
   const canManageReceipts =
     user?.role === 'sk' &&
     (user.skPosition === 'Treasurer' || user.skPosition === 'Chairperson') &&
-    user.barangay === project.barangay
+    user.barangay === activeProject.barangay
 
-  const spentPct = Math.min(Math.round((project.spent / project.proposedBudget) * 100), 100)
+  const spentPct = Math.min(Math.round((activeProject.spent / activeProject.proposedBudget) * 100), 100)
+  const canEditProject =
+    (user?.role === 'sk' || user?.role === 'superadmin') &&
+    (user?.skPosition === 'Chairperson' || user?.skPosition === 'Secretary' || user?.role === 'superadmin') &&
+    (user?.barangay === activeProject.barangay || user?.role === 'superadmin')
 
   // Simulated AI OCR Scan of uploaded receipt
   const handleScanOcr = () => {
@@ -119,14 +222,42 @@ export default function ProjectDetailModal({ project, user, onClose }: ProjectDe
     }, 1200)
   }
 
+  const handleSaveProject = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!activeProject) return
+
+    setIsSavingProject(true)
+    setDetailError('')
+    try {
+      const payload = {
+        projectName: editTitle.trim() || undefined,
+        projectDescription: editDesc.trim() || undefined,
+        projectStartTime: editStart ? new Date(editStart).toISOString() : undefined,
+        projectEndTime: editEnd ? new Date(editEnd).toISOString() : undefined,
+        projectLocation: editBarangay.trim() || undefined,
+        projectBudget: Number(editBudget) || undefined,
+        projectCategory: editCategory || undefined,
+      }
+      const res = await updateProjectApi(activeProject.projectId ?? activeProject.id, payload)
+      const updated = mapApiProjectToReportProject(res, activeProject.barangay)
+      setDetailProject(updated)
+      setIsEditing(false)
+      onProjectUpdated?.(updated)
+    } catch (err: any) {
+      setDetailError(err.message || 'Unable to update project information.')
+    } finally {
+      setIsSavingProject(false)
+    }
+  }
+
   const handleAddReceipt = (e: FormEvent) => {
     e.preventDefault()
     if (!rVendor.trim() || !rAmount || !rDate) { setRError('Fill in all required fields.'); return }
     const amt = parseFloat(rAmount.replace(/,/g, ''))
     if (isNaN(amt) || amt <= 0) { setRError('Enter a valid amount.'); return }
     const newR = {
-      id: `R-${Date.now()}`, projectId: project.id,
-      projectTitle: project.title, barangay: project.barangay,
+      id: `R-${Date.now()}`, projectId: activeProject.id,
+      projectTitle: activeProject.title, barangay: activeProject.barangay,
       vendor: rVendor.trim(), amount: amt, date: rDate,
       status: 'pending' as const, ocrExtracted: !!uploadedFile || !!ocrMsg,
       description: rDesc.trim(),
@@ -141,7 +272,7 @@ export default function ProjectDetailModal({ project, user, onClose }: ProjectDe
     e.preventDefault()
     if (!cText.trim()) { setCError('Please write your comment or suggestion.'); return }
     const newC = {
-      id: `C-${Date.now()}`, barangay: project.barangay,
+      id: `C-${Date.now()}`, barangay: activeProject.barangay,
       author: user?.name?.split(' ')[0] ?? 'Citizen',
       text: cText.trim(), date: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
       type: cType, votes: 0,
@@ -159,20 +290,20 @@ export default function ProjectDetailModal({ project, user, onClose }: ProjectDe
         {/* ── Cover ── */}
         <div className="project-modal-cover">
           <img
-            src={getCoverImg(project.category)}
-            alt={project.category}
+            src={getCoverImg(activeProject.category)}
+            alt={activeProject.category}
             className="project-modal-cover-img"
             onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
           />
           <div className="project-modal-cover-overlay">
-            <span className={`badge badge-${project.status}`}>{project.status}</span>
-            <h2 className="project-modal-title">{project.title}</h2>
+            <span className={`badge badge-${activeProject.status}`}>{activeProject.status}</span>
+            <h2 className="project-modal-title">{activeProject.title}</h2>
             <div className="project-modal-meta-row">
-              <span>{project.barangay}</span>
+              <span>{activeProject.barangay}</span>
               <span>·</span>
-              <span>{project.category}</span>
+              <span>{activeProject.category}</span>
               <span>·</span>
-              <span>{project.startDate} → {project.endDate}</span>
+              <span>{activeProject.startDate} → {activeProject.endDate}</span>
             </div>
           </div>
           <button className="modal-close-btn" onClick={onClose} aria-label="Close modal">
@@ -196,21 +327,24 @@ export default function ProjectDetailModal({ project, user, onClose }: ProjectDe
           {/* ── Tab: Overview ── */}
           {tab === 'overview' && (
             <div>
+              {detailError && <div className="alert-error" style={{ marginBottom: '1rem' }}>{detailError}</div>}
+              {isLoadingProject && <div className="alert-info" style={{ marginBottom: '1rem' }}>Loading project details…</div>}
+
               <div className="project-modal-stats">
                 <div className="project-modal-stat-item">
-                  <div className="project-modal-stat-val" style={{ color: 'var(--maroon)' }}>{project.progress}%</div>
+                  <div className="project-modal-stat-val" style={{ color: 'var(--maroon)' }}>{activeProject.progress}%</div>
                   <div className="project-modal-stat-label">Completion</div>
                 </div>
                 <div className="project-modal-stat-item">
-                  <div className="project-modal-stat-val">₱{(project.proposedBudget / 1000).toFixed(0)}K</div>
+                  <div className="project-modal-stat-val">₱{(activeProject.proposedBudget / 1000).toFixed(0)}K</div>
                   <div className="project-modal-stat-label">Proposed Budget</div>
                 </div>
                 <div className="project-modal-stat-item">
-                  <div className="project-modal-stat-val" style={{ color: '#b45309' }}>₱{(project.spent / 1000).toFixed(0)}K</div>
+                  <div className="project-modal-stat-val" style={{ color: '#b45309' }}>₱{(activeProject.spent / 1000).toFixed(0)}K</div>
                   <div className="project-modal-stat-label">Disbursed</div>
                 </div>
                 <div className="project-modal-stat-item">
-                  <div className="project-modal-stat-val" style={{ color: '#166534' }}>₱{((project.proposedBudget - project.spent) / 1000).toFixed(0)}K</div>
+                  <div className="project-modal-stat-val" style={{ color: '#166534' }}>₱{((activeProject.proposedBudget - activeProject.spent) / 1000).toFixed(0)}K</div>
                   <div className="project-modal-stat-label">Remaining</div>
                 </div>
               </div>
@@ -224,17 +358,63 @@ export default function ProjectDetailModal({ project, user, onClose }: ProjectDe
                   <div className="progress-fill" style={{ width: `${spentPct}%` }} />
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.3rem', fontSize: '0.74rem', color: 'var(--muted)', fontFamily: 'var(--font-display)' }}>
-                  <span>₱{project.spent.toLocaleString()} spent</span>
-                  <span>of ₱{project.proposedBudget.toLocaleString()}</span>
+                  <span>₱{activeProject.spent.toLocaleString()} spent</span>
+                  <span>of ₱{activeProject.proposedBudget.toLocaleString()}</span>
                 </div>
               </div>
 
               <div style={{ borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
                 <div className="page-kicker" style={{ marginBottom: '0.5rem' }}>Description</div>
-                <p style={{ fontSize: '0.9rem', lineHeight: 1.75, color: 'var(--ink)' }}>{project.description}</p>
+                {isEditing ? (
+                  <form onSubmit={handleSaveProject}>
+                    <div className="form-group">
+                      <label className="form-label">Project Title</label>
+                      <input className="form-input" value={editTitle} onChange={e => setEditTitle(e.target.value)} />
+                    </div>
+                    <div className="form-row-2">
+                      <div className="form-group">
+                        <label className="form-label">Category</label>
+                        <input className="form-input" value={editCategory} onChange={e => setEditCategory(e.target.value)} />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Budget (₱)</label>
+                        <input className="form-input" type="number" value={editBudget} onChange={e => setEditBudget(e.target.value)} />
+                      </div>
+                    </div>
+                    <div className="form-row-2">
+                      <div className="form-group">
+                        <label className="form-label">Start Date</label>
+                        <input className="form-input" type="date" value={editStart} onChange={e => setEditStart(e.target.value)} />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">End Date</label>
+                        <input className="form-input" type="date" value={editEnd} onChange={e => setEditEnd(e.target.value)} />
+                      </div>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Barangay</label>
+                      <input className="form-input" value={editBarangay} onChange={e => setEditBarangay(e.target.value)} />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Description</label>
+                      <textarea className="form-input" rows={4} value={editDesc} onChange={e => setEditDesc(e.target.value)} style={{ resize: 'vertical' }} />
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.6rem', marginTop: '0.6rem' }}>
+                      <button type="submit" className="btn btn-primary btn-sm" disabled={isSavingProject}>{isSavingProject ? 'Saving…' : 'Save Changes'}</button>
+                      <button type="button" className="btn btn-secondary btn-sm" onClick={() => setIsEditing(false)}>Cancel</button>
+                    </div>
+                  </form>
+                ) : (
+                  <p style={{ fontSize: '0.9rem', lineHeight: 1.75, color: 'var(--ink)' }}>{activeProject.description}</p>
+                )}
               </div>
 
               <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.2rem', flexWrap: 'wrap' }}>
+                {canEditProject && !isEditing && (
+                  <button className="btn btn-secondary btn-sm" onClick={() => setIsEditing(true)}>
+                    Edit Project
+                  </button>
+                )}
                 <button className="btn btn-primary btn-sm" onClick={() => setTab('finance')}>
                   View Finance Records
                 </button>
@@ -441,7 +621,7 @@ export default function ProjectDetailModal({ project, user, onClose }: ProjectDe
                 <div style={{ marginBottom: '1.2rem', padding: '1.1rem 1.3rem', background: 'rgba(118,0,49,0.04)', border: '1.5px solid rgba(118,0,49,0.14)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
                   <div>
                     <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.92rem', color: 'var(--ink)' }}>
-                      Want to share your feedback or suggestions with Barangay {project.barangay} SK?
+                      Want to share your feedback or suggestions with Barangay {activeProject.barangay} SK?
                     </div>
                     <div style={{ fontSize: '0.8rem', color: 'var(--muted)', marginTop: '0.15rem' }}>
                       Log in or create a free citizen account to submit comments directly to your local SK Council.
@@ -539,14 +719,14 @@ export default function ProjectDetailModal({ project, user, onClose }: ProjectDe
 
                 <div style={{ textAlign: 'center', borderBottom: '1px dashed #aaa', paddingBottom: '0.75rem', marginBottom: '0.85rem' }}>
                   <div style={{ fontWeight: 800, fontSize: '0.78rem', textTransform: 'uppercase' }}>Republic of the Philippines · City of Santa Rosa</div>
-                  <div style={{ fontWeight: 900, fontSize: '0.92rem', color: 'var(--maroon)', marginTop: '0.15rem' }}>BARANGAY {project.barangay.toUpperCase()} SANGGUNIANG KABATAAN</div>
+                  <div style={{ fontWeight: 900, fontSize: '0.92rem', color: 'var(--maroon)', marginTop: '0.15rem' }}>BARANGAY {activeProject.barangay.toUpperCase()} SANGGUNIANG KABATAAN</div>
                   <div style={{ fontSize: '0.72rem', color: '#555', marginTop: '0.15rem' }}>OFFICIAL DISBURSEMENT RECEIPT · O.R. #OR-2025-0{Math.abs(viewingReceipt.id.charCodeAt(0)) % 9000 + 1000}</div>
                 </div>
 
                 <div style={{ display: 'grid', gap: '0.35rem', fontSize: '0.78rem', marginBottom: '0.85rem' }}>
                   <div><strong>PAYEE / VENDOR:</strong> {viewingReceipt.vendor}</div>
                   <div><strong>DATE FILED:</strong> {viewingReceipt.date}</div>
-                  <div><strong>PROJECT:</strong> {viewingReceipt.projectTitle || project.title}</div>
+                  <div><strong>PROJECT:</strong> {viewingReceipt.projectTitle || activeProject.title}</div>
                   <div><strong>PARTICULARS:</strong> {viewingReceipt.description || 'Disbursement for youth initiative'}</div>
                 </div>
 
