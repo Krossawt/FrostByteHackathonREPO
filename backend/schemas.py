@@ -316,4 +316,5 @@ class CityConsolidatedReport(BaseModel):
     ongoingProjects: int
     completedProjects: int
     upcomingProjects: int
+    skOfficialsCount: int
     barangays: List[BarangaySummary]

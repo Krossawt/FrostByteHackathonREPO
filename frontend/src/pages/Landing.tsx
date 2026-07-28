@@ -7,7 +7,7 @@ import ProjectDetailModal from '../components/ProjectDetailModal'
 import BarangayTransactionsModal from '../components/BarangayTransactionsModal'
 import NewsTicker from '../components/NewsTicker'
 import type { ReportProject, NewsItem } from '../types'
-import { fetchExecutiveSummaryApi, fetchNewsApi, fetchProjectsApi } from '../services/api'
+import { fetchExecutiveSummaryApi, fetchNewsApi, fetchProjectsApi, fetchSKOfficialsApi } from '../services/api'
 
 
 const NEWS_IMAGES: Record<string, string> = {
@@ -63,6 +63,7 @@ export default function Landing() {
     ongoingProjects: number
     completedProjects: number
     upcomingProjects: number
+    skOfficialsCount: number
     barangays: any[]
   }>({
     totalBudget: 0,
@@ -71,17 +72,24 @@ export default function Landing() {
     ongoingProjects: 0,
     completedProjects: 0,
     upcomingProjects: 0,
+    skOfficialsCount: 0,
     barangays: []
   })
 
   useEffect(() => {
     async function loadLandingData() {
       try {
-        const [sumRes, newsRes, projRes] = await Promise.all([
+        const [sumRes, newsRes, projRes, skOfficialsRes] = await Promise.all([
           fetchExecutiveSummaryApi().catch(() => null),
           fetchNewsApi().catch(() => []),
           fetchProjectsApi({ status: 'Posted' }).catch(() => []),
+          fetchSKOfficialsApi().catch(() => []),
         ])
+
+        const fallbackSkCount = Array.isArray(skOfficialsRes) ? skOfficialsRes.length : 0
+        const skOfficialsCount = (sumRes && typeof sumRes.skOfficialsCount === 'number')
+          ? Number(sumRes.skOfficialsCount)
+          : fallbackSkCount
 
         if (sumRes) {
           setSummaryData({
@@ -91,8 +99,11 @@ export default function Landing() {
             ongoingProjects: Number(sumRes.ongoingProjects || 0),
             completedProjects: Number(sumRes.completedProjects || 0),
             upcomingProjects: Number(sumRes.upcomingProjects || 0),
+            skOfficialsCount,
             barangays: Array.isArray(sumRes.barangays) ? sumRes.barangays : [],
           })
+        } else if (fallbackSkCount > 0) {
+          setSummaryData(prev => ({ ...prev, skOfficialsCount }))
         }
 
         if (Array.isArray(newsRes)) {
@@ -206,7 +217,8 @@ export default function Landing() {
           <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
         </svg>
       ),
-      val: '54+', lbl: 'SK Officials Serving',
+      val: summaryData.skOfficialsCount === 0 ? '0' : summaryData.skOfficialsCount.toLocaleString(),
+      lbl: 'SK Officials Serving',
     },
   ]
 

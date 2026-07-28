@@ -112,7 +112,10 @@ def run_suite():
     if admin_token:
         headers = {"Authorization": f"Bearer {admin_token}"}
         summary = client.get("/api/v1/reports/summary", headers=headers)
-        assert_test("Executive Dashboard Summary (/api/v1/reports/summary)", summary.status_code == 200 and "totalBudget" in summary.json())
+        assert_test(
+            "Executive Dashboard Summary (/api/v1/reports/summary)",
+            summary.status_code == 200 and "totalBudget" in summary.json() and "skOfficialsCount" in summary.json(),
+        )
 
     # 9. Audit Trail Logging Verification
     if admin_token:
