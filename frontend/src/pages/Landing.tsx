@@ -203,7 +203,7 @@ export default function Landing() {
       <header className="landing-header">
         {/* Desktop Navigation */}
         <nav className="landing-nav-left desktop-only">
-          <Link to="/" className="landing-nav-link">HOME</Link>
+          <Link to="/" className="landing-nav-link">HOMEE</Link>
           <Link to="/about" className="landing-nav-link">ABOUT</Link>
           <Link to="/sks" className="landing-nav-link">SK OFFICIALS</Link>
         </nav>
