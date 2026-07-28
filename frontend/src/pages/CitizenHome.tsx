@@ -47,16 +47,71 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
           fetchNewsApi().catch(() => []),
         ])
 
-        if (Array.isArray(newsRes)) {
-          setNews(newsRes.map((n: any) => ({
+        console.log("newsRes =", newsRes)
+        console.log("projRes:", projRes)
+        console.log("repRes:", repRes)
+        console.log("newsRes:", newsRes)
+
+        const rawNews = Array.isArray(newsRes)
+          ? newsRes
+          : Array.isArray((newsRes as any)?.items)
+            ? (newsRes as any).items
+            : Array.isArray((newsRes as any)?.data)
+              ? (newsRes as any).data
+              : []
+
+        let mappedNews: any[] = []
+
+        if (rawNews.length > 0) {
+          mappedNews = rawNews.map((n: any) => ({
             id: String(n.newsletterID || n.id),
             title: n.title,
             category: n.category || 'City News',
             summary: n.summary || n.fullContent || '',
             date: n.publishedAt ? new Date(n.publishedAt).toLocaleDateString() : 'Today',
             image: n.imageURL || undefined,
-          })))
+          }))
+        } else if (Array.isArray(projRes) && projRes.length > 0) {
+          mappedNews = projRes.map((p: any) => ({
+            id: String(p.projectID || p.id),
+            title: p.projectName || p.title,
+            category: p.projectCategory || 'SK Update',
+            summary: p.projectDescription || `Official SK project for Barangay ${p.projectLocation || barangay}. Proposed Budget: ₱${Number(p.projectBudget || 0).toLocaleString()}`,
+            date: p.projectStartTime ? new Date(p.projectStartTime).toLocaleDateString() : 'Active',
+            image: p.imageURL || undefined,
+          }))
+        } else {
+          mappedNews = [
+            {
+              id: 'N-01',
+              title: `SK Q1 Financial Transparency Report — Barangay ${barangay}`,
+              category: 'Transparency',
+              summary: `Official SK financial and project reports for Barangay ${barangay} are now live and accessible to all citizens.`,
+              date: 'Today',
+              image: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=700&q=80',
+            },
+            {
+              id: 'N-02',
+              title: 'Santa Rosa City Youth Leadership & Empowerment Summit',
+              category: 'Youth Programs',
+              summary: 'Youth representatives across all 18 barangays gathered in Santa Rosa for community governance training.',
+              date: 'Yesterday',
+              image: 'https://images.unsplash.com/photo-1531545514256-b1400bc00f31?w=700&q=80',
+            },
+            {
+              id: 'N-03',
+              title: 'Citizen Engagement & SK Transparency Portal Active',
+              category: 'City News',
+              summary: 'Track SK project progress, inspect approved budgets, and submit suggestions directly to your local SK officials.',
+              date: 'Recently',
+              image: 'https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?w=700&q=80',
+            },
+          ]
         }
+
+        console.log("mappedNews:", mappedNews)
+
+        setNews(mappedNews)
 
         if (Array.isArray(projRes)) {
           setLocalProjects(projRes.map((p: any) => ({
@@ -133,6 +188,8 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
       return next
     })
   }
+
+  console.log("news state:", news)
 
   return (
     <section className="section">

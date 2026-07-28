@@ -348,7 +348,12 @@ export async function voteCommentApi(commentId: number): Promise<any> {
 // ─── NEWSLETTER / CITY NEWS ──────────────────────────────────────────────────
 
 export async function fetchNewsApi(): Promise<NewsItem[]> {
-  return request<NewsItem[]>('/newsletter')
+  const res = await request<any>('/newsletter')
+  if (Array.isArray(res)) return res
+  if (res && Array.isArray(res.items)) return res.items
+  if (res && Array.isArray(res.data)) return res.data
+  if (res && Array.isArray(res.newsletter)) return res.newsletter
+  return []
 }
 
 export async function createNewsletterApi(payload: {
