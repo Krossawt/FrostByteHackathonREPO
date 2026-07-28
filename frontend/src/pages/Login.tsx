@@ -1,7 +1,8 @@
-import { FormEvent, useState } from 'react'
+import { FormEvent, useEffect, useState } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 import { Menu, X } from 'lucide-react'
 import NewsTicker from '../components/NewsTicker'
+import { fetchExecutiveSummaryApi } from '../services/api'
 
 interface LoginPageProps {
   onLogin: (emailOrUsername: string, password: string, rememberMe: boolean) => Promise<boolean> | boolean
@@ -15,6 +16,22 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   const [resetNotice, setResetNotice] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [navOpen, setNavOpen] = useState(false)
+  const [projectCount, setProjectCount] = useState(0)
+
+  useEffect(() => {
+    async function loadProjectCount() {
+      try {
+        const summary = await fetchExecutiveSummaryApi().catch(() => null)
+        if (summary) {
+          setProjectCount(Number(summary.totalProjects || 0))
+        }
+      } catch (err) {
+        console.warn('Unable to load project count for login page:', err)
+      }
+    }
+
+    loadProjectCount()
+  }, [])
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -130,7 +147,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                 </div>
               </div>
               <div className="landing-stat-item">
-                <span className="landing-stat-number">141</span>
+                <span className="landing-stat-number">{projectCount}</span>
                 <div className="landing-stat-label-small">
                   SK Projects<br />
                   Active &amp;<br />

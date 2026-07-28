@@ -56,9 +56,21 @@ export default function Landing() {
   // Live API States
   const [liveNews, setLiveNews] = useState<NewsItem[]>([])
   const [liveProjects, setLiveProjects] = useState<ReportProject[]>([])
-  const [summaryData, setSummaryData] = useState<{ totalBudget: number; totalSpent: number; barangays: any[] }>({
+  const [summaryData, setSummaryData] = useState<{
+    totalBudget: number
+    totalSpent: number
+    totalProjects: number
+    ongoingProjects: number
+    completedProjects: number
+    upcomingProjects: number
+    barangays: any[]
+  }>({
     totalBudget: 0,
     totalSpent: 0,
+    totalProjects: 0,
+    ongoingProjects: 0,
+    completedProjects: 0,
+    upcomingProjects: 0,
     barangays: []
   })
 
@@ -75,6 +87,10 @@ export default function Landing() {
           setSummaryData({
             totalBudget: Number(sumRes.totalBudget || 0),
             totalSpent: Number(sumRes.totalSpent || 0),
+            totalProjects: Number(sumRes.totalProjects || 0),
+            ongoingProjects: Number(sumRes.ongoingProjects || 0),
+            completedProjects: Number(sumRes.completedProjects || 0),
+            upcomingProjects: Number(sumRes.upcomingProjects || 0),
             barangays: Array.isArray(sumRes.barangays) ? sumRes.barangays : [],
           })
         }
@@ -152,6 +168,12 @@ export default function Landing() {
   const totalSpent = summaryData.totalSpent
   const utilizationPct = totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0
   const brgyTxn = brgyProj
+  const projectCount = summaryData.totalProjects || liveProjects.length
+  const projectStatusCounts = {
+    ongoing: summaryData.ongoingProjects || liveProjects.filter(p => p.status === 'ongoing').length,
+    upcoming: summaryData.upcomingProjects || liveProjects.filter(p => p.status === 'upcoming').length,
+    completed: summaryData.completedProjects || liveProjects.filter(p => p.status === 'completed').length,
+  }
 
   const STAT_CARDS = [
     {
@@ -176,7 +198,7 @@ export default function Landing() {
           <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
         </svg>
       ),
-      val: `${liveProjects.length}`, lbl: 'SK Projects Tracked',
+      val: `${projectCount}`, lbl: 'SK Projects Tracked',
     },
     {
       icon: (
@@ -203,7 +225,7 @@ export default function Landing() {
       <header className="landing-header">
         {/* Desktop Navigation */}
         <nav className="landing-nav-left desktop-only">
-          <Link to="/" className="landing-nav-link">HOMEE</Link>
+          <Link to="/" className="landing-nav-link">HOME</Link>
           <Link to="/about" className="landing-nav-link">ABOUT</Link>
           <Link to="/sks" className="landing-nav-link">SK OFFICIALS</Link>
         </nav>
@@ -281,7 +303,7 @@ export default function Landing() {
                   </div>
                 </div>
                 <div className="landing-stat-item">
-                  <span className="landing-stat-number">141</span>
+                  <span className="landing-stat-number">{projectCount}</span>
                   <div className="landing-stat-label-small">
                     Active &amp; Completed<br />SK Projects<br />Across the City
                   </div>
@@ -587,9 +609,9 @@ export default function Landing() {
           {/* Project status row */}
           <div className="card-grid card-grid-3 reveal" style={{ marginTop: '1.5rem' }}>
             {[
-              { label: 'Ongoing Projects', count: liveProjects.filter((p: any) => p.status === 'ongoing').length, color: 'var(--maroon)', badge: 'badge-ongoing' },
-              { label: 'Upcoming Projects', count: liveProjects.filter((p: any) => p.status === 'upcoming').length, color: '#1d4ed8', badge: 'badge-upcoming' },
-              { label: 'Completed Projects', count: liveProjects.filter((p: any) => p.status === 'completed').length, color: '#166534', badge: 'badge-completed' },
+              { label: 'Ongoing Projects', count: projectStatusCounts.ongoing, color: 'var(--maroon)', badge: 'badge-ongoing' },
+              { label: 'Upcoming Projects', count: projectStatusCounts.upcoming, color: '#1d4ed8', badge: 'badge-upcoming' },
+              { label: 'Completed Projects', count: projectStatusCounts.completed, color: '#166534', badge: 'badge-completed' },
             ].map((s, i) => (
               <div key={s.label} className={`city-stat-card reveal reveal-delay-${i + 1}`}>
                 <div style={{ fontSize: '2.6rem', fontFamily: 'var(--font-display)', fontWeight: 900, color: s.color, lineHeight: 1, minWidth: '3rem' }}>{s.count}</div>
