@@ -105,6 +105,12 @@ def get_consolidated_report(db: Session = Depends(get_db)):
         completed_count += barangay_completed
         upcoming_count += barangay_upcoming
 
+    sk_officials_count = db.query(User).filter(
+        User.userIsSK == True,
+        User.userIsDeleted == False,
+        User.userIsActive == True,
+    ).count()
+
     return CityConsolidatedReport(
         totalBudget=total_budget,
         totalSpent=total_spent,
@@ -113,6 +119,7 @@ def get_consolidated_report(db: Session = Depends(get_db)):
         ongoingProjects=ongoing_count,
         completedProjects=completed_count,
         upcomingProjects=upcoming_count,
+        skOfficialsCount=sk_officials_count,
         barangays=barangay_summaries,
     )
 
