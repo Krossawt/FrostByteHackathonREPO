@@ -25,9 +25,14 @@ class UserRole(str, enum.Enum):
 
 
 class ProjectStatus(str, enum.Enum):
-    INCOMING   = "Incoming"
-    IN_PROGRESS = "In Progress"
-    COMPLETED  = "Completed"
+    INCOMING       = "Incoming"
+    IN_PROGRESS    = "In Progress"
+    COMPLETED      = "Completed"
+    # Legacy fallbacks for database backward compatibility
+    DRAFTED        = "Drafted"
+    FINANCE_UPDATE = "Finance Update"
+    FOR_APPROVAL   = "For Approval"
+    POSTED         = "Posted"
 
 
 class OrderType(str, enum.Enum):
@@ -85,7 +90,7 @@ class Project(Base):
     projectBudget       = Column(Numeric(12, 2), nullable=True)  # Proposed budget from proposal
     projectProgress     = Column(Integer, default=0)             # 0-100%
     projectCategory     = Column(String(100), nullable=True)     # e.g. Health, Education
-    projectStatus       = Column(Enum(ProjectStatus, values_callable=lambda obj: [e.value for e in obj]), nullable=False, default=ProjectStatus.INCOMING)
+    projectStatus       = Column(String(100), nullable=False, default="Incoming")
     isDeleted           = Column(Boolean, default=False)
     createdAt           = Column(DateTime, default=func.now())
     updatedAt           = Column(DateTime, default=func.now(), onupdate=func.now())

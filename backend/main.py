@@ -19,6 +19,31 @@ load_dotenv()
 # ─── Create tables ────────────────────────────────────────────────────────────
 Base.metadata.create_all(bind=engine)
 
+# ─── Automatic Database Schema & Enum Migration ─────────────────────────────
+from sqlalchemy import text
+
+def _auto_migrate_schema():
+    try:
+        with engine.connect() as conn:
+            # 1. Convert projectStatus column to VARCHAR(100) if it was created as PostgreSQL ENUM
+            try:
+                conn.execute(text('ALTER TABLE projects ALTER COLUMN "projectStatus" TYPE VARCHAR(100) USING "projectStatus"::varchar;'))
+                conn.commit()
+            except Exception as e:
+                print("Note on column type migration:", e)
+
+            # 2. Migrate any legacy row values to the new 3-status system
+            try:
+                conn.execute(text("UPDATE projects SET \"projectStatus\" = 'Incoming' WHERE \"projectStatus\" IN ('Drafted', 'Finance Update', 'For Approval');"))
+                conn.execute(text("UPDATE projects SET \"projectStatus\" = 'Completed' WHERE \"projectStatus\" = 'Posted';"))
+                conn.commit()
+            except Exception as e:
+                print("Note on row status migration:", e)
+    except Exception as err:
+        print("Note on DB migration connection:", err)
+
+_auto_migrate_schema()
+
 # ─── Static file directory for uploads ───────────────────────────────────────
 UPLOAD_DIR = os.getenv("UPLOAD_DIR", "static/uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)

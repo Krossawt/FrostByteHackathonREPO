@@ -57,9 +57,9 @@ def get_consolidated_report(db: Session = Depends(get_db)):
         # Compute spending from project breakdown or proposed budget spent
         spent = sum(float(p.projectBreakdown or 0) for p in all_projects)
 
-        barangay_ongoing = sum(1 for p in all_projects if p.projectStatus == ProjectStatus.IN_PROGRESS)
-        barangay_completed = sum(1 for p in all_projects if p.projectStatus == ProjectStatus.COMPLETED)
-        barangay_upcoming = sum(1 for p in all_projects if p.projectStatus == ProjectStatus.INCOMING)
+        barangay_ongoing = sum(1 for p in all_projects if str(getattr(p.projectStatus, 'value', p.projectStatus) or "").lower() in ["in progress", "ongoing"])
+        barangay_completed = sum(1 for p in all_projects if str(getattr(p.projectStatus, 'value', p.projectStatus) or "").lower() in ["completed", "posted"])
+        barangay_upcoming = sum(1 for p in all_projects if str(getattr(p.projectStatus, 'value', p.projectStatus) or "").lower() in ["incoming", "upcoming", "drafted", "finance update", "for approval"])
 
         barangay_summaries.append(BarangaySummary(
             barangay=barangay,
@@ -153,7 +153,7 @@ def get_barangay_report(barangay_name: str, db: Session = Depends(get_db)):
             {
                 "projectID": p.projectID,
                 "projectName": p.projectName,
-                "projectStatus": p.projectStatus.value,
+                "projectStatus": str(getattr(p.projectStatus, 'value', p.projectStatus) or "Incoming"),
                 "projectCategory": p.projectCategory,
                 "projectStartTime": p.projectStartTime.isoformat() if p.projectStartTime else None,
                 "projectEndTime": p.projectEndTime.isoformat() if p.projectEndTime else None,

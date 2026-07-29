@@ -61,22 +61,21 @@ def list_projects(
     # Optional status filter
     if status_param and status_param.strip() and status_param.strip().lower() != "all":
         st = status_param.strip().lower()
-        if "complete" in st:
-            query = query.filter(Project.projectStatus == ProjectStatus.COMPLETED)
+        if "complete" in st or "posted" in st:
+            query = query.filter(Project.projectStatus.in_(["Completed", "Posted"]))
         elif "progress" in st or "ongoing" in st:
-            query = query.filter(Project.projectStatus == ProjectStatus.IN_PROGRESS)
-        elif "incoming" in st or "upcoming" in st or "draft" in st or "posted" in st:
-            query = query.filter(Project.projectStatus == ProjectStatus.INCOMING)
+            query = query.filter(Project.projectStatus.in_(["In Progress", "ongoing"]))
+        elif "incoming" in st or "upcoming" in st or "draft" in st:
+            query = query.filter(Project.projectStatus.in_(["Incoming", "Drafted", "Finance Update", "For Approval"]))
 
-    # public_only=true → only In Progress + Completed (visible to public / citizens)
-    # public_only=None + unauthenticated → same restriction
+    # public_only=true → return visible public projects
     if public_only is True:
         query = query.filter(
-            Project.projectStatus.in_([ProjectStatus.IN_PROGRESS, ProjectStatus.COMPLETED])
+            Project.projectStatus.in_(["In Progress", "Completed", "Posted", "Incoming"])
         )
     elif public_only is None and current_user is None and not status_param:
         query = query.filter(
-            Project.projectStatus.in_([ProjectStatus.IN_PROGRESS, ProjectStatus.COMPLETED])
+            Project.projectStatus.in_(["In Progress", "Completed", "Posted", "Incoming"])
         )
 
     if barangay and barangay.strip() and barangay.strip() not in {"Santa Rosa City", "All", "all"}:
