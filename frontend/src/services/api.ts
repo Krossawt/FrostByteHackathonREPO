@@ -427,12 +427,28 @@ export async function voteCommentApi(commentId: number): Promise<any> {
 // ─── NEWSLETTER / CITY NEWS ──────────────────────────────────────────────────
 
 export async function fetchNewsApi(): Promise<NewsItem[]> {
-  const res = await request<any>('/newsletter')
-  if (Array.isArray(res)) return res
-  if (res && Array.isArray(res.items)) return res.items
-  if (res && Array.isArray(res.data)) return res.data
-  if (res && Array.isArray(res.newsletter)) return res.newsletter
-  return []
+  try {
+    const res = await request<any>('/newsletter')
+    let rawList: any[] = []
+    if (Array.isArray(res)) rawList = res
+    else if (res && Array.isArray(res.items)) rawList = res.items
+    else if (res && Array.isArray(res.data)) rawList = res.data
+    else if (res && Array.isArray(res.newsletter)) rawList = res.newsletter
+    else if (res && Array.isArray(res.newsletters)) rawList = res.newsletters
+    else if (res && Array.isArray(res.results)) rawList = res.results
+
+    return rawList.map((n: any) => ({
+      id: String(n.newsletterID || n.id || `news-${Math.random()}`),
+      title: n.title || 'City News Update',
+      category: n.category || 'City News',
+      summary: n.summary || n.fullContent || n.details || '',
+      date: n.publishedAt ? new Date(n.publishedAt).toLocaleDateString() : 'Today',
+      image: n.imageURL || n.image_url || n.image || undefined,
+    }))
+  } catch (err) {
+    console.warn('fetchNewsApi error:', err)
+    return []
+  }
 }
 
 export async function createNewsletterApi(payload: {
