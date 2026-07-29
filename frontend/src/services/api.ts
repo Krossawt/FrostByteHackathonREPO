@@ -425,6 +425,10 @@ export async function fetchCommentsApi(projectId: number): Promise<any[]> {
   return request<any[]>(`/projects/${projectId}/comments`)
 }
 
+export async function fetchProjectCommentsApi(projectId: number): Promise<any[]> {
+  return fetchCommentsApi(projectId)
+}
+
 export async function postCommentApi(payload: {
   commentFor: number
   commentDetails: string
@@ -433,7 +437,35 @@ export async function postCommentApi(payload: {
 }): Promise<any> {
   return request(`/projects/${payload.commentFor}/comments`, {
     method: 'POST',
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      commentDetails: payload.commentDetails,
+      commentType: payload.commentType || 'comment',
+      parentCommentID: payload.parentCommentID,
+    }),
+  })
+}
+
+export async function createProjectCommentApi(projectId: number, payload: {
+  commentDetails: string
+  commentType?: 'comment' | 'suggestion'
+  parentCommentID?: number
+}): Promise<any> {
+  return postCommentApi({
+    commentFor: projectId,
+    ...payload,
+  })
+}
+
+export async function replyToCommentApi(commentId: number, payload: {
+  commentDetails: string
+  commentType?: 'comment' | 'suggestion'
+}): Promise<any> {
+  return request(`/comments/${commentId}/reply`, {
+    method: 'POST',
+    body: JSON.stringify({
+      commentDetails: payload.commentDetails,
+      commentType: payload.commentType || 'comment',
+    }),
   })
 }
 

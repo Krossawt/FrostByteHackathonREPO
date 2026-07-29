@@ -8,7 +8,7 @@ import type { ReportProject, Receipt, UserAccount } from '../types'
 import CameraCaptureModal from './CameraCaptureModal'
 import ConfirmDialog from './ConfirmDialog'
 import Portal from './Portal'
-import { fetchCommentsApi, fetchProjectByIdApi, updateProjectApi } from '../services/api'
+import { fetchCommentsApi, fetchProjectByIdApi, updateProjectApi, postCommentApi } from '../services/api'
 
 const CATEGORY_IMAGES: Record<string, string> = {
   'Education': 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=800&q=80',
@@ -361,17 +361,49 @@ export default function ProjectDetailModal({
     setFeedback({ type: 'success', message: 'Receipt attached successfully' })
   }
 
-  const handleAddComment = (e: FormEvent) => {
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false)
+
+  const handleAddComment = async (e: FormEvent) => {
     e.preventDefault()
     if (!cText.trim()) { setCError('Please write your comment or suggestion.'); return }
-    const newC = {
-      id: `C-${Date.now()}`, barangay: activeProject.barangay,
-      author: user?.name?.split(' ')[0] ?? 'Citizen',
-      text: cText.trim(), date: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
-      type: cType, votes: 0,
+    const pId = Number(activeProject.id || (activeProject as any).projectId || (activeProject as any).projectID)
+    setIsSubmittingComment(true)
+    setCError('')
+
+    try {
+      if (!isNaN(pId) && pId > 0) {
+        const created = await postCommentApi({
+          commentFor: pId,
+          commentDetails: cText.trim(),
+          commentType: cType,
+        })
+        const newC = {
+          id: String(created?.commentID || Date.now()),
+          author: created?.commentName || user?.name || 'Citizen',
+          text: created?.commentDetails || cText.trim(),
+          type: created?.commentType || cType,
+          upvotes: created?.votesCount || 0,
+          date: created?.commentTimestamp ? new Date(created.commentTimestamp).toLocaleDateString() : 'Just now',
+        }
+        setLocalComments(prev => [newC, ...prev])
+        setFeedback({ type: 'success', message: 'Comment submitted successfully' })
+      } else {
+        const newC = {
+          id: `C-${Date.now()}`,
+          author: user?.name?.split(' ')[0] ?? 'Citizen',
+          text: cText.trim(),
+          type: cType,
+          upvotes: 0,
+          date: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+        }
+        setLocalComments(prev => [newC, ...prev])
+      }
+      setCText('')
+    } catch (err: any) {
+      setCError(err.message || 'Failed to submit comment')
+    } finally {
+      setIsSubmittingComment(false)
     }
-    setLocalComments(prev => [newC, ...prev])
-    setCText(''); setCError('')
   }
 
   return (
@@ -822,7 +854,9 @@ export default function ProjectDetailModal({
                         placeholder={cType === 'comment' ? 'Share your thoughts on this project…' : 'What would you suggest to improve this?'}
                         style={{ resize: 'vertical', fontFamily: 'var(--font-body)' }}
                       />
-                      <button type="submit" className="btn btn-primary btn-sm" style={{ marginTop: '0.65rem' }}>Submit</button>
+                      <button type="submit" className="btn btn-primary btn-sm" style={{ marginTop: '0.65rem' }} disabled={isSubmittingComment}>
+                        {isSubmittingComment ? 'Submitting…' : 'Submit'}
+                      </button>
                     </form>
                   )}
 

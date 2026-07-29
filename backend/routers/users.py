@@ -36,8 +36,8 @@ def list_accounts(
 ):
     query = db.query(User).filter(User.userIsDeleted == False)
 
-    if barangay:
-        query = query.filter(User.userLocation == barangay)
+    if barangay and barangay.strip() and barangay.strip() not in {"Santa Rosa City", "All", "all"}:
+        query = query.filter(func.lower(func.trim(User.userLocation)) == barangay.strip().lower())
     if role:
         query = query.filter(User.userRole == role)
     if is_active is not None:

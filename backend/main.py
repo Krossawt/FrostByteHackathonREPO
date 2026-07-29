@@ -64,29 +64,48 @@ Use **Bearer Token** (JWT) in the `Authorization` header after logging in.
 )
 
 # ─── CORS ─────────────────────────────────────────────────────────────────────
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "https://eskala.onrender.com")
 ALLOWED_ORIGINS = [
+    "*",
     FRONTEND_URL,
+    "https://eskala.onrender.com",
+    "https://frostbytehackathonrepo.onrender.com",
     "http://localhost:5173",
     "http://localhost:3000",
     "http://localhost:4173",
-    "https://frostbytehackathonrepo.onrender.com",
     "https://eskala.ph",
     "https://www.eskala.ph",
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
-    allow_origin_regex=r"https://.*\.vercel\.app|https://.*\.onrender\.com|https://.*\.railway\.app",
+    allow_origins=["*"],
+    allow_origin_regex=r"https://.*\.vercel\.app|https://.*\.onrender\.com|https://.*\.railway\.app|http://localhost:.*",
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
+
+# ─── Global Exception Handler (Ensures CORS headers on 500 errors) ───────────
+from fastapi.responses import JSONResponse
+from fastapi import Request
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    print(f"❌ [API ERROR 500] {request.method} {request.url.path}: {exc}")
+    import traceback
+    traceback.print_exc()
+    response = JSONResponse(
+        status_code=500,
+        content={"detail": f"Internal Server Error: {str(exc)}"},
+    )
+    origin = request.headers.get("origin") or "*"
+    response.headers["Access-Control-Allow-Origin"] = origin
+    response.headers["Access-Control-Allow-Credentials"] = "true"
+    return response
 
 # ─── Security & Logging Middleware ────────────────────────────────────────────
 import time
-from fastapi import Request
 
 @app.middleware("http")
 async def security_and_logging_middleware(request: Request, call_next):
@@ -100,7 +119,6 @@ async def security_and_logging_middleware(request: Request, call_next):
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
-    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
 
     print(f"-> [API Security] {request.method} {request.url.path} -> {response.status_code} ({duration}ms)")
     return response

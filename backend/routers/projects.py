@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 from datetime import datetime
 from database import get_db
-from models import User, Project, ProjectStatus, Newsletter, AuditLog
+from models import User, UserRole, Project, ProjectStatus, Newsletter, AuditLog
 from schemas import (
     ProjectCreate, ProjectUpdate, ProjectBreakdownUpdate,
     ProjectResponse, MessageResponse
@@ -53,7 +53,7 @@ from sqlalchemy import func
 @router.get("", response_model=List[ProjectResponse], summary="List all projects (public)")
 def list_projects(
     barangay: Optional[str] = Query(None),
-    project_status: Optional[ProjectStatus] = Query(None, alias="status"),
+    status_param: Optional[str] = Query(None, alias="status"),
     search: Optional[str] = Query(None),
     category: Optional[str] = Query(None),
     public_only: Optional[bool] = Query(None, description="If true, only return Posted projects"),
@@ -64,14 +64,24 @@ def list_projects(
 ):
     query = db.query(Project).options(joinedload(Project.purchase_orders)).filter(Project.isDeleted == False)
 
-    # Restrict to Posted projects only if public_only is explicitly True or for Guest/unauthenticated users when public_only is not False
+    # Filter status flexibly if provided
+    if status_param and status_param.strip() and status_param.strip().lower() != "all":
+        st = status_param.strip().lower()
+        if "post" in st or "complete" in st:
+            query = query.filter(Project.projectStatus == ProjectStatus.POSTED)
+        elif "finance" in st:
+            query = query.filter(Project.projectStatus == ProjectStatus.FINANCE_UPDATE)
+        elif "approval" in st:
+            query = query.filter(Project.projectStatus == ProjectStatus.FOR_APPROVAL)
+        elif "draft" in st:
+            query = query.filter(Project.projectStatus == ProjectStatus.DRAFTED)
+
+    # Restrict to Posted projects only if public_only is explicitly True or for unauthenticated users when no status param is specified
     if public_only is True:
         query = query.filter(Project.projectStatus == ProjectStatus.POSTED)
-    elif public_only is None and (current_user is None or (hasattr(current_user, 'userRole') and current_user.userRole == UserRole.GUEST)):
+    elif public_only is None and current_user is None and not status_param:
         query = query.filter(Project.projectStatus == ProjectStatus.POSTED)
 
-    if project_status:
-        query = query.filter(Project.projectStatus == project_status)
     if barangay and barangay.strip() and barangay.strip() not in {"Santa Rosa City", "All", "all"}:
         query = query.filter(func.lower(func.trim(Project.projectLocation)) == barangay.strip().lower())
     if search and search.strip():
@@ -90,10 +100,6 @@ def get_project(
     current_user: Optional[User] = Depends(get_optional_user),
 ):
     project = _project_or_404(db, project_id)
-    # Non-SK users can only view Posted projects
-    if (current_user is None or current_user.userRole.value in {"Guest", "System"}):
-        if project.projectStatus != ProjectStatus.POSTED:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Project not yet published")
     return ProjectResponse.model_validate(project)
 
 
