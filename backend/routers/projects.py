@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 from datetime import datetime
 from database import get_db
-from models import User, Project, ProjectStatus, Newsletter, AuditLog
+from models import User, UserRole, Project, ProjectStatus, Newsletter, AuditLog
 from schemas import (
     ProjectCreate, ProjectUpdate, ProjectBreakdownUpdate,
     ProjectResponse, MessageResponse
