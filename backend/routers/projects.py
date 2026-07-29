@@ -76,10 +76,10 @@ def list_projects(
         elif "draft" in st:
             query = query.filter(Project.projectStatus == ProjectStatus.DRAFTED)
 
-    # Restrict to Posted projects only if public_only is explicitly True or for Guest/unauthenticated users when public_only is not False
+    # Restrict to Posted projects only if public_only is explicitly True or for unauthenticated users when no status param is specified
     if public_only is True:
         query = query.filter(Project.projectStatus == ProjectStatus.POSTED)
-    elif public_only is None and (current_user is None or (hasattr(current_user, 'userRole') and current_user.userRole == UserRole.GUEST)):
+    elif public_only is None and current_user is None and not status_param:
         query = query.filter(Project.projectStatus == ProjectStatus.POSTED)
 
     if barangay and barangay.strip() and barangay.strip() not in {"Santa Rosa City", "All", "all"}:

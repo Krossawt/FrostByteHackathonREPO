@@ -163,18 +163,18 @@ class ProjectResponse(BaseModel):
     projectID: int
     projectName: str
     projectDescription: Optional[str] = None
-    projectStartTime: datetime
-    projectEndTime: datetime
+    projectStartTime: Optional[datetime] = None
+    projectEndTime: Optional[datetime] = None
     projectLocation: str
     projectCreatedBy: Optional[int] = None
     projectBreakdown: Optional[float] = None
     projectBudget: Optional[float] = None
-    projectProgress: int
+    projectProgress: Optional[int] = 0
     projectCategory: Optional[str] = None
     projectStatus: ProjectStatus
     isDeleted: bool
-    createdAt: datetime
-    updatedAt: datetime
+    createdAt: Optional[datetime] = None
+    updatedAt: Optional[datetime] = None
     purchase_orders: List[PurchaseOrderSummary] = []
 
     model_config = {"from_attributes": True}

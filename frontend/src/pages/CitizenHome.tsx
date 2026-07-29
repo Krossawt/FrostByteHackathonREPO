@@ -114,21 +114,30 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
         setNews(mappedNews)
 
         if (Array.isArray(projRes)) {
-          setLocalProjects(projRes.map((p: any) => ({
-            id: String(p.projectID || p.id),
-            title: p.projectName || p.title,
-            barangay: p.projectLocation || barangay,
-            category: p.projectCategory || 'Education',
-            status: p.projectStatus ? p.projectStatus.toLowerCase() as any : 'ongoing',
-            proposedBudget: Number(p.projectBudget || 0),
-            spent: Number(p.projectBreakdown || 0),
-            remainingBudget: Math.max(0, Number(p.projectBudget || 0) - Number(p.projectBreakdown || 0)),
-            progress: p.projectProgress || 0,
-            progressPercent: p.projectProgress || 0,
-            startDate: p.projectStartTime ? new Date(p.projectStartTime).toISOString().split('T')[0] : '',
-            endDate: p.projectEndTime ? new Date(p.projectEndTime).toISOString().split('T')[0] : '',
-            description: p.projectDescription || '',
-          })))
+          setLocalProjects(projRes.map((p: any) => {
+            const rawSt = String(p.projectStatus || p.status || 'ongoing').toLowerCase()
+            const mappedStatus: 'ongoing' | 'upcoming' | 'completed' = rawSt.includes('post') || rawSt.includes('complete')
+              ? 'completed'
+              : rawSt.includes('draft') || rawSt.includes('finance') || rawSt.includes('approval')
+                ? 'upcoming'
+                : 'ongoing'
+
+            return {
+              id: String(p.projectID || p.id),
+              title: p.projectName || p.title,
+              barangay: p.projectLocation || barangay,
+              category: p.projectCategory || 'Education',
+              status: mappedStatus,
+              proposedBudget: Number(p.projectBudget || 0),
+              spent: Number(p.projectBreakdown || 0),
+              remainingBudget: Math.max(0, Number(p.projectBudget || 0) - Number(p.projectBreakdown || 0)),
+              progress: p.projectProgress || 0,
+              progressPercent: p.projectProgress || 0,
+              startDate: p.projectStartTime ? new Date(p.projectStartTime).toISOString().split('T')[0] : '',
+              endDate: p.projectEndTime ? new Date(p.projectEndTime).toISOString().split('T')[0] : '',
+              description: p.projectDescription || '',
+            }
+          }))
         }
 
         if (repRes) {
