@@ -3924,3 +3924,99 @@ tbody tr:last-child td {
     width: 100%;
   }
 }
+
+.report-download-btn {
+  background: #b45309;
+  color: #fff;
+  border: 1.5px solid #b45309;
+  transition: background 180ms ease, border-color 180ms ease;
+}
+
+.report-download-btn:hover {
+  background: #92400e;
+  border-color: #92400e;
+}
+
+.report-print-btn {
+  background: #760031;
+  color: #fff;
+  border: 1.5px solid #760031;
+  transition: background 180ms ease, border-color 180ms ease;
+}
+
+.report-print-btn:hover {
+  background: #5c0026;
+  border-color: #5c0026;
+}
+
+.report-close-btn {
+  background: #dc2626;
+  color: #fff;
+  border: 1.5px solid #dc2626;
+  transition: background 180ms ease, border-color 180ms ease;
+}
+
+.report-close-btn:hover {
+  background: #b91c1c;
+  border-color: #b91c1c;
+}
+
+/* Print isolation — only the printable A4 page prints */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  #sk-report-printable,
+  #sk-report-printable * {
+    visibility: visible;
+  }
+
+  #sk-report-printable {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 210mm;
+    min-height: 297mm;
+    box-shadow: none !important;
+    margin: 0;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  @page {
+    size: A4;
+    margin: 0;
+  }
+}
+
+/* Responsive scaling for the on-screen A4 preview */
+@media screen and (max-width: 900px) {
+  #sk-report-printable {
+    transform: scale(0.75);
+    transform-origin: top center;
+  }
+}
+
+@media screen and (max-width: 650px) {
+  #sk-report-printable {
+    transform: scale(0.5);
+    transform-origin: top center;
+  }
+
+  .report-toolbar {
+    flex-direction: column;
+    align-items: stretch !important;
+  }
+
+  .report-toolbar-actions {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .report-toolbar-btn {
+    width: 100%;
+  }
+}
