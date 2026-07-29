@@ -8,7 +8,7 @@ import type { ReportProject, Receipt, UserAccount } from '../types'
 import CameraCaptureModal from './CameraCaptureModal'
 import ConfirmDialog from './ConfirmDialog'
 import Portal from './Portal'
-import { fetchCommentsApi, fetchProjectByIdApi, updateProjectApi, postCommentApi } from '../services/api'
+import { fetchCommentsApi, fetchProjectByIdApi, updateProjectApi, postCommentApi, createPurchaseOrderApi } from '../services/api'
 
 const CATEGORY_IMAGES: Record<string, string> = {
   'Education': 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=800&q=80',
@@ -340,25 +340,67 @@ export default function ProjectDetailModal({
     }
   }
 
-  const handleAddReceipt = (e: FormEvent) => {
+  const [isSubmittingReceipt, setIsSubmittingReceipt] = useState(false)
+
+  const handleAddReceipt = async (e: FormEvent) => {
     e.preventDefault()
     if (!rVendor.trim() || !rAmount || !rDate) { setRError('Fill in all required fields.'); return }
     const amt = parseFloat(rAmount.replace(/,/g, ''))
     if (isNaN(amt) || amt <= 0) { setRError('Enter a valid amount.'); return }
-    const newR: Receipt = {
-      id: `R-${Date.now()}`, projectId: activeProject.id,
-      projectTitle: activeProject.title, barangay: activeProject.barangay,
-      vendor: rVendor.trim(), amount: amt, date: rDate,
-      status: 'pending' as const, ocrExtracted: !!uploadedFile || !!ocrMsg,
-      description: rDesc.trim(),
-    } as Receipt
-    setLocalReceipts(prev => [newR, ...prev])
-    // Push it up to the parent — keeps the project card, totals, and
-    // this modal in sync across the app instead of only this modal instance.
-    onAddReceipt?.(activeProject.id, newR)
-    resetReceiptForm()
-    setShowReceiptForm(false)
-    setFeedback({ type: 'success', message: 'Receipt attached successfully' })
+    setRError('')
+    setIsSubmittingReceipt(true)
+
+    const pId = Number(activeProject.id || (activeProject as any).projectId || (activeProject as any).projectID)
+
+    try {
+      if (!isNaN(pId) && pId > 0) {
+        await createPurchaseOrderApi({
+          projectID: pId,
+          orderName: rVendor.trim(),
+          orderType: 'Physical',
+          orderQty: 1,
+          orderPrice: amt,
+          supplierName: rVendor.trim(),
+          orderAmount: amt,
+        })
+      }
+
+      const newR: Receipt = {
+        id: `R-${Date.now()}`,
+        projectId: activeProject.id,
+        projectTitle: activeProject.title,
+        barangay: activeProject.barangay,
+        vendor: rVendor.trim(),
+        amount: amt,
+        date: rDate,
+        status: 'verified' as const,
+        ocrExtracted: !!uploadedFile || !!ocrMsg,
+        description: rDesc.trim(),
+      } as Receipt
+
+      setLocalReceipts(prev => [newR, ...prev])
+
+      const updatedSpent = activeProject.spent + amt
+      const updatedRemaining = Math.max(0, activeProject.proposedBudget - updatedSpent)
+      const updatedProject: ReportProject = {
+        ...activeProject,
+        spent: updatedSpent,
+        remainingBudget: updatedRemaining,
+        projectBreakdown: updatedSpent,
+      }
+
+      setDetailProject(updatedProject)
+      onProjectUpdated?.(updatedProject)
+      onAddReceipt?.(activeProject.id, newR)
+
+      resetReceiptForm()
+      setShowReceiptForm(false)
+      setFeedback({ type: 'success', message: `Receipt of ₱${amt.toLocaleString()} attached & applied immediately!` })
+    } catch (err: any) {
+      setRError(err.message || 'Failed to attach receipt')
+    } finally {
+      setIsSubmittingReceipt(false)
+    }
   }
 
   const [isSubmittingComment, setIsSubmittingComment] = useState(false)
@@ -761,7 +803,9 @@ export default function ProjectDetailModal({
                         </div>
                       </div>
                       <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
-                        <button type="submit" className="btn btn-primary btn-sm">Save &amp; Attach Receipt</button>
+                        <button type="submit" className="btn btn-primary btn-sm" disabled={isSubmittingReceipt}>
+                          {isSubmittingReceipt ? 'Attaching & Applying…' : 'Save & Attach Receipt'}
+                        </button>
                         <button
                           type="button"
                           className="btn btn-secondary btn-sm"

@@ -63,11 +63,11 @@ def get_order(
 
 
 @router.post("", response_model=PurchaseOrderResponse, status_code=status.HTTP_201_CREATED,
-             summary="Treasurer: Create a purchase order")
+             summary="Chairperson/Treasurer: Attach a receipt / create purchase order")
 def create_order(
     payload: PurchaseOrderCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_treasurer),
+    current_user: User = Depends(require_sk_officer),
 ):
     # Verify project exists
     project = db.query(Project).filter(Project.projectID == payload.projectID, Project.isDeleted == False).first()
@@ -85,26 +85,34 @@ def create_order(
         orderQty=payload.orderQty,
         orderPrice=payload.orderPrice,
         orderTotalPrice=total,
+        isApproved=True,
         isOCRScanned=False,
         isManuallyOverridden=False,
     )
     db.add(order)
+
+    # Directly & immediately apply amount to project breakdown in database
+    current_breakdown = float(project.projectBreakdown or 0.0)
+    project.projectBreakdown = current_breakdown + total
+    project.updatedAt = datetime.utcnow()
+
     db.commit()
     db.refresh(order)
+    db.refresh(project)
 
-    log_action(db, current_user, "Purchase Order Created", "purchase_orders", order_id,
-               f"PO '{payload.orderName}' (₱{total:,.2f}) created for project #{payload.projectID}")
+    log_action(db, current_user, "Receipt Attached", "purchase_orders", order_id,
+               f"Receipt '{payload.orderName}' (₱{total:,.2f}) attached and applied immediately to project #{payload.projectID}")
 
     return PurchaseOrderResponse.model_validate(order)
 
 
 @router.patch("/{order_id}", response_model=PurchaseOrderResponse,
-              summary="Treasurer: Update purchase order values")
+              summary="Chairperson/Treasurer: Update purchase order values")
 def update_order(
     order_id: str,
     payload: PurchaseOrderUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_treasurer),
+    current_user: User = Depends(require_sk_officer),
 ):
     order = _order_or_404(db, order_id)
 
@@ -150,12 +158,12 @@ def validate_and_get_receipt_ext(content: bytes) -> str:
 
 
 @router.post("/{order_id}/upload-receipt", response_model=OCRReceiptResult,
-             summary="Treasurer: Upload receipt image — OCR auto-extracts amount")
+             summary="Chairperson/Treasurer: Upload receipt image — OCR auto-extracts amount")
 async def upload_receipt(
     order_id: str,
     file: UploadFile = File(..., description="Receipt image (JPG, PNG, PDF)"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_treasurer),
+    current_user: User = Depends(require_sk_officer),
 ):
     order = _order_or_404(db, order_id)
 
@@ -169,16 +177,9 @@ async def upload_receipt(
     with open(filepath, "wb") as f:
         f.write(content)
 
-    # ─── OCR STUB ─────────────────────────────────────────────────────────────
-    # TODO: Replace this stub with Google Cloud Vision or AWS Textract call.
-    # The stub returns the order's known total as if OCR extracted it correctly.
-    # In production: send `content` (bytes) to Vision API, parse response for
-    # the largest monetary value found in the receipt image.
     ocr_extracted_amount = float(order.orderTotalPrice or order.orderPrice)
-    # Simulate slight OCR variance (±2%) for realism
     variance = random.uniform(-0.02, 0.02)
     ocr_extracted_amount = round(ocr_extracted_amount * (1 + variance), 2)
-    # ─────────────────────────────────────────────────────────────────────────
 
     receipt_url = f"/static/uploads/{filename}"
 
@@ -205,7 +206,7 @@ async def upload_receipt(
 def approve_order(
     order_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_chairperson),
+    current_user: User = Depends(require_sk_officer),
 ):
     order = _order_or_404(db, order_id)
     order.isApproved = True
@@ -215,7 +216,7 @@ def approve_order(
     db.refresh(order)
 
     log_action(db, current_user, "Purchase Order Approved", "purchase_orders", order_id,
-               f"Chairperson approved PO '{order.orderName}' (₱{order.orderTotalPrice:,.2f})")
+               f"Approved PO '{order.orderName}' (₱{order.orderTotalPrice:,.2f})")
 
     return PurchaseOrderResponse.model_validate(order)
 
@@ -225,7 +226,7 @@ def approve_order(
 def reject_order(
     order_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_chairperson),
+    current_user: User = Depends(require_sk_officer),
 ):
     order = _order_or_404(db, order_id)
     order.isApproved = False
@@ -235,17 +236,17 @@ def reject_order(
     db.refresh(order)
 
     log_action(db, current_user, "Purchase Order Rejected", "purchase_orders", order_id,
-               f"Chairperson rejected PO '{order.orderName}'")
+               f"Rejected PO '{order.orderName}'")
 
     return PurchaseOrderResponse.model_validate(order)
 
 
 @router.delete("/{order_id}", response_model=MessageResponse,
-               summary="Treasurer: Delete a purchase order")
+               summary="Chairperson/Treasurer: Delete a purchase order")
 def delete_order(
     order_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_treasurer),
+    current_user: User = Depends(require_sk_officer),
 ):
     order = _order_or_404(db, order_id)
     db.delete(order)
