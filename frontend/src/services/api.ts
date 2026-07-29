@@ -317,16 +317,35 @@ export async function createUserAccountApi(payload: {
   })
 }
 
-// TEMPORARY STUB — replace once backend implements PUT/PATCH /users/:id
-export async function updateUserAccountApi(id: number, payload: any) {
-  console.warn('updateUserAccountApi stub — backend endpoint not yet implemented', id, payload)
-  return { userID: id, ...payload }
+export async function updateUserAccountApi(id: number, payload: {
+  userName?: string
+  userEmail?: string
+  password?: string
+  userPassword?: string
+  userRole?: string
+  userLocation?: string
+  userIsStaRosa?: boolean
+}): Promise<any> {
+  const body: any = { ...payload }
+  if (payload.userPassword && !payload.password) {
+    body.password = payload.userPassword
+  }
+  return request(`/admin/accounts/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  })
 }
 
 export async function toggleUserStatusApi(userId: number, isActive: boolean): Promise<any> {
   void isActive
   return request(`/admin/accounts/${userId}/toggle-active`, {
     method: 'PATCH',
+  })
+}
+
+export async function deleteUserAccountApi(userId: number): Promise<any> {
+  return request(`/admin/accounts/${userId}`, {
+    method: 'DELETE',
   })
 }
 
@@ -478,10 +497,18 @@ export async function createNewsletterApi(payload: {
   })
 }
 
-// TEMPORARY STUB — replace once backend implements PUT/PATCH /newsletter/:id
-export async function updateNewsletterApi(newsletterId: number, payload: any) {
-  console.warn('updateNewsletterApi stub — backend endpoint not yet implemented', newsletterId, payload)
-  return { newsletterID: newsletterId, ...payload }
+export async function updateNewsletterApi(newsletterId: number, payload: {
+  title?: string
+  summary?: string
+  fullContent?: string
+  category?: string
+  imageURL?: string
+  isPublished?: boolean
+}): Promise<any> {
+  return request(`/newsletter/${newsletterId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
 }
 
 export async function uploadNewsImageApi(file: File): Promise<{ imageURL: string }> {

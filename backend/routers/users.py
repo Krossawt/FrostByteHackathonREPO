@@ -116,7 +116,24 @@ def update_account(
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    dump = payload.model_dump(exclude_unset=True)
+
+    if "userEmail" in dump and dump["userEmail"]:
+        new_email = str(dump.pop("userEmail")).lower()
+        existing = db.query(User).filter(User.userEmail == new_email, User.userID != user_id).first()
+        if existing:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already used by another account")
+        user.userEmail = new_email
+
+    if "password" in dump and dump["password"]:
+        user.userHashedPassword = hash_password(dump.pop("password"))
+
+    if "userRole" in dump and dump["userRole"]:
+        role = dump.pop("userRole")
+        user.userRole = role
+        user.userIsSK = role in {UserRole.CHAIRPERSON, UserRole.SECRETARY, UserRole.TREASURER}
+
+    for field, value in dump.items():
         setattr(user, field, value)
 
     db.commit()

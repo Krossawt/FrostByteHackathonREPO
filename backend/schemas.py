@@ -67,13 +67,21 @@ class AdminCreateUser(BaseModel):
 
 
 class UserUpdate(BaseModel):
-    userName: Optional[str] = None
-    userLocation: Optional[str] = None
+    userName: Optional[str] = Field(None, min_length=2, max_length=100)
+    userEmail: Optional[EmailStr] = None
+    password: Optional[str] = Field(None, min_length=8, max_length=128)
+    userRole: Optional[UserRole] = None
+    userLocation: Optional[str] = Field(None, min_length=2, max_length=100)
     userIsStaRosa: Optional[bool] = None
     userIsActive: Optional[bool] = None
     userSKTermStart: Optional[date] = None
     userSKTermEnd: Optional[date] = None
     userProfilePicture: Optional[str] = None
+
+    @field_validator("userName", "userLocation", mode="before")
+    @classmethod
+    def clean_user_update_fields(cls, v: Optional[str]) -> Optional[str]:
+        return sanitize_str(v)
 
 
 class UserResponse(BaseModel):
