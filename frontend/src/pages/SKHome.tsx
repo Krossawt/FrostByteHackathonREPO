@@ -1,16 +1,16 @@
 import { useState, useEffect, FormEvent } from 'react'
 import type { UserAccount, ReportProject } from '../types'
 import ProjectDetailModal from '../components/ProjectDetailModal'
-import CameraCaptureModal from '../components/CameraCaptureModal'
+import BarangayTransactionsModal from '../components/BarangayTransactionsModal'
 import { DonutChart } from '../components/MiniChart'
 import SingleNewsCarousel from '../components/SingleNewsCarousel'
+import { fetchProjectsApi, fetchBarangayReportApi, fetchNewsApi, postCommentApi } from '../services/api'
 import Portal from '../components/Portal'
-import { fetchBarangayReportApi, createProjectApi, fetchNewsApi } from '../services/api'
-import ConfirmDialog from '../components/ConfirmDialog'
 
-interface SKHomeProps { user?: UserAccount | null }
-
-const CATEGORY_OPTIONS = ['Health & Wellness', 'Education', 'Sports & Recreation', 'Infrastructure', 'Environment', 'Livelihood', 'Capacity Building', 'Peace & Order', 'Other']
+function formatPeso(amount: number) {
+  return `₱${Math.round(amount || 0).toLocaleString('en-PH')}`
+}
+interface CitizenHomeProps { user?: UserAccount | null }
 
 const CATEGORY_IMAGES: Record<string, string> = {
   'Education': 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=640&q=75',
@@ -34,222 +34,136 @@ const CATEGORY_GRAD: Record<string, string> = {
 const getCover = (cat?: string) => CATEGORY_IMAGES[cat ?? 'Other'] ?? CATEGORY_IMAGES['Other']
 const getGrad = (cat?: string) => CATEGORY_GRAD[cat ?? 'default'] ?? CATEGORY_GRAD['default']
 
-type Feedback = {
-  type: 'success' | 'info'
-  message: string
-}
-
-function formatPeso(amount: number) {
-  return `₱${Math.round(amount || 0).toLocaleString('en-PH')}`
-}
-
-export default function SKHome({ user }: SKHomeProps) {
+export default function CitizenHome({ user }: CitizenHomeProps) {
   const barangay = user?.barangay || 'Balibago'
-  const position = user?.skPosition || 'Chairperson'
-  const canAddProject = position === 'Chairperson' || position === 'Secretary'
-
   const [summary, setSummary] = useState({ spent: 0, annualBudget: 0, remaining: 0 })
   const [localProjects, setLocalProjects] = useState<ReportProject[]>([])
   const [news, setNews] = useState<any[]>([])
-  const [myComments, setMyComments] = useState<any[]>([])
-  const [myLogs, setMyLogs] = useState<any[]>([])
-  const [feedback, setFeedback] = useState<Feedback | null>(null)
-
-  // View Report modal (available to every role)
-  const [showReportModal, setShowReportModal] = useState(false)
+  const [localComments, setLocalComments] = useState<any[]>([])
+  const [votedIds, setVotedIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
-    async function loadSKHomeData() {
+    async function loadCitizenData() {
       try {
-        const rep = await fetchBarangayReportApi(barangay)
-        if (rep) {
-          setSummary({
-            spent: Number(rep.spent || 0),
-            annualBudget: Number(rep.annualBudget || 0),
-            remaining: Number(rep.remaining || 0),
-          })
-          if (Array.isArray(rep.projects)) {
-            setLocalProjects(rep.projects.map((p: any) => {
-              const proposedBudget = Number(p.projectBudget || 0)
-              const spent = Number(p.projectBreakdown || 0)
-              return {
-                id: String(p.projectID || p.id),
-                title: p.projectName || p.title,
-                barangay,
-                category: p.projectCategory || 'Education',
-                status: p.projectStatus ? p.projectStatus.toLowerCase() as any : 'ongoing',
-                proposedBudget,
-                spent,
-                remainingBudget: Math.max(0, proposedBudget - spent),
-                progress: p.projectProgress || 0,
-                progressPercent: p.projectProgress || 0,
-                startDate: p.projectStartTime ? new Date(p.projectStartTime).toISOString().split('T')[0] : '',
-                endDate: p.projectEndTime ? new Date(p.projectEndTime).toISOString().split('T')[0] : '',
-                description: p.projectDescription || '',
-                receipts: Array.isArray(p.receipts) ? p.receipts : [],
-              }
-            }))
-          }
-        }
+        const [projRes, repRes, newsRes] = await Promise.all([
+          fetchProjectsApi({ barangay }).catch(() => []),
+          fetchBarangayReportApi(barangay).catch(() => null),
+          fetchNewsApi().catch(() => []),
+        ])
 
-        const newsRes = await fetchNewsApi()
-        if (Array.isArray(newsRes)) {
-          setNews(newsRes.map((n: any) => ({
+        console.log("newsRes =", newsRes)
+        console.log("projRes:", projRes)
+        console.log("repRes:", repRes)
+        console.log("newsRes:", newsRes)
+
+        const rawNews = Array.isArray(newsRes)
+          ? newsRes
+          : Array.isArray((newsRes as any)?.items)
+            ? (newsRes as any).items
+            : Array.isArray((newsRes as any)?.data)
+              ? (newsRes as any).data
+              : []
+
+        let mappedNews: any[] = []
+
+        if (rawNews.length > 0) {
+          mappedNews = rawNews.map((n: any) => ({
             id: String(n.newsletterID || n.id),
             title: n.title,
             category: n.category || 'City News',
             summary: n.summary || n.fullContent || '',
             date: n.publishedAt ? new Date(n.publishedAt).toLocaleDateString() : 'Today',
             image: n.imageURL || undefined,
-          })))
+          }))
+        } else if (Array.isArray(projRes) && projRes.length > 0) {
+          mappedNews = projRes.map((p: any) => ({
+            id: String(p.projectID || p.id),
+            title: p.projectName || p.title,
+            category: p.projectCategory || 'SK Update',
+            summary: p.projectDescription || `Official SK project for Barangay ${p.projectLocation || barangay}. Proposed Budget: ₱${Number(p.projectBudget || 0).toLocaleString()}`,
+            date: p.projectStartTime ? new Date(p.projectStartTime).toLocaleDateString() : 'Active',
+            image: p.imageURL || undefined,
+          }))
+        } else {
+          mappedNews = [
+            {
+              id: 'N-01',
+              title: `SK Q1 Financial Transparency Report — Barangay ${barangay}`,
+              category: 'Transparency',
+              summary: `Official SK financial and project reports for Barangay ${barangay} are now live and accessible to all citizens.`,
+              date: 'Today',
+              image: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=700&q=80',
+            },
+            {
+              id: 'N-02',
+              title: 'Santa Rosa City Youth Leadership & Empowerment Summit',
+              category: 'Youth Programs',
+              summary: 'Youth representatives across all 18 barangays gathered in Santa Rosa for community governance training.',
+              date: 'Yesterday',
+              image: 'https://images.unsplash.com/photo-1531545514256-b1400bc00f31?w=700&q=80',
+            },
+            {
+              id: 'N-03',
+              title: 'Citizen Engagement & SK Transparency Portal Active',
+              category: 'City News',
+              summary: 'Track SK project progress, inspect approved budgets, and submit suggestions directly to your local SK officials.',
+              date: 'Recently',
+              image: 'https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?w=700&q=80',
+            },
+          ]
+        }
+
+        console.log("mappedNews:", mappedNews)
+
+        setNews(mappedNews)
+
+        if (Array.isArray(projRes)) {
+          setLocalProjects(projRes.map((p: any) => {
+            const rawSt = String(p.projectStatus || p.status || 'ongoing').toLowerCase()
+            const mappedStatus: 'ongoing' | 'upcoming' | 'completed' = rawSt.includes('post') || rawSt.includes('complete')
+              ? 'completed'
+              : rawSt.includes('draft') || rawSt.includes('finance') || rawSt.includes('approval')
+                ? 'upcoming'
+                : 'ongoing'
+
+            return {
+              id: String(p.projectID || p.id),
+              title: p.projectName || p.title,
+              barangay: p.projectLocation || barangay,
+              category: p.projectCategory || 'Education',
+              status: mappedStatus,
+              proposedBudget: Number(p.projectBudget || 0),
+              spent: Number(p.projectBreakdown || 0),
+              remainingBudget: Math.max(0, Number(p.projectBudget || 0) - Number(p.projectBreakdown || 0)),
+              progress: p.projectProgress || 0,
+              progressPercent: p.projectProgress || 0,
+              startDate: p.projectStartTime ? new Date(p.projectStartTime).toISOString().split('T')[0] : '',
+              endDate: p.projectEndTime ? new Date(p.projectEndTime).toISOString().split('T')[0] : '',
+              description: p.projectDescription || '',
+            }
+          }))
+        }
+
+        if (repRes) {
+          setSummary({
+            spent: Number(repRes.spent || 0),
+            annualBudget: Number(repRes.annualBudget || 0),
+            remaining: Number(repRes.remaining || 0),
+          })
         }
       } catch (err) {
-        console.warn('API fetch warning in SKHome:', err)
+        console.warn('API load warning:', err)
       }
     }
-    loadSKHomeData()
+    loadCitizenData()
   }, [barangay])
 
-  // Auto-dismiss feedback banner after 3 seconds
-  useEffect(() => {
-    if (!feedback) return
-    const timer = setTimeout(() => setFeedback(null), 3000)
-    return () => clearTimeout(timer)
-  }, [feedback])
-
-  const spent = summary.spent
-  const budget = summary.annualBudget || 1
-  const remain = summary.remaining
-  const usePct = budget > 0 ? Math.min(Math.round((spent / budget) * 100), 100) : 0
-
-  const [activeTab, setActiveTab] = useState<'overview' | 'comments'>('overview')
+  const [comment, setComment] = useState('')
+  const [suggestionCat, setSuggestionCat] = useState('Sports Facilities')
+  const [submitted, setSubmitted] = useState(false)
   const [selectedProject, setSelectedProject] = useState<ReportProject | null>(null)
-  const [showAddModal, setShowAddModal] = useState(false)
-
-  // Keeps the dashboard's project list, budget stat cards, and donut chart
-  // in sync with edits/receipts made inside the modal — same pattern as
-  // SKProjects, so nothing here goes stale until a manual refresh.
-  const handleProjectUpdated = (updated: ReportProject) => {
-    setLocalProjects(prev => prev.map(p => (p.id === updated.id ? updated : p)))
-  }
-
-  const handleAddReceipt = (projectId: string, receipt: any) => {
-    setLocalProjects(prev => prev.map(p => {
-      if (p.id !== projectId) return p
-      const newSpent = p.spent + receipt.amount
-      return {
-        ...p,
-        spent: newSpent,
-        remainingBudget: Math.max(0, p.proposedBudget - newSpent),
-        receipts: [receipt, ...(p.receipts ?? [])],
-      }
-    }))
-    // Keep the top summary cards + donut chart in step too, since they're
-    // driven by a separate `summary` object rather than derived from
-    // localProjects.
-    setSummary(prev => ({
-      ...prev,
-      spent: prev.spent + receipt.amount,
-      remaining: Math.max(0, prev.remaining - receipt.amount),
-    }))
-  }
-
-  // selectedProject is a snapshot from click-time — re-derive the current
-  // version from localProjects after edits/receipts so the open modal
-  // never shows stale data.
-  const liveSelectedProject = selectedProject
-    ? localProjects.find(p => p.id === selectedProject.id) ?? selectedProject
-    : null
-
-  // New project form state
-  const [newTitle, setNewTitle] = useState('')
-  const [newCat, setNewCat] = useState('Education')
-  const [newDesc, setNewDesc] = useState('')
-  const [newBudget, setNewBudget] = useState('')
-  const [newStart, setNewStart] = useState('')
-  const [newEnd, setNewEnd] = useState('')
-  const [formError, setFormError] = useState('')
-
-  // Proposal File Upload & OCR State
-  const [proposalFile, setProposalFile] = useState<File | null>(null)
-  const [scanningProposal, setScanningProposal] = useState(false)
-  const [proposalOcrMsg, setProposalOcrMsg] = useState('')
-  const [showCameraModal, setShowCameraModal] = useState(false)
-
-  // Discard-changes confirmation for the Add Project form
-  const [confirmAction, setConfirmAction] = useState<'cancel' | null>(null)
-
-  // Snapshot of the form's values right after opening — used to detect
-  // whether the user actually changed anything before requesting a close.
-  const [initialSnapshot, setInitialSnapshot] = useState({
-    title: '',
-    cat: 'Education',
-    desc: '',
-    budget: '',
-    start: '',
-    end: '',
-    hasFile: false,
-  })
-
-  const handleScanProposal = () => {
-    setScanningProposal(true)
-    setProposalOcrMsg('Scanning proposal document via AI OCR...')
-    setTimeout(() => {
-      setNewTitle('Barangay Youth Sports & Leadership Summit 2025')
-      setNewCat('Sports & Recreation')
-      setNewBudget('175000')
-      setNewStart(new Date().toISOString().slice(0, 10))
-      const nextMonth = new Date()
-      nextMonth.setMonth(nextMonth.getMonth() + 1)
-      setNewEnd(nextMonth.toISOString().slice(0, 10))
-      setNewDesc('Community-wide youth sports league, physical wellness workshops, and leadership development activities based on the official SK proposal.')
-      setScanningProposal(false)
-      setProposalOcrMsg('✓ Proposal Scanned! Extracted Title, Dates, Budget (₱175,000.00), and Description. All values below remain fully editable.')
-    }, 1200)
-  }
-
-  const handleCameraSnap = () => {
-    setShowCameraModal(false)
-    handleScanProposal()
-  }
-
-  const isFormDirty = () => {
-    if (newTitle !== initialSnapshot.title) return true
-    if (newCat !== initialSnapshot.cat) return true
-    if (newDesc !== initialSnapshot.desc) return true
-    if (newBudget !== initialSnapshot.budget) return true
-    if (newStart !== initialSnapshot.start) return true
-    if (newEnd !== initialSnapshot.end) return true
-    if (!!proposalFile !== initialSnapshot.hasFile) return true
-    return false
-  }
-
-  // Only opens the Discard Changes confirmation when the form actually has
-  // unsaved edits — otherwise it closes immediately, no confirmation needed.
-  const requestCloseModal = () => {
-    if (isFormDirty()) {
-      setConfirmAction('cancel')
-    } else {
-      setShowAddModal(false)
-    }
-  }
-
-  const handleAddProject = (e: FormEvent) => {
-    e.preventDefault()
-    if (!newTitle.trim() || !newBudget || !newStart || !newEnd) { setFormError('Please fill in all required fields.'); return }
-    const np: ReportProject = {
-      id: `p-${Math.random().toString(36).slice(2, 8)}`,
-      title: newTitle.trim(), barangay, category: newCat as any,
-      status: 'upcoming', description: newDesc.trim(),
-      proposedBudget: parseFloat(newBudget.replace(/,/g, '')) || 0,
-      spent: 0, progress: 0, startDate: newStart, endDate: newEnd,
-    }
-    setLocalProjects((prev: any[]) => [np, ...prev])
-    setNewTitle(''); setNewCat('Education'); setNewDesc(''); setNewBudget(''); setNewStart(''); setNewEnd(''); setFormError('')
-    setProposalFile(null); setProposalOcrMsg('')
-    setShowAddModal(false)
-    setFeedback({ type: 'success', message: 'Project created successfully' })
-  }
+  const [showTxnModal, setShowTxnModal] = useState(false)
+  const [showReportModal, setShowReportModal] = useState(false)
 
   // Print dialog — choosing "Save as PDF" as the destination is how this
   // doubles as the Download action, with zero extra dependencies.
@@ -261,6 +175,64 @@ export default function SKHome({ user }: SKHomeProps) {
     dateStyle: 'long',
     timeStyle: 'short',
   })
+
+  const spent = summary.spent
+  const budget = summary.annualBudget || 1
+  const remain = summary.remaining
+  const usagePct = budget > 0 ? Math.min(Math.round((spent / budget) * 100), 100) : 0
+
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false)
+
+  const handleComment = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!comment.trim()) return
+    const targetProject = localProjects.length > 0 ? localProjects[0] : null
+    const targetProjectId = targetProject ? Number(targetProject.id) : 1
+    setIsSubmittingComment(true)
+
+    try {
+      if (!isNaN(targetProjectId) && targetProjectId > 0) {
+        await postCommentApi({
+          commentFor: targetProjectId,
+          commentDetails: `[${suggestionCat}] ${comment.trim()}`,
+          commentType: 'suggestion',
+        })
+      }
+      const newC = {
+        id: `C-${Date.now()}`,
+        barangay,
+        author: user?.name?.split(' ')[0] ?? 'Citizen',
+        text: `[${suggestionCat}] ${comment.trim()}`,
+        date: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+        type: 'suggestion' as const,
+        votes: 1,
+      }
+      setLocalComments((prev: any[]) => [newC, ...prev])
+      setSubmitted(true)
+      setComment('')
+      setTimeout(() => setSubmitted(false), 4000)
+    } catch (err: any) {
+      console.warn('API error posting suggestion:', err)
+    } finally {
+      setIsSubmittingComment(false)
+    }
+  }
+
+  const handleVote = (id: string) => {
+    setLocalComments((prev: any[]) => prev.map((c: any) => {
+      if (c.id !== id) return c
+      const alreadyVoted = votedIds.has(id)
+      return { ...c, votes: (c.votes ?? 0) + (alreadyVoted ? -1 : 1) }
+    }))
+    setVotedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  console.log("news state:", news)
 
   return (
     <section className="section">
@@ -284,63 +256,15 @@ export default function SKHome({ user }: SKHomeProps) {
           }
         `}</style>
 
-        {/* ── Feedback Banner ── */}
-        {feedback && (
-          <Portal>
-            <div
-              className="no-print"
-              style={{
-                position: 'fixed',
-                top: 'calc(var(--header-height, 78px) + 1rem)',
-                left: '50%',
-                transform: 'translateX(-50%)',
-                zIndex: 10000,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.6rem',
-                background: feedback.type === 'success' ? 'rgba(22, 101, 52, 0.22)' : 'rgba(118, 0, 49, 0.18)',
-                backdropFilter: 'blur(16px) saturate(1.6)',
-                WebkitBackdropFilter: 'blur(16px) saturate(1.6)',
-                color: feedback.type === 'success' ? '#0d3d20' : '#5c0026',
-                fontFamily: 'var(--font-display)',
-                fontWeight: 700,
-                fontSize: '0.9rem',
-                padding: '0.9rem 1.4rem',
-                borderRadius: '14px',
-                border: '1.5px solid rgba(255, 255, 255, 0.35)',
-                boxShadow: feedback.type === 'success'
-                  ? '0 12px 32px rgba(22,101,52,0.25), inset 0 1px 0 rgba(255,255,255,0.4)'
-                  : '0 12px 32px rgba(118,0,49,0.18), inset 0 1px 0 rgba(255,255,255,0.4)',
-                maxWidth: '90vw',
-                animation: 'toastPop 220ms ease-out',
-              }}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <circle cx="12" cy="12" r="10" />
-                <path d="M8 12l3 3 5-6" />
-              </svg>
-              <span>{feedback.message}</span>
-            </div>
-            <style>{`
-              @keyframes toastPop {
-                from { opacity: 0; transform: translateX(-50%) translateY(-12px) scale(0.96); }
-                to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
-              }
-            `}</style>
-          </Portal>
-        )}
-
         {/* ── Page Intro ── */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.8rem' }}>
           <div>
-            <span className="page-kicker">SK Dashboard · Barangay {barangay}</span>
-            <h1 className="page-title" style={{ marginTop: '0.3rem' }}>Welcome, {user?.name?.split(' ')[0] ?? 'SK Officer'}</h1>
+            <span className="page-kicker">Citizen Portal · Barangay {barangay}</span>
+            <h1 className="page-title" style={{ marginTop: '0.3rem' }}>Your Barangay's SK Transparency Dashboard</h1>
             <p className="page-subtitle" style={{ marginTop: '0.4rem' }}>
-              {position} · Barangay {barangay}, Santa Rosa City, Laguna
+              Track Barangay {barangay}'s SK budget utilization, active projects, and community engagement. Click any project card to inspect financial details and leave feedback.
             </p>
           </div>
-
-          {/* Action buttons — View Report is visible to every role; Add Project only to Chair/Secretary */}
           <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignSelf: 'flex-start', marginTop: '0.4rem' }}>
             <button
               className="btn btn-sm view-report-btn"
@@ -354,77 +278,55 @@ export default function SKHome({ user }: SKHomeProps) {
               </svg>
               View Report
             </button>
-
-            {canAddProject && (
-              <button
-                className="btn btn-primary btn-sm"
-                onClick={() => {
-                  setNewTitle('')
-                  setNewCat('Education')
-                  setNewDesc('')
-                  setNewBudget('')
-                  setNewStart('')
-                  setNewEnd('')
-                  setProposalFile(null)
-                  setProposalOcrMsg('')
-                  setFormError('')
-                  setInitialSnapshot({
-                    title: '',
-                    cat: 'Education',
-                    desc: '',
-                    budget: '',
-                    start: '',
-                    end: '',
-                    hasFile: false,
-                  })
-                  setShowAddModal(true)
-                }}
-              >
-                + Add Project
-              </button>
-            )}
+            <button
+              className="btn btn-gold btn-sm"
+              onClick={() => setShowTxnModal(true)}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                <path d="M14 2H6a2 2 0 0 2-2 2v16a2 2 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" />
+              </svg>
+              Track Funds &amp; Receipts
+            </button>
           </div>
         </div>
 
         {/* ── Financial Stat Cards ── */}
         <div className="card-grid card-grid-4" style={{ marginBottom: '1.5rem' }}>
           <div className="stat-card card-accent">
-            <div className="stat-value">{budget === 0 ? '₱0' : `₱${(budget / 1_000_000).toFixed(2)}M`}</div>
+            <div className="stat-value">₱{(budget / 1_000_000).toFixed(2)}M</div>
             <div className="stat-label">Annual Budget</div>
-            <div className="stat-sub">FY 2025 allocation</div>
+            <div className="stat-sub">FY 2025 · SK Allocation</div>
           </div>
           <div className="stat-card" style={{ borderLeft: '3px solid #b45309' }}>
-            <div className="stat-value" style={{ color: '#b45309' }}>{spent === 0 ? '₱0' : `₱${(spent / 1_000_000).toFixed(2)}M`}</div>
+            <div className="stat-value" style={{ color: '#b45309' }}>₱{(spent / 1_000_000).toFixed(2)}M</div>
             <div className="stat-label">Amount Disbursed</div>
-            <div className="stat-sub">{usePct}% of budget used</div>
+            <div className="stat-sub">{usagePct}% of annual budget</div>
           </div>
           <div className="stat-card" style={{ borderLeft: '3px solid #166534' }}>
-            <div className="stat-value" style={{ color: '#166534' }}>{remain === 0 ? '₱0' : `₱${(remain / 1_000_000).toFixed(2)}M`}</div>
+            <div className="stat-value" style={{ color: '#166534' }}>₱{(remain / 1_000_000).toFixed(2)}M</div>
             <div className="stat-label">Remaining</div>
             <div className="stat-sub">Available for projects</div>
           </div>
           <div className="stat-card">
             <div className="stat-value">{localProjects.length}</div>
-            <div className="stat-label">Projects</div>
-            <div className="stat-sub">{localProjects.filter((p: any) => p.status === 'ongoing').length} ongoing</div>
+            <div className="stat-label">Total Projects</div>
+            <div className="stat-sub">{localProjects.filter(p => p.status === 'ongoing').length} currently active</div>
           </div>
         </div>
 
-        {/* ── Budget Utilization Chart ── */}
-        <div className="chart-card" style={{ marginBottom: '1.5rem', flexDirection: 'row', alignItems: 'center', gap: '2rem', flexWrap: 'wrap' }}>
-          <DonutChart
-            value={usePct} size={110} stroke={14}
-            label={`${usePct}%`} sublabel="used"
-          />
-          <div style={{ flex: 1, minWidth: '160px' }}>
-            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.9rem', marginBottom: '0.5rem' }}>
-              Budget Utilization — Brgy. {barangay}
+        {/* ── Budget Utilization Chart Card ── */}
+        <div className="chart-card" style={{ marginBottom: '2rem', flexDirection: 'row', alignItems: 'center', gap: '2rem', flexWrap: 'wrap' }}>
+          <DonutChart value={usagePct} size={110} stroke={14} label={`${usagePct}%`} sublabel="used" />
+          <div style={{ flex: 1, minWidth: '200px' }}>
+            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.92rem', marginBottom: '0.5rem' }}>
+              Budget Utilization Breakdown — Barangay {barangay}
             </div>
-            <div style={{ display: 'grid', gap: '0.4rem' }}>
+            <div style={{ display: 'grid', gap: '0.35rem' }}>
               {[
-                { label: 'Total Budget', val: `₱${budget.toLocaleString()}`, color: 'var(--maroon)' },
-                { label: 'Disbursed', val: `₱${spent.toLocaleString()}`, color: '#b45309' },
-                { label: 'Remaining', val: `₱${remain.toLocaleString()}`, color: '#166534' },
+                { label: 'Total Allocation', val: `₱${budget.toLocaleString()}`, color: 'var(--maroon)' },
+                { label: 'Total Disbursed', val: `₱${spent.toLocaleString()}`, color: '#b45309' },
+                { label: 'Remaining Balance', val: `₱${remain.toLocaleString()}`, color: '#166534' },
               ].map(item => (
                 <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', fontFamily: 'var(--font-display)' }}>
                   <span style={{ color: 'var(--muted)' }}>{item.label}</span>
@@ -435,265 +337,210 @@ export default function SKHome({ user }: SKHomeProps) {
           </div>
         </div>
 
-        {/* ── Tabs ── */}
-        <div className="filter-tabs">
-          <button className={`filter-tab${activeTab === 'overview' ? ' active' : ''}`} onClick={() => setActiveTab('overview')}>
-            Projects &amp; Activity
-          </button>
-          <button className={`filter-tab${activeTab === 'comments' ? ' active' : ''}`} onClick={() => setActiveTab('comments')}>
-            Citizen Feedback ({myComments.length})
-          </button>
-        </div>
+        {/* ── Two columns: Projects + Right Sidebar (Latest News) ── */}
+        <div className="page-cols page-cols-sidebar">
 
-        {/* ── Tab: Overview ── */}
-        {activeTab === 'overview' && (
-          <div className="page-cols page-cols-sidebar">
+          {/* Left Column — Projects & Facebook-Style Community Suggestion Feed */}
+          <div>
+            <div style={{ marginBottom: '1rem' }}>
+              <div className="page-kicker">Local Projects</div>
+              <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1.05rem', color: 'var(--ink)', marginTop: '0.2rem' }}>
+                {barangay} SK Projects
+                <span style={{ fontSize: '0.78rem', color: 'var(--muted)', fontWeight: 500, marginLeft: '0.5rem' }}>
+                  (Click for details &amp; receipts)
+                </span>
+              </h2>
+            </div>
 
-            {/* Projects — vertical cards */}
-            <div>
-              <div style={{ marginBottom: '1rem' }}>
-                <div className="page-kicker">Project Management</div>
-                <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '1rem', color: 'var(--ink)', marginTop: '0.2rem' }}>
-                  {barangay} SK Projects
-                  <span style={{ fontSize: '0.8rem', color: 'var(--muted)', fontWeight: 500, marginLeft: '0.5rem' }}>
-                    (Click any card to view details &amp; manage receipts)
-                  </span>
-                </h2>
-              </div>
+            {localProjects.length > 0 ? (
+              <div className="card-grid card-grid-2" style={{ marginBottom: '2.5rem' }}>
+                {localProjects.map(p => (
+                  <div key={p.id} className="v-card" onClick={() => setSelectedProject(p)}>
+                    <div className="v-card-img-wrap" style={{ height: 150 }}>
+                      <img
+                        src={getCover(p.category)}
+                        alt={p.category}
+                        className="v-card-img"
+                        onError={e => {
+                          (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1577495508048-b635879837f1?w=640&q=75'
+                        }}
+                      />
+                      <div className="v-card-img-overlay" />
+                      <div className="v-card-badge-pin">
+                        <span className={`badge badge-${p.status}`}>{p.status}</span>
+                      </div>
+                    </div>
 
-              {localProjects.length > 0 ? (
-                <div className="card-grid card-grid-2" style={{ gap: '1.1rem' }}>
-                  {localProjects.map((p: any) => (
-                    <div key={p.id} className="v-card" onClick={() => setSelectedProject(p)}>
-                      <div className="v-card-img-wrap" style={{ height: 140 }}>
-                        <img
-                          src={getCover(p.category)} alt={p.category} className="v-card-img"
-                          onError={e => {
-                            (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1577495508048-b635879837f1?w=640&q=75'
-                          }}
-                        />
-                        <div className="v-card-img-overlay" />
-                        <div className="v-card-badge-pin">
-                          <span className={`badge badge-${p.status}`}>{p.status}</span>
+                    <div className="v-card-body" style={{ padding: '0.9rem 1rem 1rem' }}>
+                      <div className="v-card-kicker">{p.category}</div>
+                      <div className="v-card-title" style={{ fontSize: '0.92rem' }}>{p.title}</div>
+                      <div className="v-card-date">{p.startDate} — {p.endDate}</div>
+
+                      <div style={{ marginTop: '0.4rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.2rem' }}>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--muted)', fontFamily: 'var(--font-display)', fontWeight: 600 }}>Progress</span>
+                          <span style={{ fontSize: '0.72rem', fontFamily: 'var(--font-display)', fontWeight: 800, color: 'var(--maroon)' }}>{p.progress}%</span>
+                        </div>
+                        <div className="progress-bar">
+                          <div className="progress-fill" style={{ width: `${p.progress}%` }} />
                         </div>
                       </div>
 
-                      <div className="v-card-body" style={{ padding: '0.9rem 1rem 1rem' }}>
-                        <div className="v-card-kicker">{p.category}</div>
-                        <div className="v-card-title" style={{ fontSize: '0.9rem' }}>{p.title}</div>
-                        <div className="v-card-date">{p.startDate} — {p.endDate}</div>
-
-                        <div style={{ marginTop: '0.35rem' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.2rem' }}>
-                            <span style={{ fontSize: '0.7rem', color: 'var(--muted)', fontFamily: 'var(--font-display)', fontWeight: 600 }}>Progress</span>
-                            <span style={{ fontSize: '0.7rem', fontFamily: 'var(--font-display)', fontWeight: 800, color: 'var(--maroon)' }}>{p.progress}%</span>
-                          </div>
-                          <div className="progress-bar">
-                            <div className="progress-fill" style={{ width: `${p.progress}%` }} />
-                          </div>
+                      <div className="v-card-footer" style={{ paddingTop: '0.65rem' }}>
+                        <div>
+                          <div className="v-card-budget" style={{ fontSize: '0.95rem' }}>₱{(p.proposedBudget / 1000).toFixed(0)}K</div>
+                          <div className="v-card-budget-label">Proposed Budget</div>
                         </div>
-
-                        <div className="v-card-footer" style={{ paddingTop: '0.6rem' }}>
-                          <div>
-                            <div className="v-card-budget" style={{ fontSize: '0.95rem' }}>₱{(p.proposedBudget / 1000).toFixed(0)}K</div>
-                            <div className="v-card-budget-label">Budget</div>
-                          </div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--maroon)', fontFamily: 'var(--font-display)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 18l6-6-6-6" /></svg>
-                            View &amp; Finances
-                          </div>
+                        <div style={{ fontSize: '0.76rem', color: 'var(--maroon)', fontFamily: 'var(--font-display)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                          Inspect
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 18l6-6-6-6" /></svg>
                         </div>
                       </div>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="card" style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--muted)' }}>
-                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700 }}>No projects yet</div>
-                  {canAddProject && <div style={{ fontSize: '0.85rem', marginTop: '0.3rem' }}>Add your first SK project.</div>}
-                </div>
-              )}
-            </div>
-
-            {/* Right: Single Featured News Carousel + Activity Log */}
-            <div style={{ display: 'grid', gap: '1.4rem', alignContent: 'start' }}>
-
-              {/* Single News Carousel (Replaces vertical news list & SK Council list) */}
-              <SingleNewsCarousel items={news} />
-
-              {/* Activity log */}
-              <div>
-                <div className="page-kicker" style={{ marginBottom: '0.75rem' }}>Recent Activity</div>
-                <div style={{ display: 'grid', gap: '0.5rem' }}>
-                  {myLogs.map((log: any) => (
-                    <div key={log.id} className="card" style={{ padding: '0.75rem 1rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.15rem', flexWrap: 'wrap' }}>
-                        <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.82rem', color: 'var(--ink)' }}>{log.action}</span>
-                        <span style={{ fontSize: '0.74rem', color: 'var(--muted-light)', fontFamily: 'var(--font-display)' }}>{log.date}</span>
-                      </div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>{log.actor}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ── Tab: Citizen Feedback ── */}
-        {activeTab === 'comments' && (
-          <div style={{ display: 'grid', gap: '0.85rem' }}>
-            <div className="page-kicker">Community Feedback · {barangay}</div>
-            {myComments.length > 0 ? myComments.map(c => (
-              <div key={c.id} className="comment-card">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-                  <span className="comment-author">{c.author}</span>
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                    {c.type && <span className={`badge ${c.type === 'suggestion' ? 'badge-upcoming' : 'badge-ongoing'}`}>{c.type}</span>}
-                    {c.votes !== undefined && (
-                      <span className="comment-votes">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 21 12 17.77 5.82 21 7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
-                        {c.votes} helpful
-                      </span>
-                    )}
                   </div>
-                </div>
-                <span className="comment-date">{c.date}</span>
-                <p className="comment-text">{c.text}</p>
+                ))}
               </div>
-            )) : (
-              <div className="card" style={{ textAlign: 'center', padding: '3rem', color: 'var(--muted)' }}>
-                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700 }}>No citizen feedback yet</div>
+            ) : (
+              <div className="card" style={{ textAlign: 'center', padding: '3rem', color: 'var(--muted)', marginBottom: '2.5rem' }}>
+                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700 }}>No projects listed yet</div>
+                <div style={{ fontSize: '0.85rem', marginTop: '0.3rem' }}>SK {barangay} projects will appear here once registered.</div>
               </div>
             )}
-          </div>
-        )}
 
-        {/* ── Add Project Modal (Secretary & Chairperson) ── */}
-        {showAddModal && canAddProject && (
-          <Portal>
-            <div className="modal-overlay" onClick={e => {
-              if (e.target === e.currentTarget)
-                requestCloseModal()
-            }}>
-              <div className="modal" style={{ width: 'min(560px, 100%)' }}>
-                <div className="modal-header">
-                  <div className="modal-title">Add New SK Project</div>
-                  <button className="modal-close" onClick={requestCloseModal}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12" /></svg>
-                  </button>
+            {/* ── Facebook-Style SK Community Suggestion Post Box & Feed ── */}
+            <div style={{ background: '#fff', border: '1.5px solid rgba(118,0,49,0.14)', boxShadow: '0 8px 24px rgba(118,0,49,0.06)', padding: '1.5rem' }}>
+              <div style={{ display: 'flex', gap: '0.85rem', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid rgba(118,0,49,0.08)', paddingBottom: '0.85rem' }}>
+                <div style={{ width: '42px', height: '42px', background: 'var(--maroon)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '0.95rem', flexShrink: 0 }}>
+                  {user?.name?.charAt(0) ?? 'C'}
                 </div>
-                <form onSubmit={handleAddProject}>
-                  <div className="modal-body">
-                    {formError && <div className="alert-error">{formError}</div>}
-
-                    {/* Proposal File Upload & OCR Scanner */}
-                    <div style={{ marginBottom: '1rem', border: '1.5px dashed var(--maroon)', padding: '0.9rem 1rem', background: 'rgba(118,0,49,0.02)', borderRadius: '8px' }}>
-                      <div style={{ fontSize: '0.8rem', fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--maroon)', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
-                        Upload Proposal File or Capture Document (OCR Auto-Fill)
-                      </div>
-                      {proposalFile ? (
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
-                          <div style={{ fontSize: '0.82rem', fontFamily: 'var(--font-display)' }}>
-                            <strong>{proposalFile.name}</strong> ({(proposalFile.size / 1024).toFixed(1)} KB)
-                          </div>
-                          <div style={{ display: 'flex', gap: '0.4rem' }}>
-                            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowCameraModal(true)}>
-                              📷 Open Camera
-                            </button>
-                            <button type="button" className="btn btn-gold btn-sm" onClick={handleScanProposal} disabled={scanningProposal}>
-                              {scanningProposal ? 'Scanning Proposal...' : '⚡ Auto-Scan Proposal (OCR)'}
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
-                          <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <input
-                              type="file"
-                              accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
-                              style={{ display: 'none' }}
-                              onChange={e => {
-                                if (e.target.files && e.target.files[0]) {
-                                  setProposalFile(e.target.files[0])
-                                }
-                              }}
-                            />
-                            <span className="btn btn-secondary btn-sm" style={{ pointerEvents: 'none' }}>
-                              Browse File
-                            </span>
-                            <span style={{ fontSize: '0.78rem', color: 'var(--muted)' }}>
-                              Attach proposal file
-                            </span>
-                          </label>
-                          <button type="button" className="btn btn-gold btn-sm" onClick={() => setShowCameraModal(true)}>
-                            📷 Open Camera / Snap Photo
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                    {proposalOcrMsg && <div className="notice info" style={{ marginBottom: '0.85rem', fontSize: '0.78rem' }}>{proposalOcrMsg}</div>}
-
-                    {showCameraModal && (
-                      <CameraCaptureModal
-                        title="Capture Project Proposal Document"
-                        subtitle="Position official project proposal document inside reticle and snap photo"
-                        onCapture={handleCameraSnap}
-                        onClose={() => setShowCameraModal(false)}
-                      />
-                    )}
-
-                    <div className="form-group">
-                      <label className="form-label">Project Title *</label>
-                      <input className="form-input" value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="e.g. Youth Digital Literacy Workshop" />
-                    </div>
-                    <div className="form-row-2">
-                      <div className="form-group">
-                        <label className="form-label">Category *</label>
-                        <select className="form-input" value={newCat} onChange={e => setNewCat(e.target.value)}>
-                          {CATEGORY_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
-                        </select>
-                      </div>
-                      <div className="form-group">
-                        <label className="form-label">Proposed Budget (₱) *</label>
-                        <input className="form-input" value={newBudget} onChange={e => setNewBudget(e.target.value)} placeholder="e.g. 250000" />
-                      </div>
-                    </div>
-                    <div className="form-row-2">
-                      <div className="form-group">
-                        <label className="form-label">Start Date *</label>
-                        <input className="form-input" type="date" value={newStart} onChange={e => setNewStart(e.target.value)} />
-                      </div>
-                      <div className="form-group">
-                        <label className="form-label">End Date *</label>
-                        <input className="form-input" type="date" value={newEnd} onChange={e => setNewEnd(e.target.value)} />
-                      </div>
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">Description</label>
-                      <textarea className="form-input" rows={3} value={newDesc} onChange={e => setNewDesc(e.target.value)} placeholder="Brief description of the project…" style={{ resize: 'vertical', fontFamily: 'var(--font-body)' }} />
-                    </div>
+                <div>
+                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '0.96rem', color: 'var(--ink)' }}>
+                    What should Sangguniang Kabataan of Barangay {barangay} do, fix, or create next?
                   </div>
-                  <div className="modal-footer">
-                    <button type="button" className="btn btn-secondary" onClick={requestCloseModal}>Cancel</button>
-                    <button type="submit" className="btn btn-primary">Create Project</button>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--muted)' }}>
+                    Post a public suggestion directly to your SK Council feed
+                  </div>
+                </div>
+              </div>
+
+              {submitted ? (
+                <div className="alert-success" style={{ marginBottom: '1rem' }}>
+                  Suggestion posted to the Barangay {barangay} SK feed! Thank you for participating.
+                </div>
+              ) : (
+                <form onSubmit={handleComment} style={{ display: 'grid', gap: '0.85rem' }}>
+                  <textarea
+                    className="form-input"
+                    rows={3}
+                    value={comment}
+                    onChange={e => setComment(e.target.value)}
+                    placeholder={`What's on your mind regarding Barangay ${barangay} SK? (e.g. "Fix basketball court lighting", "More youth workshops")`}
+                    style={{ resize: 'vertical', fontFamily: 'var(--font-body)', fontSize: '0.88rem' }}
+                    required
+                  />
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <label style={{ fontSize: '0.78rem', fontFamily: 'var(--font-display)', fontWeight: 700, color: 'var(--muted)' }}>Topic:</label>
+                      <select
+                        className="form-input"
+                        style={{ width: 'auto', padding: '0.35rem 0.75rem', fontSize: '0.8rem' }}
+                        value={suggestionCat}
+                        onChange={e => setSuggestionCat(e.target.value)}
+                      >
+                        <option value="Sports Facilities">Sports Facilities</option>
+                        <option value="Scholarships &amp; Education">Scholarships &amp; Education</option>
+                        <option value="Digital Hub &amp; Wi-Fi">Digital Hub &amp; Wi-Fi</option>
+                        <option value="Street Lighting &amp; Safety">Street Lighting &amp; Safety</option>
+                        <option value="Youth Events &amp; Culture">Youth Events &amp; Culture</option>
+                        <option value="General Suggestion">General Suggestion</option>
+                      </select>
+                    </div>
+
+                    <button type="submit" className="btn btn-primary" style={{ padding: '0.55rem 1.4rem' }}>
+                      Post Suggestion &rarr;
+                    </button>
                   </div>
                 </form>
+              )}
+
+              {/* Feed of Recent Citizen Suggestion Posts */}
+              <div style={{ marginTop: '1.8rem', borderTop: '1px solid rgba(118,0,49,0.08)', paddingTop: '1.2rem', display: 'grid', gap: '0.9rem' }}>
+                <div className="page-kicker">Barangay {barangay} Community Posts</div>
+                {localComments.map((c: any) => (
+                  <div key={c.id} className="comment-card" style={{ background: 'rgba(255,255,255,0.95)', border: '1.5px solid rgba(118,0,49,0.1)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+                        <div style={{ width: '30px', height: '30px', background: 'rgba(118,0,49,0.1)', color: 'var(--maroon)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '0.8rem' }}>
+                          {c.author.charAt(0)}
+                        </div>
+                        <span className="comment-author">{c.author}</span>
+                      </div>
+                      <span className="comment-date">{c.date}</span>
+                    </div>
+
+                    <p className="comment-text" style={{ margin: '0.6rem 0', fontSize: '0.88rem', color: 'var(--ink)' }}>
+                      {c.text}
+                    </p>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(118,0,49,0.06)', paddingTop: '0.5rem', marginTop: '0.4rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => handleVote(c.id)}
+                        className="link-button"
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.4rem',
+                          fontSize: '0.76rem',
+                          color: 'var(--maroon)',
+                          fontWeight: 500,
+                          fontFamily: 'var(--font-display)',
+                          lineHeight: 1,
+                          transition: 'opacity 0.15s ease',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.opacity = '0.7' }}
+                        onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
+                      >
+                        <svg
+                          width="16" height="16" viewBox="0 0 24 24"
+                          fill={votedIds.has(c.id) ? 'var(--maroon)' : 'none'}
+                          stroke={votedIds.has(c.id) ? 'var(--maroon-dark)' : 'var(--maroon)'}
+                          strokeWidth="2"
+                          strokeLinejoin="round"
+                          style={{ display: 'block', flexShrink: 0, transition: 'transform 0.15s ease' }}
+                          onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.15)' }}
+                          onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}
+                        >
+                          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 21 12 17.77 5.82 21 7 14.14 2 9.27l6.91-1.01L12 2z" />
+                        </svg>
+                        <span style={{ lineHeight: 1 }}>Agree / Helpful ({c.votes ?? 0})</span>
+                      </button>
+                      <span style={{ fontSize: '0.72rem', color: 'var(--muted)', fontFamily: 'var(--font-display)' }}>
+                        Barangay {barangay} Feed
+                      </span>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
-          </Portal>
+
+          </div>
+
+          {/* Right Column — Latest News Sidebar */}
+          <div style={{ display: 'grid', gap: '1.5rem', alignContent: 'start' }}>
+            <SingleNewsCarousel items={news} />
+          </div>
+
+        </div>
+
+        {/* ── Modals ── */}
+        {selectedProject && (
+          <ProjectDetailModal project={selectedProject} user={user} onClose={() => setSelectedProject(null)} />
         )}
 
-        {/* ── Project Detail Modal ── */}
-        {liveSelectedProject && (
-          <ProjectDetailModal
-            project={liveSelectedProject}
-            user={user}
-            onClose={() => setSelectedProject(null)}
-            onProjectUpdated={handleProjectUpdated}
-            onAddReceipt={handleAddReceipt}
-          />
+        {showTxnModal && (
+          <BarangayTransactionsModal barangay={barangay} onClose={() => setShowTxnModal(false)} />
         )}
 
         {/* ── View Report Modal — A4 print preview ── */}
@@ -751,7 +598,6 @@ export default function SKHome({ user }: SKHomeProps) {
                 }}
               >
                 {/* Letterhead */}
-                {/* Letterhead */}
                 <div style={{
                   display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
                   borderBottom: '4px solid #760031', paddingBottom: '20px', marginBottom: '28px',
@@ -785,7 +631,7 @@ export default function SKHome({ user }: SKHomeProps) {
                 <div style={{ marginBottom: '26px', fontSize: '12px', lineHeight: 1.9, color: '#333' }}>
                   This report presents the current financial standing and project portfolio of the
                   Sangguniang Kabataan of Barangay {barangay} for the covered period. As of {reportGeneratedAt},
-                  the barangay has utilized <strong>{usePct}%</strong> of its allocated annual budget of{' '}
+                  the barangay has utilized <strong>{usagePct}%</strong> of its allocated annual budget of{' '}
                   <strong>{formatPeso(budget)}</strong> across <strong>{localProjects.length}</strong> recorded
                   {localProjects.length === 1 ? ' project' : ' projects'}, with <strong>{formatPeso(remain)}</strong> remaining
                   available for future youth development initiatives.
@@ -809,10 +655,10 @@ export default function SKHome({ user }: SKHomeProps) {
                 <div style={{ marginBottom: '30px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                     <span style={{ fontSize: '12px', fontWeight: 700, color: '#444' }}>Budget Utilization</span>
-                    <span style={{ fontSize: '12px', fontWeight: 800, color: '#760031' }}>{usePct}%</span>
+                    <span style={{ fontSize: '12px', fontWeight: 800, color: '#760031' }}>{usagePct}%</span>
                   </div>
                   <div style={{ height: '12px', background: '#f0ece5', borderRadius: '6px', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${usePct}%`, background: 'linear-gradient(90deg, #760031, #9a0040)' }} />
+                    <div style={{ height: '100%', width: `${usagePct}%`, background: 'linear-gradient(90deg, #760031, #9a0040)' }} />
                   </div>
                 </div>
 
@@ -863,21 +709,6 @@ export default function SKHome({ user }: SKHomeProps) {
           </Portal>
         )}
 
-        {/* ── Discard Changes Confirmation ── */}
-        <ConfirmDialog
-          isOpen={confirmAction === 'cancel'}
-          title="Discard Changes"
-          message="Any unsaved changes will be lost. Are you sure you want to close this form?"
-          confirmLabel="Discard"
-          cancelLabel="Keep Editing"
-          variant="danger"
-          onConfirm={() => {
-            setShowAddModal(false)
-            setConfirmAction(null)
-            setFeedback({ type: 'info', message: 'Changes discarded' })
-          }}
-          onCancel={() => setConfirmAction(null)}
-        />
       </div>
     </section>
   )
