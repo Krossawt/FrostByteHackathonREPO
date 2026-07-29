@@ -31,10 +31,17 @@ export default function RegisterPage({ onRegister }: RegisterPageProps) {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault(); setError('')
-    if (!name.trim() || !email.trim() || !password) { setError('Please complete all required fields.'); return }
-    if (!isStaRosa) { setError('Registration is strictly restricted to Santa Rosa City, Laguna residents.'); return }
+    if (!name.trim()) { setError('Full name is required.'); return }
+    if (name.trim().length < 2) { setError('Full name must be at least 2 characters.'); return }
+    if (!email.trim()) { setError('Email address is required.'); return }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email.trim())) { setError('Please enter a valid email address (e.g. juan@gmail.com).'); return }
+    if (username.trim() && username.trim().length < 3) { setError('Username must be at least 3 characters.'); return }
+    if (username.trim() && !/^[a-zA-Z0-9_]+$/.test(username.trim())) { setError('Username may only contain letters, numbers, and underscores.'); return }
+    if (!password) { setError('Password is required.'); return }
+    if (password.length < 8) { setError('Password must be at least 8 characters.'); return }
     if (password !== confirmPw) { setError('Passwords do not match.'); return }
-    if (password.length < 6) { setError('Password must be at least 6 characters.'); return }
+    if (!isStaRosa) { setError('Registration is strictly restricted to Santa Rosa City, Laguna residents.'); return }
     if (!agreed) { setError('You must agree to the Terms & Conditions and Privacy Policy.'); return }
 
     setIsSubmitting(true)

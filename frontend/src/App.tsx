@@ -84,6 +84,11 @@ function App() {
     return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('scroll', onScroll) }
   }, [])
 
+  // Scroll to top on every route change (prevents mid-page starts after navigation)
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' })
+  }, [location.pathname])
+
   // Global repeating scroll reveal: fades in on enter, resets on exit so scrolling up/down re-animates smoothly
   useEffect(() => {
     const obs = new IntersectionObserver(
@@ -120,7 +125,8 @@ function App() {
     if (result) {
       setUser(result)
       const next = result.role === 'superadmin' ? '/superadmin/home' : result.role === 'sk' ? '/sk/home' : '/citizen/home'
-      navigate(next)
+      // replace:true removes /login from history so the Back button won't return to the login page
+      navigate(next, { replace: true })
       return true
     }
     return false
@@ -132,7 +138,7 @@ function App() {
     return result
   }
 
-  const handleLogout = () => { logoutService(); setUser(null); navigate('/') }
+  const handleLogout = () => { logoutService(); setUser(null); navigate('/', { replace: true }) }
   const confirmLogout = () => setShowLogoutConfirm(true)
 
   const posColor = user?.skPosition ? (positionColors[user.skPosition] ?? '#760031') : '#760031'

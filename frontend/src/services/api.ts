@@ -150,12 +150,14 @@ export async function fetchProjectsApi(params?: {
   status?: string
   search?: string
   category?: string
+  public_only?: boolean
 }): Promise<ReportProject[]> {
   const query = new URLSearchParams()
   if (params?.barangay) query.append('barangay', params.barangay)
   if (params?.status) query.append('status', params.status)
   if (params?.search) query.append('search', params.search)
   if (params?.category) query.append('category', params.category)
+  if (params?.public_only === false) query.append('public_only', 'false')
 
   const queryString = query.toString() ? `?${query.toString()}` : ''
   return request<ReportProject[]>(`/projects${queryString}`)

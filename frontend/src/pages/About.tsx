@@ -161,39 +161,6 @@ export default function About() {
           </div>
         </div>
 
-        {/* ── Roles Breakdown ── */}
-        <div>
-          <div className="page-kicker" style={{ marginBottom: '1rem' }}>Role-Based Access</div>
-          <div className="card-grid card-grid-3">
-            {[
-              {
-                role: 'Super Admin', color: 'var(--maroon)', bg: 'rgba(118,0,49,0.06)',
-                abilities: ['Manage all 18 barangay SK accounts', 'Publish and edit city-wide news', 'Review full activity logs', 'Export audit reports to PDF', 'Barangay-level filtering & oversight']
-              },
-              {
-                role: 'SK Officer', color: '#b45309', bg: 'rgba(180,83,9,0.06)',
-                abilities: ['Chairperson + Secretary: Add & edit projects', 'Chairperson + Treasurer: Add receipts', 'Upload project documents (OCR-assisted)', 'Update project progress & status', 'View citizen comments & suggestions']
-              },
-              {
-                role: 'Citizen', color: '#166534', bg: 'rgba(22,101,52,0.06)',
-                abilities: ['View barangay SK financial reports', 'Track all active & completed projects', 'Submit comments and suggestions', 'View SK official profiles & contacts', 'Read city-wide news & announcements']
-              },
-            ].map(r => (
-              <div key={r.role} className="card" style={{ background: r.bg, borderColor: `${r.color}22` }}>
-                <div style={{ padding: '0.25rem 0.65rem', background: r.color, color: '#fff', fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.75rem', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '0.85rem', display: 'inline-flex' }}>{r.role}</div>
-                <ul style={{ display: 'grid', gap: '0.5rem', paddingLeft: '0', listStyle: 'none' }}>
-                  {r.abilities.map(a => (
-                    <li key={a} style={{ display: 'flex', gap: '0.55rem', alignItems: 'flex-start' }}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={r.color} strokeWidth="3" style={{ flexShrink: 0, marginTop: '3px' }}><polyline points="20 6 9 17 4 12" /></svg>
-                      <span style={{ fontSize: '0.84rem', color: 'var(--muted)', lineHeight: 1.55 }}>{a}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-        </div>
-
       </div>
     </section>
   )

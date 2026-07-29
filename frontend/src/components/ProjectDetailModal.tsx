@@ -273,6 +273,21 @@ export default function ProjectDetailModal({
     e.preventDefault()
     if (!activeProject) return
 
+    // ─ Validation ─────────────────────────────────────────────────────────
+    if (!editTitle.trim() || editTitle.trim().length < 3) {
+      setDetailError('Project title must be at least 3 characters.')
+      return
+    }
+    if (!editBudget || Number(editBudget) <= 0) {
+      setDetailError('Budget must be a positive number.')
+      return
+    }
+    if (editStart && editEnd && new Date(editEnd) <= new Date(editStart)) {
+      setDetailError('End date must be after the start date.')
+      return
+    }
+    // ─────────────────────────────────────────────────────────────────────
+
     setIsSavingProject(true)
     setDetailError('')
     try {

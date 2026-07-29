@@ -146,15 +146,31 @@ export default function Landing() {
 
   const newsList = liveNews
 
-  const nextNews = useCallback(() => setNewsIdx(i => (i + 1) % newsList.length), [newsList.length])
-  const prevNews = useCallback(() => setNewsIdx(i => (i - 1 + newsList.length) % newsList.length), [newsList.length])
+  // Guard: only advance if there's more than one item to prevent NaN from % 0
+  const nextNews = useCallback(() => {
+    if (newsList.length < 2) return
+    setNewsIdx(i => (i + 1) % newsList.length)
+  }, [newsList.length])
+  const prevNews = useCallback(() => {
+    if (newsList.length < 2) return
+    setNewsIdx(i => (i - 1 + newsList.length) % newsList.length)
+  }, [newsList.length])
   const pauseAuto = () => { if (autoRef.current) clearInterval(autoRef.current) }
-  const resumeAuto = () => { autoRef.current = setInterval(nextNews, 4000) }
+  const resumeAuto = () => {
+    if (newsList.length < 2) return
+    autoRef.current = setInterval(nextNews, 4000)
+  }
 
+  // Restart the interval only after news has actually loaded (length changes from 0 → n)
   useEffect(() => {
+    if (newsList.length < 2) return
     autoRef.current = setInterval(nextNews, 4000)
     return () => { if (autoRef.current) clearInterval(autoRef.current) }
-  }, [nextNews])
+  }, [nextNews, newsList.length])
+
+  // Legal popup state
+  type LegalModal = 'terms' | 'privacy' | 'ra10742' | 'disclosure' | null
+  const [legalModal, setLegalModal] = useState<LegalModal>(null)
 
   // Barangay picker & modals
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -721,12 +737,95 @@ export default function Landing() {
       <footer className="landing-footer">
         <div className="landing-footer-version">eSKala v1.0 · City of Santa Rosa, Laguna · CYDO</div>
         <div className="landing-footer-links">
-          <Link to="/about">Terms and Conditions</Link>
-          <Link to="/about">Privacy Policy</Link>
-          <a href="#">RA 10742</a>
-          <a href="#">Full Disclosure</a>
+          <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', font: 'inherit', padding: 0, textDecoration: 'underline' }}
+            onClick={() => setLegalModal('terms')}>Terms and Conditions</button>
+          <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', font: 'inherit', padding: 0, textDecoration: 'underline' }}
+            onClick={() => setLegalModal('privacy')}>Privacy Policy</button>
+          <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', font: 'inherit', padding: 0, textDecoration: 'underline' }}
+            onClick={() => setLegalModal('ra10742')}>RA 10742</button>
+          <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', font: 'inherit', padding: 0, textDecoration: 'underline' }}
+            onClick={() => setLegalModal('disclosure')}>Full Disclosure</button>
         </div>
       </footer>
+
+      {/* ── Legal Popups ── */}
+      {legalModal && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+          onClick={() => setLegalModal(null)}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ background: '#fff', borderRadius: '14px', padding: '2rem', maxWidth: '560px', width: '100%', maxHeight: '80vh', overflowY: 'auto', boxShadow: '0 24px 80px rgba(0,0,0,0.22)' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
+              <div>
+                <div style={{ fontSize: '0.72rem', fontFamily: 'var(--font-display)', fontWeight: 700, letterSpacing: '0.12em', color: 'var(--maroon)', textTransform: 'uppercase', marginBottom: '0.3rem' }}>eSKala Legal</div>
+                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: '1.15rem', color: 'var(--ink)' }}>
+                  {legalModal === 'terms' && 'Terms and Conditions'}
+                  {legalModal === 'privacy' && 'Privacy Policy'}
+                  {legalModal === 'ra10742' && 'RA 10742 — SK Reform Act of 2015'}
+                  {legalModal === 'disclosure' && 'Full Disclosure Policy'}
+                </div>
+              </div>
+              <button onClick={() => setLegalModal(null)}
+                style={{ background: 'rgba(118,0,49,0.08)', border: 'none', cursor: 'pointer', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px', flexShrink: 0 }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+              </button>
+            </div>
+            <div style={{ fontSize: '0.88rem', color: 'var(--muted)', lineHeight: 1.75 }}>
+              {legalModal === 'terms' && (
+                <>
+                  <p>By accessing and using the eSKala platform, you agree to comply with and be bound by the following terms and conditions of use.</p>
+                  <p style={{ marginTop: '0.75rem' }}><strong>1. Platform Purpose.</strong> eSKala is the official Sangguniang Kabataan financial transparency portal of the City of Santa Rosa, Laguna. It is operated by the City Youth Development Office (CYDO) in compliance with RA 10742 (SK Reform Act of 2015) as amended by RA 11768.</p>
+                  <p style={{ marginTop: '0.75rem' }}><strong>2. User Eligibility.</strong> Registration is strictly limited to residents of Santa Rosa City, Laguna. Providing false information during registration is grounds for account suspension.</p>
+                  <p style={{ marginTop: '0.75rem' }}><strong>3. Acceptable Use.</strong> Users shall not post false, misleading, or offensive content. Comments and suggestions must be constructive and relevant to SK projects.</p>
+                  <p style={{ marginTop: '0.75rem' }}><strong>4. Data Accuracy.</strong> Financial data displayed is sourced from official SK barangay records. Any discrepancies should be reported to CYDO.</p>
+                  <p style={{ marginTop: '0.75rem' }}><strong>5. Governing Law.</strong> These terms are governed by the laws of the Republic of the Philippines, including RA 10742, RA 10173 (Data Privacy Act), and applicable DILG memoranda.</p>
+                  <p style={{ marginTop: '0.75rem', fontWeight: 600 }}>For questions: cydo@santarosacity.gov.ph · (049) 530-0015 local 5011</p>
+                </>
+              )}
+              {legalModal === 'privacy' && (
+                <>
+                  <p>The City Government of Santa Rosa, Laguna, through CYDO, is committed to protecting your personal information in accordance with <strong>Republic Act No. 10173</strong> (Data Privacy Act of 2012).</p>
+                  <p style={{ marginTop: '0.75rem' }}><strong>Information We Collect.</strong> Name, email address, barangay location, and username upon registration. Usage data such as project views, comments, and login timestamps.</p>
+                  <p style={{ marginTop: '0.75rem' }}><strong>How We Use Your Data.</strong> To provide citizen services and account management. To track SK project engagement and community participation. To comply with DILG Full Disclosure and COA audit requirements.</p>
+                  <p style={{ marginTop: '0.75rem' }}><strong>Data Sharing.</strong> Your data will not be sold or disclosed to third parties. It may be shared with DILG and COA for compliance audits as required by law.</p>
+                  <p style={{ marginTop: '0.75rem' }}><strong>Your Rights.</strong> You have the right to access, correct, or request deletion of your personal data. Submit requests to CYDO.</p>
+                  <p style={{ marginTop: '0.75rem', fontWeight: 600 }}>Data Protection Officer: cydo@santarosacity.gov.ph</p>
+                </>
+              )}
+              {legalModal === 'ra10742' && (
+                <>
+                  <p><strong>Republic Act No. 10742</strong> — Sangguniang Kabataan Reform Act of 2015 establishes the legal and operational framework for all SK units in the Philippines.</p>
+                  <p style={{ marginTop: '0.75rem' }}><strong>Key Provisions Relevant to eSKala:</strong></p>
+                  <ul style={{ paddingLeft: '1.25rem', marginTop: '0.5rem', display: 'grid', gap: '0.4rem' }}>
+                    <li>Section 12 — Annual Barangay Youth Investment Program (ABYIP): Every SK unit must prepare an annual program detailing all planned youth activities and their corresponding budgets.</li>
+                    <li>Section 17 — SK Fund Sources: SK funds come from the General Fund of the barangay (10% allocation) and other sources as provided by law.</li>
+                    <li>Section 20 — Full Disclosure: All SK financial records must be publicly posted within 30 days of quarter end in compliance with DILG Memorandum Circulars.</li>
+                    <li>RA 11768 Amendment: Enhanced digital reporting requirements and updated age qualification criteria for SK officers.</li>
+                  </ul>
+                  <p style={{ marginTop: '0.75rem' }}>eSKala operationalizes these mandates by providing a centralized, real-time digital transparency portal accessible to all Santa Rosa City residents.</p>
+                </>
+              )}
+              {legalModal === 'disclosure' && (
+                <>
+                  <p>In compliance with the <strong>DILG Full Disclosure Policy</strong> and <strong>RA 10742 Section 20</strong>, the City of Santa Rosa SK units are required to disclose the following financial documents:</p>
+                  <ul style={{ paddingLeft: '1.25rem', marginTop: '0.5rem', display: 'grid', gap: '0.4rem' }}>
+                    <li>Annual Barangay Youth Investment Program (ABYIP) — within 30 days of approval</li>
+                    <li>Quarterly Budget Reports — within 30 days of quarter end</li>
+                    <li>Project Progress Reports — as each project milestone is reached</li>
+                    <li>Purchase Orders and Disbursements — as processed</li>
+                    <li>Audit Observation Memoranda (AOM) responses — within 60 days of COA issuance</li>
+                  </ul>
+                  <p style={{ marginTop: '0.75rem' }}>eSKala serves as the official digital disclosure platform for all 18 barangay SK units of Santa Rosa City, Laguna. All disclosures are binding public records.</p>
+                  <p style={{ marginTop: '0.75rem', fontWeight: 600 }}>CYDO Full Disclosure Desk: cydo@santarosacity.gov.ph</p>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Floating Barangay Picker ── */}
       {pickerOpen && (

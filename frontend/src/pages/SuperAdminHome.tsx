@@ -3,7 +3,7 @@ import { DonutChart } from '../components/MiniChart'
 import ProjectDetailModal from '../components/ProjectDetailModal'
 import type { ReportProject } from '../types'
 import Portal from '../components/Portal'
-import { fetchProjectsApi, fetchExecutiveSummaryApi, fetchAuditLogsApi, postApprovedAbyipApi, createNewsletterApi } from '../services/api'
+import { fetchProjectsApi, fetchExecutiveSummaryApi, fetchAuditLogsApi, fetchNewsApi, postApprovedAbyipApi, createNewsletterApi } from '../services/api'
 
 // ── Category cover images (same palette as SKProjects) ──────────────────────
 const CATEGORY_IMAGES: Record<string, string> = {
@@ -24,6 +24,43 @@ const CATEGORY_IMAGES: Record<string, string> = {
 }
 function getCover(cat?: string) {
   return CATEGORY_IMAGES[cat ?? 'Other'] ?? CATEGORY_IMAGES['Other']
+}
+
+// Normalizes raw API project data into the ReportProject shape used by the UI.
+// Raw API statuses like "Posted", "Drafted", "For Finance Update" are mapped
+// to the four values the UI renders: ongoing | upcoming | completed | cancelled.
+function mapApiProjectToReportProject(project: any): ReportProject {
+  const rawStatus = String(project?.projectStatus || project?.status || 'ongoing')
+  const normalizedStatus = rawStatus.toLowerCase()
+  const status: ReportProject['status'] = normalizedStatus.includes('posted') || normalizedStatus.includes('completed')
+    ? 'completed'
+    : normalizedStatus.includes('approval') || normalizedStatus.includes('finance') || normalizedStatus.includes('draft')
+      ? 'upcoming'
+      : normalizedStatus.includes('cancel')
+        ? 'cancelled'
+        : 'ongoing'
+
+  const proposedBudget = Number(project?.projectBudget ?? project?.proposedBudget ?? 0)
+  const spent = Number(project?.projectBreakdown ?? project?.spent ?? 0)
+  const startDateValue = project?.projectStartTime || project?.startDate || ''
+  const endDateValue = project?.projectEndTime || project?.endDate || ''
+
+  return {
+    id: String(project?.projectID || project?.id || ''),
+    title: project?.projectName || project?.title || 'Untitled Project',
+    barangay: project?.projectLocation || project?.barangay || '',
+    category: project?.projectCategory || project?.category || 'Education',
+    status,
+    proposedBudget,
+    spent,
+    remainingBudget: Math.max(0, proposedBudget - spent),
+    progress: Number(project?.projectProgress ?? project?.progress ?? 0),
+    progressPercent: Number(project?.projectProgress ?? project?.progress ?? 0),
+    startDate: startDateValue ? new Date(startDateValue).toISOString().split('T')[0] : '',
+    endDate: endDateValue ? new Date(endDateValue).toISOString().split('T')[0] : '',
+    description: project?.projectDescription || project?.description || '',
+    receipts: project?.receipts ?? [],
+  }
 }
 
 function formatMillionsTruncate(amount: number, decimals = 2) {
@@ -77,10 +114,12 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
   useEffect(() => {
     async function loadLiveData() {
       try {
-        const [sumRes, projRes, logsRes] = await Promise.all([
+        const [sumRes, projRes, logsRes, newsRes] = await Promise.all([
           fetchExecutiveSummaryApi().catch(() => null),
-          fetchProjectsApi().catch(() => []),
+          // public_only=false so Super Admin sees ALL projects, not only Posted
+          fetchProjectsApi({ public_only: false }).catch(() => []),
           fetchAuditLogsApi().catch(() => []),
+          fetchNewsApi().catch(() => []),
         ])
 
         if (sumRes && sumRes.barangays) {
@@ -94,7 +133,8 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
         }
 
         if (Array.isArray(projRes)) {
-          setLiveProjects(projRes)
+          // Apply full normalization so statuses like "Posted" become "completed", etc.
+          setLiveProjects(projRes.map((p: any) => mapApiProjectToReportProject(p)))
         }
 
         if (Array.isArray(logsRes) && logsRes.length > 0) {
@@ -106,6 +146,16 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
             action: `${l.actionType}: ${l.details || ''}`,
             date: l.timestamp ? new Date(l.timestamp).toLocaleDateString() : 'Today',
             when: 'Recently'
+          })))
+        }
+
+        if (Array.isArray(newsRes) && newsRes.length > 0) {
+          setCityNews(newsRes.map((n: any) => ({
+            id: String(n.newsletterID || n.id),
+            title: n.title,
+            category: n.category || 'City News',
+            summary: n.summary || '',
+            date: n.publishedAt ? new Date(n.publishedAt).toLocaleDateString() : 'Today',
           })))
         }
       } catch (err) {
