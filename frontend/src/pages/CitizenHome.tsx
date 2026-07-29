@@ -4,7 +4,8 @@ import ProjectDetailModal from '../components/ProjectDetailModal'
 import BarangayTransactionsModal from '../components/BarangayTransactionsModal'
 import { DonutChart } from '../components/MiniChart'
 import SingleNewsCarousel from '../components/SingleNewsCarousel'
-import { fetchProjectsApi, fetchBarangayReportApi, fetchNewsApi, postCommentApi } from '../services/api'import Portal from '../components/Portal'
+import { fetchProjectsApi, fetchBarangayReportApi, fetchNewsApi, postCommentApi } from '../services/api'
+import Portal from '../components/Portal'
 
 function formatPeso(amount: number) {
   return `₱${Math.round(amount || 0).toLocaleString('en-PH')}`
