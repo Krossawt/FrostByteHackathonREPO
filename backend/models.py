@@ -85,7 +85,7 @@ class Project(Base):
     projectBudget       = Column(Numeric(12, 2), nullable=True)  # Proposed budget from proposal
     projectProgress     = Column(Integer, default=0)             # 0-100%
     projectCategory     = Column(String(100), nullable=True)     # e.g. Health, Education
-    projectStatus       = Column(Enum(ProjectStatus, values_callable=lambda obj: [e.value for e in obj]), nullable=False, default=ProjectStatus.DRAFTED)
+    projectStatus       = Column(Enum(ProjectStatus, values_callable=lambda obj: [e.value for e in obj]), nullable=False, default=ProjectStatus.INCOMING)
     isDeleted           = Column(Boolean, default=False)
     createdAt           = Column(DateTime, default=func.now())
     updatedAt           = Column(DateTime, default=func.now(), onupdate=func.now())
