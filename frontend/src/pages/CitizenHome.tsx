@@ -4,7 +4,7 @@ import ProjectDetailModal from '../components/ProjectDetailModal'
 import BarangayTransactionsModal from '../components/BarangayTransactionsModal'
 import { DonutChart } from '../components/MiniChart'
 import SingleNewsCarousel from '../components/SingleNewsCarousel'
-import { fetchProjectsApi, fetchBarangayReportApi, fetchNewsApi } from '../services/api'
+import { fetchProjectsApi, fetchBarangayReportApi, fetchNewsApi, postCommentApi } from '../services/api'
 
 interface CitizenHomeProps { user?: UserAccount | null }
 
@@ -165,9 +165,23 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
   const remain = summary.remaining
   const usagePct = budget > 0 ? Math.min(Math.round((spent / budget) * 100), 100) : 0
 
-  const handleComment = (e: FormEvent) => {
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false)
+
+  const handleComment = async (e: FormEvent) => {
     e.preventDefault()
-    if (comment.trim()) {
+    if (!comment.trim()) return
+    const targetProject = localProjects.length > 0 ? localProjects[0] : null
+    const targetProjectId = targetProject ? Number(targetProject.id) : 1
+    setIsSubmittingComment(true)
+
+    try {
+      if (!isNaN(targetProjectId) && targetProjectId > 0) {
+        await postCommentApi({
+          commentFor: targetProjectId,
+          commentDetails: `[${suggestionCat}] ${comment.trim()}`,
+          commentType: 'suggestion',
+        })
+      }
       const newC = {
         id: `C-${Date.now()}`,
         barangay,
@@ -181,6 +195,10 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
       setSubmitted(true)
       setComment('')
       setTimeout(() => setSubmitted(false), 4000)
+    } catch (err: any) {
+      console.warn('API error posting suggestion:', err)
+    } finally {
+      setIsSubmittingComment(false)
     }
   }
 
