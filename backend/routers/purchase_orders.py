@@ -125,6 +125,30 @@ def update_order(
     return PurchaseOrderResponse.model_validate(order)
 
 
+MAX_RECEIPT_SIZE = 5 * 1024 * 1024  # 5 MB limit
+
+
+def validate_and_get_receipt_ext(content: bytes) -> str:
+    if len(content) > MAX_RECEIPT_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="Receipt file size exceeds maximum allowed limit of 5MB",
+        )
+    if content.startswith(b"\xFF\xD8\xFF"):
+        return "jpg"
+    elif content.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "png"
+    elif len(content) >= 12 and content.startswith(b"RIFF") and content[8:12] == b"WEBP":
+        return "webp"
+    elif content.startswith(b"%PDF-"):
+        return "pdf"
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Invalid file format. Only authentic JPG, PNG, WEBP, or PDF files are accepted.",
+        )
+
+
 @router.post("/{order_id}/upload-receipt", response_model=OCRReceiptResult,
              summary="Treasurer: Upload receipt image — OCR auto-extracts amount")
 async def upload_receipt(
@@ -135,19 +159,13 @@ async def upload_receipt(
 ):
     order = _order_or_404(db, order_id)
 
-    # Validate file type
-    allowed_types = {"image/jpeg", "image/png", "image/webp", "application/pdf"}
-    if file.content_type not in allowed_types:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                            detail="Only JPG, PNG, WEBP, or PDF files are accepted")
+    content = await file.read()
+    ext = validate_and_get_receipt_ext(content)
 
-    # Save file to local storage
     os.makedirs(UPLOAD_DIR, exist_ok=True)
-    ext = file.filename.rsplit(".", 1)[-1] if "." in file.filename else "jpg"
-    filename = f"receipt_{order_id}_{uuid.uuid4().hex[:6]}.{ext}"
+    filename = f"receipt_{order_id}_{uuid.uuid4().hex[:8]}.{ext}"
     filepath = os.path.join(UPLOAD_DIR, filename)
 
-    content = await file.read()
     with open(filepath, "wb") as f:
         f.write(content)
 

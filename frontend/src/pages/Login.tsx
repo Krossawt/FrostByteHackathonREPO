@@ -35,20 +35,56 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
     loadProjectCount()
   }, [])
 
+  const [failedAttempts, setFailedAttempts] = useState(0)
+  const [lockoutSec, setLockoutSec] = useState(0)
+
+  useEffect(() => {
+    if (lockoutSec <= 0) return
+    const timer = setInterval(() => {
+      setLockoutSec(prev => (prev > 1 ? prev - 1 : 0))
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [lockoutSec])
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setError('')
     setResetNotice('')
-    if (!credential.trim() || !password) { setError('Please enter your username/email and password.'); return }
+
+    if (lockoutSec > 0) {
+      setError(`Account login temporarily locked due to multiple failed attempts. Please wait ${lockoutSec}s.`)
+      return
+    }
+
+    const cleanCred = credential.trim()
+    if (!cleanCred || !password) { setError('Please enter your username/email and password.'); return }
 
     setIsSubmitting(true)
     try {
-      const ok = await onLogin(credential.trim(), password, true)
+      const ok = await onLogin(cleanCred, password, true)
       if (!ok) {
-        setError('Invalid email/username or password. Please verify your credentials.')
+        const nextAttempts = failedAttempts + 1
+        setFailedAttempts(nextAttempts)
+        if (nextAttempts >= 5) {
+          setLockoutSec(60) // 60s client lock
+          setError('Too many failed login attempts. Temporarily locked for 60 seconds for your account security.')
+        } else if (nextAttempts >= 3) {
+          setError(`Invalid credentials. Attempt ${nextAttempts}/5 before temporary lockout.`)
+        } else {
+          setError('Invalid email/username or password. Please verify your credentials.')
+        }
+      } else {
+        setFailedAttempts(0)
       }
     } catch (err: any) {
-      setError(err.message || 'Login failed. Please check your credentials.')
+      const nextAttempts = failedAttempts + 1
+      setFailedAttempts(nextAttempts)
+      if (err.message?.includes('429') || err.message?.includes('Locked')) {
+        setLockoutSec(900)
+        setError(err.message)
+      } else {
+        setError(err.message || 'Login failed. Please check your credentials.')
+      }
     } finally {
       setIsSubmitting(false)
     }

@@ -66,24 +66,40 @@ from fastapi import UploadFile, File
 UPLOAD_DIR = os.getenv("UPLOAD_DIR", "static/uploads")
 
 
+MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5 MB limit
+
+
+def validate_and_get_image_ext(content: bytes) -> str:
+    if len(content) > MAX_IMAGE_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="File size exceeds maximum allowed limit of 5MB",
+        )
+    if content.startswith(b"\xFF\xD8\xFF"):
+        return "jpg"
+    elif content.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "png"
+    elif len(content) >= 12 and content.startswith(b"RIFF") and content[8:12] == b"WEBP":
+        return "webp"
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Invalid image format. Only authentic JPG, PNG, or WEBP image files are allowed.",
+        )
+
+
 @router.post("/upload-image", summary="Upload news display image (JPG, PNG, WEBP)")
 async def upload_news_image(
     file: UploadFile = File(..., description="News image file"),
     current_user: User = Depends(require_superadmin),
 ):
-    allowed_types = {"image/jpeg", "image/png", "image/webp"}
-    if file.content_type not in allowed_types:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Only JPG, PNG, or WEBP image files are allowed",
-        )
+    content = await file.read()
+    ext = validate_and_get_image_ext(content)
 
     os.makedirs(UPLOAD_DIR, exist_ok=True)
-    ext = file.filename.rsplit(".", 1)[-1] if file.filename and "." in file.filename else "jpg"
-    filename = f"news_{uuid.uuid4().hex[:8]}.{ext}"
+    filename = f"news_{uuid.uuid4().hex[:12]}.{ext}"
     filepath = os.path.join(UPLOAD_DIR, filename)
 
-    content = await file.read()
     with open(filepath, "wb") as f:
         f.write(content)
 

@@ -88,6 +88,30 @@ def get_budget_report(
     return BudgetReportResponse.model_validate(report)
 
 
+MAX_BUDGET_FILE_SIZE = 10 * 1024 * 1024  # 10 MB limit
+
+
+def validate_and_get_budget_file_ext(content: bytes) -> str:
+    if len(content) > MAX_BUDGET_FILE_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="File size exceeds maximum allowed limit of 10MB",
+        )
+    if content.startswith(b"\xFF\xD8\xFF"):
+        return "jpg"
+    elif content.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "png"
+    elif len(content) >= 12 and content.startswith(b"RIFF") and content[8:12] == b"WEBP":
+        return "webp"
+    elif content.startswith(b"%PDF-"):
+        return "pdf"
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Invalid file format. Only authentic JPG, PNG, WEBP, or PDF files are accepted.",
+        )
+
+
 @router.post("/upload", response_model=BudgetReportResponse, status_code=status.HTTP_201_CREATED,
              summary="Upload Annual Budget Report — OCR auto-extracts budget year and value")
 async def upload_budget_report(
@@ -100,18 +124,13 @@ async def upload_budget_report(
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                             detail=f"'{barangay}' is not a valid Santa Rosa City barangay")
 
-    allowed_types = {"image/jpeg", "image/png", "image/webp", "application/pdf"}
-    if file.content_type not in allowed_types:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                            detail="Only JPG, PNG, WEBP, or PDF files are accepted")
+    content = await file.read()
+    ext = validate_and_get_budget_file_ext(content)
 
-    # Save file
     os.makedirs(UPLOAD_DIR, exist_ok=True)
-    ext = file.filename.rsplit(".", 1)[-1] if "." in file.filename else "pdf"
-    filename = f"budget_{barangay.replace(' ', '_')}_{uuid.uuid4().hex[:6]}.{ext}"
+    filename = f"budget_{barangay.replace(' ', '_')}_{uuid.uuid4().hex[:8]}.{ext}"
     filepath = os.path.join(UPLOAD_DIR, filename)
 
-    content = await file.read()
     with open(filepath, "wb") as f:
         f.write(content)
 

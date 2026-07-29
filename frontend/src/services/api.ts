@@ -27,6 +27,25 @@ export function setStoredToken(token: string | null, remember = false): void {
 
 const IS_DEV = true
 
+import { sanitizeText } from '../utils/sanitize'
+
+function deepSanitizePayload(obj: any): any {
+  if (typeof obj === 'string') {
+    return sanitizeText(obj)
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(deepSanitizePayload)
+  }
+  if (obj && typeof obj === 'object' && !(obj instanceof File) && !(obj instanceof Blob) && !(obj instanceof FormData)) {
+    const cleaned: Record<string, any> = {}
+    for (const key of Object.keys(obj)) {
+      cleaned[key] = deepSanitizePayload(obj[key])
+    }
+    return cleaned
+  }
+  return obj
+}
+
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = getStoredToken()
   const method = options.method || 'GET'
@@ -39,6 +58,17 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 
   if (token) {
     headers['Authorization'] = `Bearer ${token}`
+  }
+
+  // Automatic client-side payload sanitization for JSON requests
+  if (options.body && typeof options.body === 'string' && headers['Content-Type']?.includes('application/json')) {
+    try {
+      const parsed = JSON.parse(options.body)
+      const sanitized = deepSanitizePayload(parsed)
+      options.body = JSON.stringify(sanitized)
+    } catch {
+      // Keep original body if parsing fails
+    }
   }
 
   if (IS_DEV) {

@@ -65,32 +65,44 @@ Use **Bearer Token** (JWT) in the `Authorization` header after logging in.
 
 # ─── CORS ─────────────────────────────────────────────────────────────────────
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+ALLOWED_ORIGINS = [
+    FRONTEND_URL,
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://localhost:4173",
+    "https://frostbytehackathonrepo.onrender.com",
+    "https://eskala.ph",
+    "https://www.eskala.ph",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        FRONTEND_URL,
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "http://localhost:4173",
-        "https://eskala.ph",
-        "https://www.eskala.ph",
-    ],
-    allow_origin_regex=r"https://.*\.vercel\.app|https://.*\.railway\.app|http://localhost:.*",
+    allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=r"https://.*\.vercel\.app|https://.*\.onrender\.com|https://.*\.railway\.app",
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With"],
 )
 
-# ─── Request Logging Middleware (Development Diagnostics) ──────────────────────
+# ─── Security & Logging Middleware ────────────────────────────────────────────
 import time
 from fastapi import Request
 
 @app.middleware("http")
-async def log_requests(request: Request, call_next):
+async def security_and_logging_middleware(request: Request, call_next):
     start_time = time.time()
     response = await call_next(request)
     duration = round((time.time() - start_time) * 1000, 2)
-    print(f"-> [API] {request.method} {request.url.path} -> {response.status_code} ({duration}ms)")
+
+    # Security HTTP Response Headers
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
+
+    print(f"-> [API Security] {request.method} {request.url.path} -> {response.status_code} ({duration}ms)")
     return response
 
 # ─── Static Files (uploaded receipts, budget docs) ────────────────────────────

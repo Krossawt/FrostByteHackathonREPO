@@ -6,8 +6,10 @@ GET  /api/v1/auth/me
 POST /api/v1/auth/logout (client-side but endpoint for completeness)
 """
 
+from collections import defaultdict
+import time
 from datetime import datetime, timedelta
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from database import get_db
 from models import User, UserRole, AuditLog
@@ -21,32 +23,70 @@ import os
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
 
+FAILED_ATTEMPTS: dict[str, list[float]] = defaultdict(list)
+LOCKOUT_THRESHOLD = 5
+LOCKOUT_DURATION = 900  # 15 minutes in seconds
+
+DUMMY_HASH = "$2b$12$e83W.D1yM/m1.5Q3b2Q7O.X8.G5g5.X8G5g5X8G5g5X8G5g5X8G5g"
+
+def check_rate_limit(key: str):
+    now = time.time()
+    attempts = [t for t in FAILED_ATTEMPTS[key] if now - t < LOCKOUT_DURATION]
+    FAILED_ATTEMPTS[key] = attempts
+    if len(attempts) >= LOCKOUT_THRESHOLD:
+        time_left = int(LOCKOUT_DURATION - (now - attempts[0]))
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Too many failed login attempts. Locked out for security. Please try again in {max(1, time_left // 60)} minutes.",
+        )
+
+def record_failed_attempt(key: str):
+    FAILED_ATTEMPTS[key].append(time.time())
+
+def clear_failed_attempts(key: str):
+    FAILED_ATTEMPTS.pop(key, None)
+
 
 @router.post("/login", response_model=Token, summary="Login and receive JWT")
-def login(payload: UserLogin, db: Session = Depends(get_db)):
+def login(payload: UserLogin, request: Request, db: Session = Depends(get_db)):
+    client_ip = request.client.host if request.client else "unknown"
     credential = payload.credential.strip().lower()
 
-    # Match by email or — for legacy compatibility — find by email containing @
+    check_rate_limit(client_ip)
+    check_rate_limit(credential)
+
+    # Match by email or username
     user = (
         db.query(User)
         .filter(User.userEmail == credential, User.userIsDeleted == False)
         .first()
     )
+
     if not user:
+        record_failed_attempt(client_ip)
+        record_failed_attempt(credential)
+        verify_password(payload.password, DUMMY_HASH)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials",
         )
+
     if not verify_password(payload.password, user.userHashedPassword):
+        record_failed_attempt(client_ip)
+        record_failed_attempt(credential)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials",
         )
+
     if not user.userIsActive:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Account is suspended. Contact your Super Admin.",
         )
+
+    clear_failed_attempts(client_ip)
+    clear_failed_attempts(credential)
 
     # Update last login timestamp
     user.lastLogin = datetime.utcnow()

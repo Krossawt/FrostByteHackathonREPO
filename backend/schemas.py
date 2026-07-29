@@ -10,6 +10,18 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 from models import UserRole, ProjectStatus, OrderType, CommentType
 
 
+import re
+import html
+
+def sanitize_str(v: Optional[str]) -> Optional[str]:
+    if v is None:
+        return None
+    # Strip HTML/script tags
+    clean = re.sub(r'<[^>]*>', '', str(v))
+    clean = html.unescape(clean).strip()
+    return clean
+
+
 # ─── SHARED ───────────────────────────────────────────────────────────────────
 
 class MessageResponse(BaseModel):
@@ -19,17 +31,27 @@ class MessageResponse(BaseModel):
 # ─── AUTH / USERS ─────────────────────────────────────────────────────────────
 
 class UserLogin(BaseModel):
-    credential: str = Field(..., description="Email or username")
-    password: str
+    credential: str = Field(..., min_length=1, max_length=254, description="Email or username")
+    password: str = Field(..., min_length=1, max_length=128)
     rememberMe: bool = False
+
+    @field_validator("credential", mode="before")
+    @classmethod
+    def clean_credential(cls, v: str) -> str:
+        return sanitize_str(v) or ""
 
 
 class UserRegister(BaseModel):
     userName: str = Field(..., min_length=2, max_length=100)
     userEmail: EmailStr
-    password: str = Field(..., min_length=8)
-    userLocation: str = Field(..., description="Santa Rosa City Barangay")
+    password: str = Field(..., min_length=8, max_length=128)
+    userLocation: str = Field(..., min_length=2, max_length=100, description="Santa Rosa City Barangay")
     userIsStaRosa: bool = True
+
+    @field_validator("userName", "userLocation", mode="before")
+    @classmethod
+    def clean_user_fields(cls, v: Optional[str]) -> Optional[str]:
+        return sanitize_str(v)
 
 
 class AdminCreateUser(BaseModel):
@@ -85,26 +107,36 @@ class Token(BaseModel):
 
 class ProjectCreate(BaseModel):
     projectName: str = Field(..., min_length=3, max_length=255)
-    projectDescription: Optional[str] = None
+    projectDescription: Optional[str] = Field(None, max_length=5000)
     projectStartTime: datetime
     projectEndTime: datetime
-    projectLocation: str = Field(..., description="Barangay")
-    projectBudget: Optional[float] = Field(None, ge=0)
-    projectCategory: Optional[str] = None
+    projectLocation: str = Field(..., min_length=2, max_length=100, description="Barangay")
+    projectBudget: Optional[float] = Field(None, ge=0, le=1_000_000_000)
+    projectCategory: Optional[str] = Field(None, max_length=100)
+
+    @field_validator("projectName", "projectDescription", "projectLocation", "projectCategory", mode="before")
+    @classmethod
+    def clean_project_fields(cls, v: Optional[str]) -> Optional[str]:
+        return sanitize_str(v)
 
 
 class ProjectUpdate(BaseModel):
-    projectName: Optional[str] = None
-    projectDescription: Optional[str] = None
+    projectName: Optional[str] = Field(None, min_length=3, max_length=255)
+    projectDescription: Optional[str] = Field(None, max_length=5000)
     projectStartTime: Optional[datetime] = None
     projectEndTime: Optional[datetime] = None
-    projectBudget: Optional[float] = None
-    projectCategory: Optional[str] = None
+    projectBudget: Optional[float] = Field(None, ge=0, le=1_000_000_000)
+    projectCategory: Optional[str] = Field(None, max_length=100)
     projectProgress: Optional[int] = Field(None, ge=0, le=100)
+
+    @field_validator("projectName", "projectDescription", "projectCategory", mode="before")
+    @classmethod
+    def clean_project_update_fields(cls, v: Optional[str]) -> Optional[str]:
+        return sanitize_str(v)
 
 
 class ProjectBreakdownUpdate(BaseModel):
-    projectBreakdown: float = Field(..., ge=0, description="Total financial breakdown filled by Treasurer")
+    projectBreakdown: float = Field(..., ge=0, le=1_000_000_000, description="Total financial breakdown filled by Treasurer")
 
 
 class PurchaseOrderSummary(BaseModel):
@@ -146,17 +178,27 @@ class PurchaseOrderCreate(BaseModel):
     projectID: int
     orderName: str = Field(..., min_length=2, max_length=255)
     orderType: OrderType = OrderType.PHYSICAL
-    orderQty: float = Field(..., gt=0)
-    orderPrice: float = Field(..., ge=0)
+    orderQty: float = Field(..., gt=0, le=1_000_000)
+    orderPrice: float = Field(..., ge=0, le=1_000_000_000)
+
+    @field_validator("orderName", mode="before")
+    @classmethod
+    def clean_po_fields(cls, v: Optional[str]) -> Optional[str]:
+        return sanitize_str(v)
 
 
 class PurchaseOrderUpdate(BaseModel):
-    orderName: Optional[str] = None
+    orderName: Optional[str] = Field(None, min_length=2, max_length=255)
     orderType: Optional[OrderType] = None
-    orderQty: Optional[float] = Field(None, gt=0)
-    orderPrice: Optional[float] = Field(None, ge=0)
+    orderQty: Optional[float] = Field(None, gt=0, le=1_000_000)
+    orderPrice: Optional[float] = Field(None, ge=0, le=1_000_000_000)
     isManuallyOverridden: Optional[bool] = None
-    ocrExtractedAmount: Optional[float] = None
+    ocrExtractedAmount: Optional[float] = Field(None, ge=0, le=1_000_000_000)
+
+    @field_validator("orderName", mode="before")
+    @classmethod
+    def clean_po_update_fields(cls, v: Optional[str]) -> Optional[str]:
+        return sanitize_str(v)
 
 
 class PurchaseOrderResponse(BaseModel):
@@ -188,9 +230,14 @@ class OCRReceiptResult(BaseModel):
 # ─── COMMENTS ─────────────────────────────────────────────────────────────────
 
 class CommentCreate(BaseModel):
-    commentDetails: str = Field(..., min_length=1)
+    commentDetails: str = Field(..., min_length=1, max_length=2000)
     commentType: CommentType = CommentType.COMMENT
     parentCommentID: Optional[int] = None
+
+    @field_validator("commentDetails", mode="before")
+    @classmethod
+    def clean_comment_fields(cls, v: Optional[str]) -> Optional[str]:
+        return sanitize_str(v)
 
 
 class CommentResponse(BaseModel):
@@ -215,20 +262,30 @@ CommentResponse.model_rebuild()
 
 class NewsletterCreate(BaseModel):
     title: str = Field(..., min_length=3, max_length=255)
-    summary: Optional[str] = None
-    fullContent: Optional[str] = None
-    category: str = "City News"
-    projectLocation: Optional[str] = None
-    imageURL: Optional[str] = None
+    summary: Optional[str] = Field(None, max_length=2000)
+    fullContent: Optional[str] = Field(None, max_length=10000)
+    category: str = Field("City News", max_length=100)
+    projectLocation: Optional[str] = Field(None, max_length=100)
+    imageURL: Optional[str] = Field(None, max_length=500)
+
+    @field_validator("title", "summary", "fullContent", "category", "projectLocation", mode="before")
+    @classmethod
+    def clean_news_fields(cls, v: Optional[str]) -> Optional[str]:
+        return sanitize_str(v)
 
 
 class NewsletterUpdate(BaseModel):
-    title: Optional[str] = None
-    summary: Optional[str] = None
-    fullContent: Optional[str] = None
-    category: Optional[str] = None
-    imageURL: Optional[str] = None
+    title: Optional[str] = Field(None, min_length=3, max_length=255)
+    summary: Optional[str] = Field(None, max_length=2000)
+    fullContent: Optional[str] = Field(None, max_length=10000)
+    category: Optional[str] = Field(None, max_length=100)
+    imageURL: Optional[str] = Field(None, max_length=500)
     isPublished: Optional[bool] = None
+
+    @field_validator("title", "summary", "fullContent", "category", mode="before")
+    @classmethod
+    def clean_news_update_fields(cls, v: Optional[str]) -> Optional[str]:
+        return sanitize_str(v)
 
 
 class NewsletterResponse(BaseModel):
