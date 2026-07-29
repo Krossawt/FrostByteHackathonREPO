@@ -134,7 +134,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
           </p>
 
           <div className="landing-stats-section">
-            <p className="landing-stats-caption">As of 2025:</p>
+            <p className="landing-stats-caption">As of 2026:</p>
             <div className="landing-stats-row">
               <div className="landing-stat-item">
                 <span className="landing-stat-number">18</span>
