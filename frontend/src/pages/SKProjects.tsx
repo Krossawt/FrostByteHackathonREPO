@@ -115,7 +115,7 @@ export default function SKProjects({ user }: SKProjectsProps) {
       setIsLoadingProjects(true)
       setProjectsError('')
       try {
-        const res = await fetchProjectsApi({ barangay })
+        const res = await fetchProjectsApi({ barangay, public_only: false })
         if (Array.isArray(res)) {
           const mapped: ReportProject[] = res.map((p: any) => mapApiProjectToReportProject(p, barangay))
           setLocalProjects(mapped)

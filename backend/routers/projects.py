@@ -47,35 +47,37 @@ def _project_or_404(db: Session, project_id: int) -> Project:
     return project
 
 
+from sqlalchemy import func
+
+
 @router.get("", response_model=List[ProjectResponse], summary="List all projects (public)")
 def list_projects(
     barangay: Optional[str] = Query(None),
     project_status: Optional[ProjectStatus] = Query(None, alias="status"),
     search: Optional[str] = Query(None),
     category: Optional[str] = Query(None),
-    public_only: bool = Query(True, description="If true, only return Posted projects"),
+    public_only: Optional[bool] = Query(None, description="If true, only return Posted projects"),
     skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=200),
+    limit: int = Query(200, ge=1, le=500),
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_optional_user),
 ):
     query = db.query(Project).options(joinedload(Project.purchase_orders)).filter(Project.isDeleted == False)
 
-    # Unauthenticated and citizens only see Posted projects
-    if current_user is None or current_user.userRole.value == "Guest":
+    # Restrict to Posted projects only if public_only is explicitly True or for Guest/unauthenticated users when public_only is not False
+    if public_only is True:
         query = query.filter(Project.projectStatus == ProjectStatus.POSTED)
-    elif public_only and project_status is None:
-        # SK officers can see all unless explicitly filtering
-        pass
+    elif public_only is None and (current_user is None or (hasattr(current_user, 'userRole') and current_user.userRole == UserRole.GUEST)):
+        query = query.filter(Project.projectStatus == ProjectStatus.POSTED)
 
     if project_status:
         query = query.filter(Project.projectStatus == project_status)
-    if barangay:
-        query = query.filter(Project.projectLocation == barangay)
-    if search:
-        query = query.filter(Project.projectName.ilike(f"%{search}%"))
-    if category:
-        query = query.filter(Project.projectCategory == category)
+    if barangay and barangay.strip() and barangay.strip() not in {"Santa Rosa City", "All", "all"}:
+        query = query.filter(func.lower(func.trim(Project.projectLocation)) == barangay.strip().lower())
+    if search and search.strip():
+        query = query.filter(Project.projectName.ilike(f"%{search.strip()}%"))
+    if category and category.strip() and category.strip() != "All":
+        query = query.filter(Project.projectCategory.ilike(category.strip()))
 
     projects = query.order_by(Project.createdAt.desc()).offset(skip).limit(limit).all()
     return [ProjectResponse.model_validate(p) for p in projects]

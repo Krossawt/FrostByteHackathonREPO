@@ -47,11 +47,11 @@ def get_consolidated_report(db: Session = Depends(get_db)):
         )
         annual_budget = float(budget_row.budgetValue) if budget_row else 0.0
 
-        # Get projects for this barangay
+        # Get projects for this barangay (case-insensitive & whitespace trimmed)
         posted_projects = (
             db.query(Project)
             .filter(
-                Project.projectLocation == barangay,
+                func.lower(func.trim(Project.projectLocation)) == barangay.lower(),
                 Project.isDeleted == False,
                 Project.projectStatus == ProjectStatus.POSTED,
             )
@@ -60,7 +60,7 @@ def get_consolidated_report(db: Session = Depends(get_db)):
 
         all_projects = (
             db.query(Project)
-            .filter(Project.projectLocation == barangay, Project.isDeleted == False)
+            .filter(func.lower(func.trim(Project.projectLocation)) == barangay.lower(), Project.isDeleted == False)
             .all()
         )
 
@@ -126,38 +126,38 @@ def get_consolidated_report(db: Session = Depends(get_db)):
 
 @router.get("/barangay/{barangay_name}", summary="Per-barangay financial and project summary (public)")
 def get_barangay_report(barangay_name: str, db: Session = Depends(get_db)):
-    if barangay_name not in BARANGAYS:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                            detail=f"'{barangay_name}' is not a valid Santa Rosa City barangay")
+    target_brgy = barangay_name.strip()
+    matched_brgy = next((b for b in BARANGAYS if b.lower() == target_brgy.lower()), None)
+    canonical_name = matched_brgy if matched_brgy else target_brgy
 
     # Budget reports
-    budget_reports = (
-        db.query(AnnualBudgetReport)
-        .filter(AnnualBudgetReport.budgetBarangay == barangay_name)
-        .order_by(AnnualBudgetReport.budgetYear.desc())
-        .all()
-    )
+    budget_reports_query = db.query(AnnualBudgetReport)
+    if canonical_name not in {"Santa Rosa City", "All", "all"}:
+        budget_reports_query = budget_reports_query.filter(
+            func.lower(func.trim(AnnualBudgetReport.budgetBarangay)) == canonical_name.lower()
+        )
+    budget_reports = budget_reports_query.order_by(AnnualBudgetReport.budgetYear.desc()).all()
     latest_budget = float(budget_reports[0].budgetValue) if budget_reports else 0.0
 
     # Projects
-    projects = (
-        db.query(Project)
-        .filter(Project.projectLocation == barangay_name, Project.isDeleted == False)
-        .order_by(Project.createdAt.desc())
-        .all()
-    )
+    projects_query = db.query(Project).filter(Project.isDeleted == False)
+    if canonical_name not in {"Santa Rosa City", "All", "all"}:
+        projects_query = projects_query.filter(
+            func.lower(func.trim(Project.projectLocation)) == canonical_name.lower()
+        )
+    projects = projects_query.order_by(Project.createdAt.desc()).all()
 
     # SK Officials for this barangay
-    officials = (
-        db.query(User)
-        .filter(
-            User.userLocation == barangay_name,
-            User.userIsSK == True,
-            User.userIsDeleted == False,
-            User.userIsActive == True,
-        )
-        .all()
+    officials_query = db.query(User).filter(
+        User.userIsSK == True,
+        User.userIsDeleted == False,
+        User.userIsActive == True,
     )
+    if canonical_name not in {"Santa Rosa City", "All", "all"}:
+        officials_query = officials_query.filter(
+            func.lower(func.trim(User.userLocation)) == canonical_name.lower()
+        )
+    officials = officials_query.all()
 
     from datetime import datetime as dt
     now = dt.utcnow()
