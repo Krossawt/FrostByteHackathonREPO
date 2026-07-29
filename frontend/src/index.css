@@ -1906,8 +1906,8 @@ tbody tr:last-child td {
 
 /* ─── FOOTER ─────────────────────────────────────────────────────────────────── */
 .footer {
-  background: rgba(12, 4, 8, 0.97);
-  color: rgba(255, 255, 255, 0.7);
+  background: linear-gradient(135deg, #ffffff 0%, #FEF5A0 50%, #D9A0B8 100%);
+  color: rgba(17, 17, 17, 0.7);
   padding: 3rem 0 1.8rem;
   border-top: 2px solid var(--maroon);
   position: relative;
@@ -1915,40 +1915,58 @@ tbody tr:last-child td {
 }
 
 .footer-grid {
-  display: grid;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
   gap: 2.5rem;
-  grid-template-columns: 1.4fr repeat(3, 1fr);
+  flex-wrap: wrap;
 }
 
-@media (max-width: 900px) {
-  .footer-grid {
-    grid-template-columns: 1fr 1fr;
-  }
+.footer-brand-col {
+  flex: 1 1 280px;
+  max-width: 380px;
+}
+
+.footer-links-group {
+  display: flex;
+  gap: clamp(2rem, 5vw, 4rem);
+  flex-wrap: wrap;
 }
 
 @media (max-width: 600px) {
   .footer-grid {
-    grid-template-columns: 1fr;
+    flex-direction: column;
+    gap: 1.8rem;
+  }
+
+  .footer-brand-col {
+    flex-basis: auto;
+    max-width: 100%;
+  }
+
+  .footer-links-group {
+    flex-direction: column;
+    gap: 1.8rem;
   }
 }
 
-.footer-brand {
+.footer-brand-name {
   font-family: var(--font-display);
   font-weight: 900;
   font-size: 1.35rem;
   letter-spacing: -0.03em;
-  color: #fff;
+  color: #000000;
   margin-bottom: 0.4rem;
 }
 
-.footer-brand span {
-  color: var(--gold);
+.footer-brand-name span {
+  color: var(--maroon);
 }
 
-.footer-desc {
+.footer-brand-desc {
   font-size: 0.82rem;
   line-height: 1.75;
-  color: rgba(255, 255, 255, 0.45);
+  color: #000000;
 }
 
 .footer-col-title {
@@ -1957,8 +1975,65 @@ tbody tr:last-child td {
   font-size: 0.72rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--gold);
+  color: var(--maroon);
   margin-bottom: 0.85rem;
+}
+
+.footer-links {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.footer-links a {
+  display: inline-block;
+  width: fit-content;
+  color: #000000;
+  font-size: 0.83rem;
+}
+
+.footer-links a:hover {
+  color: var(--maroon);
+}
+
+.footer-contact-item {
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+  color: #000000;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.footer-bottom {
+  border-top: 1px solid rgba(17, 17, 17, 0.1);
+  margin-top: 2.5rem;
+  padding-top: 1.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.footer-copyright {
+  font-size: 0.76rem;
+  color: #000000;
+  font-family: var(--font-display);
+}
+
+.footer-badges {
+  display: flex;
+  gap: 0.45rem;
+}
+
+.footer-badge {
+  padding: 0.22rem 0.55rem;
+  border: 1px solid rgba(118, 0, 49, 0.2);
+  font-family: var(--font-display);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--maroon);
 }
 
 .footer-links-col {
@@ -2006,16 +2081,6 @@ tbody tr:last-child td {
   gap: 0.45rem;
 }
 
-.footer-badge {
-  padding: 0.22rem 0.55rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  font-family: var(--font-display);
-  font-size: 0.66rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.3);
-}
 
 /* ─── RECEIPT ITEMS ──────────────────────────────────────────────────────────── */
 .receipt-row {
@@ -3805,4 +3870,46 @@ tbody tr:last-child td {
   .brand-block {
     max-width: 55%;
   }
+}
+
+@media (max-width: 400px) {
+  .v-card-footer {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.6rem;
+  }
+}
+
+@media (max-width: 400px) {
+  .v-card-actions {
+    width: 100%;
+  }
+
+  .v-card-actions button {
+    flex: 1 1 auto;
+  }
+}
+
+.btn-gold:hover {
+  background: rgba(254, 236, 65, 0.35);
+  backdrop-filter: blur(8px) saturate(1.5);
+  -webkit-backdrop-filter: blur(8px) saturate(1.5);
+  border: 1.5px solid rgba(251, 226, 0, 0.829);
+  color: var(--ink);
+  box-shadow: 0 8px 24px rgba(232, 210, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.confirm-dialog-icon.success {
+  background: rgba(22, 101, 52, 0.08);
+  color: #166534;
+}
+
+.btn-save {
+  background: rgba(22, 101, 52, 0.08);
+  color: #166534;
+  border-color: rgba(22, 101, 52, 0.2);
+}
+
+.btn-save:hover {
+  background: rgba(22, 101, 52, 0.14);
 }

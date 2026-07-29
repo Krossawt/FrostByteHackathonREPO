@@ -299,38 +299,39 @@ function App() {
         <footer className="footer">
           <div className="container">
             <div className="footer-grid">
-              <div>
+              <div className="footer-brand-col">
                 <div className="footer-brand-name">e<span>SK</span>ala</div>
                 <p className="footer-brand-desc">
                   The official Sangguniang Kabataan financial transparency portal for the City of Santa Rosa, Laguna.
                   Powered by RA 10742 (SK Reform Act) as amended by RA 11768.
                 </p>
               </div>
-              <div>
-                <div className="footer-col-title">Navigation</div>
-                <div className="footer-links">
-                  <Link to="/about">About eSKala</Link>
-                  <Link to="/about">About eSKala</Link>
-                  <Link to="/sks">SK Officials</Link>
-                  <Link to="/login">Citizen Login</Link>
+              <div className="footer-links-group">
+                <div>
+                  <div className="footer-col-title">Navigation</div>
+                  <div className="footer-links">
+                    <Link to="/about">About eSKala</Link>
+                    <Link to="/sks">SK Officials</Link>
+                    <Link to="/login">Citizen Login</Link>
+                  </div>
                 </div>
-              </div>
-              <div>
-                <div className="footer-col-title">Contact</div>
-                <div className="footer-contact-item">
-                  City Youth Development Office (CYDO)<br />
-                  Santa Rosa City, Laguna<br />
-                  Tel: (049) 530-0015 loc. 5011<br />
-                  Email: cydo@santarosacity.gov.ph
+                <div>
+                  <div className="footer-col-title">Contact</div>
+                  <div className="footer-contact-item">
+                    <span>City Youth Development Office (CYDO)</span>
+                    <span>Santa Rosa City, Laguna</span>
+                    <span>Tel: (049) 530-0015 loc. 5011</span>
+                    <span>Email: cydo@santarosacity.gov.ph</span>
+                  </div>
                 </div>
-              </div>
-              <div>
-                <div className="footer-col-title">Legal</div>
-                <div className="footer-links">
-                  <a href="#">Terms & Conditions</a>
-                  <a href="#">Privacy Policy</a>
-                  <a href="#">RA 10742 Full Text</a>
-                  <a href="#">Full Disclosure Policy</a>
+                <div>
+                  <div className="footer-col-title">Legal</div>
+                  <div className="footer-links">
+                    <a href="#">Terms & Conditions</a>
+                    <a href="#">Privacy Policy</a>
+                    <a href="#">RA 10742 Full Text</a>
+                    <a href="#">Full Disclosure Policy</a>
+                  </div>
                 </div>
               </div>
             </div>

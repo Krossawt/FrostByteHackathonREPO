@@ -6,20 +6,21 @@ import { DonutChart } from '../components/MiniChart'
 import SingleNewsCarousel from '../components/SingleNewsCarousel'
 import Portal from '../components/Portal'
 import { fetchBarangayReportApi, createProjectApi, fetchNewsApi } from '../services/api'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 interface SKHomeProps { user?: UserAccount | null }
 
 const CATEGORY_OPTIONS = ['Health & Wellness', 'Education', 'Sports & Recreation', 'Infrastructure', 'Environment', 'Livelihood', 'Capacity Building', 'Peace & Order', 'Other']
 
 const CATEGORY_IMAGES: Record<string, string> = {
-  'Education':            'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=640&q=75',
-  'Health':               'https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=640&q=75',
-  'Sports':               'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=640&q=75',
-  'Environment':          'https://images.unsplash.com/photo-1588880331179-bc9b93a8cb5e?w=640&q=75',
-  'Livelihood':           'https://images.unsplash.com/photo-1556761175-b413da4baf72?w=640&q=75',
-  'Arts & Culture':       'https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=640&q=75',
-  'Governance':           'https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?w=640&q=75',
-  'Other':                'https://images.unsplash.com/photo-1532629345422-7515f3d16bb6?w=640&q=75',
+  'Education': 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=640&q=75',
+  'Health': 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=640&q=75',
+  'Sports': 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=640&q=75',
+  'Environment': 'https://images.unsplash.com/photo-1588880331179-bc9b93a8cb5e?w=640&q=75',
+  'Livelihood': 'https://images.unsplash.com/photo-1556761175-b413da4baf72?w=640&q=75',
+  'Arts & Culture': 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=640&q=75',
+  'Governance': 'https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?w=640&q=75',
+  'Other': 'https://images.unsplash.com/photo-1532629345422-7515f3d16bb6?w=640&q=75',
 }
 const CATEGORY_GRAD: Record<string, string> = {
   'Education': 'linear-gradient(135deg,#1d4ed8,#1e40af)',
@@ -31,7 +32,12 @@ const CATEGORY_GRAD: Record<string, string> = {
   'default': 'linear-gradient(135deg,#760031,#9a0040)',
 }
 const getCover = (cat?: string) => CATEGORY_IMAGES[cat ?? 'Other'] ?? CATEGORY_IMAGES['Other']
-const getGrad  = (cat?: string) => CATEGORY_GRAD[cat ?? 'default']  ?? CATEGORY_GRAD['default']
+const getGrad = (cat?: string) => CATEGORY_GRAD[cat ?? 'default'] ?? CATEGORY_GRAD['default']
+
+type Feedback = {
+  type: 'success' | 'info'
+  message: string
+}
 
 export default function SKHome({ user }: SKHomeProps) {
   const barangay = user?.barangay || 'Balibago'
@@ -43,6 +49,7 @@ export default function SKHome({ user }: SKHomeProps) {
   const [news, setNews] = useState<any[]>([])
   const [myComments, setMyComments] = useState<any[]>([])
   const [myLogs, setMyLogs] = useState<any[]>([])
+  const [feedback, setFeedback] = useState<Feedback | null>(null)
 
   useEffect(() => {
     async function loadSKHomeData() {
@@ -55,20 +62,26 @@ export default function SKHome({ user }: SKHomeProps) {
             remaining: Number(rep.remaining || 0),
           })
           if (Array.isArray(rep.projects)) {
-            setLocalProjects(rep.projects.map((p: any) => ({
-              id: String(p.projectID || p.id),
-              title: p.projectName || p.title,
-              barangay,
-              category: p.projectCategory || 'Education',
-              status: p.projectStatus ? p.projectStatus.toLowerCase() as any : 'ongoing',
-              proposedBudget: Number(p.projectBudget || 0),
-              spent: Number(p.projectBreakdown || 0),
-              progress: p.projectProgress || 0,
-              progressPercent: p.projectProgress || 0,
-              startDate: p.projectStartTime ? new Date(p.projectStartTime).toISOString().split('T')[0] : '',
-              endDate: p.projectEndTime ? new Date(p.projectEndTime).toISOString().split('T')[0] : '',
-              description: p.projectDescription || '',
-            })))
+            setLocalProjects(rep.projects.map((p: any) => {
+              const proposedBudget = Number(p.projectBudget || 0)
+              const spent = Number(p.projectBreakdown || 0)
+              return {
+                id: String(p.projectID || p.id),
+                title: p.projectName || p.title,
+                barangay,
+                category: p.projectCategory || 'Education',
+                status: p.projectStatus ? p.projectStatus.toLowerCase() as any : 'ongoing',
+                proposedBudget,
+                spent,
+                remainingBudget: Math.max(0, proposedBudget - spent),
+                progress: p.projectProgress || 0,
+                progressPercent: p.projectProgress || 0,
+                startDate: p.projectStartTime ? new Date(p.projectStartTime).toISOString().split('T')[0] : '',
+                endDate: p.projectEndTime ? new Date(p.projectEndTime).toISOString().split('T')[0] : '',
+                description: p.projectDescription || '',
+                receipts: Array.isArray(p.receipts) ? p.receipts : [],
+              }
+            }))
           }
         }
 
@@ -90,7 +103,14 @@ export default function SKHome({ user }: SKHomeProps) {
     loadSKHomeData()
   }, [barangay])
 
-  const spent  = summary.spent
+  // Auto-dismiss feedback banner after 3 seconds
+  useEffect(() => {
+    if (!feedback) return
+    const timer = setTimeout(() => setFeedback(null), 3000)
+    return () => clearTimeout(timer)
+  }, [feedback])
+
+  const spent = summary.spent
   const budget = summary.annualBudget || 1
   const remain = summary.remaining
   const usePct = budget > 0 ? Math.min(Math.round((spent / budget) * 100), 100) : 0
@@ -99,13 +119,48 @@ export default function SKHome({ user }: SKHomeProps) {
   const [selectedProject, setSelectedProject] = useState<ReportProject | null>(null)
   const [showAddModal, setShowAddModal] = useState(false)
 
+  // Keeps the dashboard's project list, budget stat cards, and donut chart
+  // in sync with edits/receipts made inside the modal — same pattern as
+  // SKProjects, so nothing here goes stale until a manual refresh.
+  const handleProjectUpdated = (updated: ReportProject) => {
+    setLocalProjects(prev => prev.map(p => (p.id === updated.id ? updated : p)))
+  }
+
+  const handleAddReceipt = (projectId: string, receipt: any) => {
+    setLocalProjects(prev => prev.map(p => {
+      if (p.id !== projectId) return p
+      const newSpent = p.spent + receipt.amount
+      return {
+        ...p,
+        spent: newSpent,
+        remainingBudget: Math.max(0, p.proposedBudget - newSpent),
+        receipts: [receipt, ...(p.receipts ?? [])],
+      }
+    }))
+    // Keep the top summary cards + donut chart in step too, since they're
+    // driven by a separate `summary` object rather than derived from
+    // localProjects.
+    setSummary(prev => ({
+      ...prev,
+      spent: prev.spent + receipt.amount,
+      remaining: Math.max(0, prev.remaining - receipt.amount),
+    }))
+  }
+
+  // selectedProject is a snapshot from click-time — re-derive the current
+  // version from localProjects after edits/receipts so the open modal
+  // never shows stale data.
+  const liveSelectedProject = selectedProject
+    ? localProjects.find(p => p.id === selectedProject.id) ?? selectedProject
+    : null
+
   // New project form state
   const [newTitle, setNewTitle] = useState('')
-  const [newCat, setNewCat]     = useState('Education')
-  const [newDesc, setNewDesc]   = useState('')
+  const [newCat, setNewCat] = useState('Education')
+  const [newDesc, setNewDesc] = useState('')
   const [newBudget, setNewBudget] = useState('')
   const [newStart, setNewStart] = useState('')
-  const [newEnd, setNewEnd]     = useState('')
+  const [newEnd, setNewEnd] = useState('')
   const [formError, setFormError] = useState('')
 
   // Proposal File Upload & OCR State
@@ -113,6 +168,21 @@ export default function SKHome({ user }: SKHomeProps) {
   const [scanningProposal, setScanningProposal] = useState(false)
   const [proposalOcrMsg, setProposalOcrMsg] = useState('')
   const [showCameraModal, setShowCameraModal] = useState(false)
+
+  // Discard-changes confirmation for the Add Project form
+  const [confirmAction, setConfirmAction] = useState<'cancel' | null>(null)
+
+  // Snapshot of the form's values right after opening — used to detect
+  // whether the user actually changed anything before requesting a close.
+  const [initialSnapshot, setInitialSnapshot] = useState({
+    title: '',
+    cat: 'Education',
+    desc: '',
+    budget: '',
+    start: '',
+    end: '',
+    hasFile: false,
+  })
 
   const handleScanProposal = () => {
     setScanningProposal(true)
@@ -136,6 +206,27 @@ export default function SKHome({ user }: SKHomeProps) {
     handleScanProposal()
   }
 
+  const isFormDirty = () => {
+    if (newTitle !== initialSnapshot.title) return true
+    if (newCat !== initialSnapshot.cat) return true
+    if (newDesc !== initialSnapshot.desc) return true
+    if (newBudget !== initialSnapshot.budget) return true
+    if (newStart !== initialSnapshot.start) return true
+    if (newEnd !== initialSnapshot.end) return true
+    if (!!proposalFile !== initialSnapshot.hasFile) return true
+    return false
+  }
+
+  // Only opens the Discard Changes confirmation when the form actually has
+  // unsaved edits — otherwise it closes immediately, no confirmation needed.
+  const requestCloseModal = () => {
+    if (isFormDirty()) {
+      setConfirmAction('cancel')
+    } else {
+      setShowAddModal(false)
+    }
+  }
+
   const handleAddProject = (e: FormEvent) => {
     e.preventDefault()
     if (!newTitle.trim() || !newBudget || !newStart || !newEnd) { setFormError('Please fill in all required fields.'); return }
@@ -150,11 +241,57 @@ export default function SKHome({ user }: SKHomeProps) {
     setNewTitle(''); setNewCat('Education'); setNewDesc(''); setNewBudget(''); setNewStart(''); setNewEnd(''); setFormError('')
     setProposalFile(null); setProposalOcrMsg('')
     setShowAddModal(false)
+    setFeedback({ type: 'success', message: 'Project created successfully' })
   }
 
   return (
     <section className="section">
       <div className="container">
+
+        {/* ── Feedback Banner ── */}
+        {feedback && (
+          <Portal>
+            <div
+              style={{
+                position: 'fixed',
+                top: 'calc(var(--header-height, 78px) + 1rem)',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                zIndex: 10000,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.6rem',
+                background: feedback.type === 'success' ? 'rgba(22, 101, 52, 0.22)' : 'rgba(118, 0, 49, 0.18)',
+                backdropFilter: 'blur(16px) saturate(1.6)',
+                WebkitBackdropFilter: 'blur(16px) saturate(1.6)',
+                color: feedback.type === 'success' ? '#0d3d20' : '#5c0026',
+                fontFamily: 'var(--font-display)',
+                fontWeight: 700,
+                fontSize: '0.9rem',
+                padding: '0.9rem 1.4rem',
+                borderRadius: '14px',
+                border: '1.5px solid rgba(255, 255, 255, 0.35)',
+                boxShadow: feedback.type === 'success'
+                  ? '0 12px 32px rgba(22,101,52,0.25), inset 0 1px 0 rgba(255,255,255,0.4)'
+                  : '0 12px 32px rgba(118,0,49,0.18), inset 0 1px 0 rgba(255,255,255,0.4)',
+                maxWidth: '90vw',
+                animation: 'toastPop 220ms ease-out',
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M8 12l3 3 5-6" />
+              </svg>
+              <span>{feedback.message}</span>
+            </div>
+            <style>{`
+              @keyframes toastPop {
+                from { opacity: 0; transform: translateX(-50%) translateY(-12px) scale(0.96); }
+                to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+              }
+            `}</style>
+          </Portal>
+        )}
 
         {/* ── Page Intro ── */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.8rem' }}>
@@ -166,7 +303,30 @@ export default function SKHome({ user }: SKHomeProps) {
             </p>
           </div>
           {canAddProject && (
-            <button className="btn btn-primary btn-sm" onClick={() => setShowAddModal(true)} style={{ alignSelf: 'flex-start', marginTop: '0.4rem' }}>
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={() => {
+                setNewTitle('')
+                setNewCat('Education')
+                setNewDesc('')
+                setNewBudget('')
+                setNewStart('')
+                setNewEnd('')
+                setProposalFile(null)
+                setProposalOcrMsg('')
+                setFormError('')
+                setInitialSnapshot({
+                  title: '',
+                  cat: 'Education',
+                  desc: '',
+                  budget: '',
+                  start: '',
+                  end: '',
+                  hasFile: false,
+                })
+                setShowAddModal(true)
+              }}
+              style={{ alignSelf: 'flex-start', marginTop: '0.4rem' }}>
               + Add Project
             </button>
           )}
@@ -285,7 +445,7 @@ export default function SKHome({ user }: SKHomeProps) {
                             <div className="v-card-budget-label">Budget</div>
                           </div>
                           <div style={{ fontSize: '0.75rem', color: 'var(--maroon)', fontFamily: 'var(--font-display)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 18l6-6-6-6"/></svg>
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 18l6-6-6-6" /></svg>
                             View &amp; Finances
                           </div>
                         </div>
@@ -338,7 +498,7 @@ export default function SKHome({ user }: SKHomeProps) {
                     {c.type && <span className={`badge ${c.type === 'suggestion' ? 'badge-upcoming' : 'badge-ongoing'}`}>{c.type}</span>}
                     {c.votes !== undefined && (
                       <span className="comment-votes">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 21 12 17.77 5.82 21 7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 21 12 17.77 5.82 21 7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
                         {c.votes} helpful
                       </span>
                     )}
@@ -358,121 +518,145 @@ export default function SKHome({ user }: SKHomeProps) {
         {/* ── Add Project Modal (Secretary & Chairperson) ── */}
         {showAddModal && canAddProject && (
           <Portal>
-          <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowAddModal(false) }}>
-            <div className="modal" style={{ width: 'min(560px, 100%)' }}>
-              <div className="modal-header">
-                <div className="modal-title">Add New SK Project</div>
-                <button className="modal-close" onClick={() => setShowAddModal(false)}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
-                </button>
-              </div>
-              <form onSubmit={handleAddProject}>
-                <div className="modal-body">
-                  {formError && <div className="alert-error">{formError}</div>}
+            <div className="modal-overlay" onClick={e => {
+              if (e.target === e.currentTarget)
+                requestCloseModal()
+            }}>
+              <div className="modal" style={{ width: 'min(560px, 100%)' }}>
+                <div className="modal-header">
+                  <div className="modal-title">Add New SK Project</div>
+                  <button className="modal-close" onClick={requestCloseModal}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12" /></svg>
+                  </button>
+                </div>
+                <form onSubmit={handleAddProject}>
+                  <div className="modal-body">
+                    {formError && <div className="alert-error">{formError}</div>}
 
-                  {/* Proposal File Upload & OCR Scanner */}
-                  <div style={{ marginBottom: '1rem', border: '1.5px dashed var(--maroon)', padding: '0.9rem 1rem', background: 'rgba(118,0,49,0.02)', borderRadius: '8px' }}>
-                    <div style={{ fontSize: '0.8rem', fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--maroon)', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                      Upload Proposal File or Capture Document (OCR Auto-Fill)
+                    {/* Proposal File Upload & OCR Scanner */}
+                    <div style={{ marginBottom: '1rem', border: '1.5px dashed var(--maroon)', padding: '0.9rem 1rem', background: 'rgba(118,0,49,0.02)', borderRadius: '8px' }}>
+                      <div style={{ fontSize: '0.8rem', fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--maroon)', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
+                        Upload Proposal File or Capture Document (OCR Auto-Fill)
+                      </div>
+                      {proposalFile ? (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
+                          <div style={{ fontSize: '0.82rem', fontFamily: 'var(--font-display)' }}>
+                            <strong>{proposalFile.name}</strong> ({(proposalFile.size / 1024).toFixed(1)} KB)
+                          </div>
+                          <div style={{ display: 'flex', gap: '0.4rem' }}>
+                            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowCameraModal(true)}>
+                              📷 Open Camera
+                            </button>
+                            <button type="button" className="btn btn-gold btn-sm" onClick={handleScanProposal} disabled={scanningProposal}>
+                              {scanningProposal ? 'Scanning Proposal...' : '⚡ Auto-Scan Proposal (OCR)'}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
+                          <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <input
+                              type="file"
+                              accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
+                              style={{ display: 'none' }}
+                              onChange={e => {
+                                if (e.target.files && e.target.files[0]) {
+                                  setProposalFile(e.target.files[0])
+                                }
+                              }}
+                            />
+                            <span className="btn btn-secondary btn-sm" style={{ pointerEvents: 'none' }}>
+                              Browse File
+                            </span>
+                            <span style={{ fontSize: '0.78rem', color: 'var(--muted)' }}>
+                              Attach proposal file
+                            </span>
+                          </label>
+                          <button type="button" className="btn btn-gold btn-sm" onClick={() => setShowCameraModal(true)}>
+                            📷 Open Camera / Snap Photo
+                          </button>
+                        </div>
+                      )}
                     </div>
-                    {proposalFile ? (
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
-                        <div style={{ fontSize: '0.82rem', fontFamily: 'var(--font-display)' }}>
-                          <strong>{proposalFile.name}</strong> ({(proposalFile.size / 1024).toFixed(1)} KB)
-                        </div>
-                        <div style={{ display: 'flex', gap: '0.4rem' }}>
-                          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowCameraModal(true)}>
-                            📷 Open Camera
-                          </button>
-                          <button type="button" className="btn btn-gold btn-sm" onClick={handleScanProposal} disabled={scanningProposal}>
-                            {scanningProposal ? 'Scanning Proposal...' : '⚡ Auto-Scan Proposal (OCR)'}
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
-                        <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <input
-                            type="file"
-                            accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
-                            style={{ display: 'none' }}
-                            onChange={e => {
-                              if (e.target.files && e.target.files[0]) {
-                                setProposalFile(e.target.files[0])
-                              }
-                            }}
-                          />
-                          <span className="btn btn-secondary btn-sm" style={{ pointerEvents: 'none' }}>
-                            Browse File
-                          </span>
-                          <span style={{ fontSize: '0.78rem', color: 'var(--muted)' }}>
-                            Attach proposal file
-                          </span>
-                        </label>
-                        <button type="button" className="btn btn-gold btn-sm" onClick={() => setShowCameraModal(true)}>
-                          📷 Open Camera / Snap Photo
-                        </button>
-                      </div>
+                    {proposalOcrMsg && <div className="notice info" style={{ marginBottom: '0.85rem', fontSize: '0.78rem' }}>{proposalOcrMsg}</div>}
+
+                    {showCameraModal && (
+                      <CameraCaptureModal
+                        title="Capture Project Proposal Document"
+                        subtitle="Position official project proposal document inside reticle and snap photo"
+                        onCapture={handleCameraSnap}
+                        onClose={() => setShowCameraModal(false)}
+                      />
                     )}
-                  </div>
-                  {proposalOcrMsg && <div className="notice info" style={{ marginBottom: '0.85rem', fontSize: '0.78rem' }}>{proposalOcrMsg}</div>}
 
-                  {showCameraModal && (
-                    <CameraCaptureModal
-                      title="Capture Project Proposal Document"
-                      subtitle="Position official project proposal document inside reticle and snap photo"
-                      onCapture={handleCameraSnap}
-                      onClose={() => setShowCameraModal(false)}
-                    />
-                  )}
-
-                  <div className="form-group">
-                    <label className="form-label">Project Title *</label>
-                    <input className="form-input" value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="e.g. Youth Digital Literacy Workshop" />
-                  </div>
-                  <div className="form-row-2">
                     <div className="form-group">
-                      <label className="form-label">Category *</label>
-                      <select className="form-input" value={newCat} onChange={e => setNewCat(e.target.value)}>
-                        {CATEGORY_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
-                      </select>
+                      <label className="form-label">Project Title *</label>
+                      <input className="form-input" value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="e.g. Youth Digital Literacy Workshop" />
+                    </div>
+                    <div className="form-row-2">
+                      <div className="form-group">
+                        <label className="form-label">Category *</label>
+                        <select className="form-input" value={newCat} onChange={e => setNewCat(e.target.value)}>
+                          {CATEGORY_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Proposed Budget (₱) *</label>
+                        <input className="form-input" value={newBudget} onChange={e => setNewBudget(e.target.value)} placeholder="e.g. 250000" />
+                      </div>
+                    </div>
+                    <div className="form-row-2">
+                      <div className="form-group">
+                        <label className="form-label">Start Date *</label>
+                        <input className="form-input" type="date" value={newStart} onChange={e => setNewStart(e.target.value)} />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">End Date *</label>
+                        <input className="form-input" type="date" value={newEnd} onChange={e => setNewEnd(e.target.value)} />
+                      </div>
                     </div>
                     <div className="form-group">
-                      <label className="form-label">Proposed Budget (₱) *</label>
-                      <input className="form-input" value={newBudget} onChange={e => setNewBudget(e.target.value)} placeholder="e.g. 250000" />
+                      <label className="form-label">Description</label>
+                      <textarea className="form-input" rows={3} value={newDesc} onChange={e => setNewDesc(e.target.value)} placeholder="Brief description of the project…" style={{ resize: 'vertical', fontFamily: 'var(--font-body)' }} />
                     </div>
                   </div>
-                  <div className="form-row-2">
-                    <div className="form-group">
-                      <label className="form-label">Start Date *</label>
-                      <input className="form-input" type="date" value={newStart} onChange={e => setNewStart(e.target.value)} />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">End Date *</label>
-                      <input className="form-input" type="date" value={newEnd} onChange={e => setNewEnd(e.target.value)} />
-                    </div>
+                  <div className="modal-footer">
+                    <button type="button" className="btn btn-secondary" onClick={requestCloseModal}>Cancel</button>
+                    <button type="submit" className="btn btn-primary">Create Project</button>
                   </div>
-                  <div className="form-group">
-                    <label className="form-label">Description</label>
-                    <textarea className="form-input" rows={3} value={newDesc} onChange={e => setNewDesc(e.target.value)} placeholder="Brief description of the project…" style={{ resize: 'vertical', fontFamily: 'var(--font-body)' }} />
-                  </div>
-                </div>
-                <div className="modal-footer">
-                  <button type="button" className="btn btn-secondary" onClick={() => setShowAddModal(false)}>Cancel</button>
-                  <button type="submit" className="btn btn-primary">Create Project</button>
-                </div>
-              </form>
+                </form>
+              </div>
             </div>
-          </div>
           </Portal>
         )}
 
         {/* ── Project Detail Modal ── */}
-        {selectedProject && (
-          <ProjectDetailModal project={selectedProject} user={user} onClose={() => setSelectedProject(null)} />
+        {liveSelectedProject && (
+          <ProjectDetailModal
+            project={liveSelectedProject}
+            user={user}
+            onClose={() => setSelectedProject(null)}
+            onProjectUpdated={handleProjectUpdated}
+            onAddReceipt={handleAddReceipt}
+          />
         )}
 
+        {/* ── Discard Changes Confirmation ── */}
+        <ConfirmDialog
+          isOpen={confirmAction === 'cancel'}
+          title="Discard Changes"
+          message="Any unsaved changes will be lost. Are you sure you want to close this form?"
+          confirmLabel="Discard"
+          cancelLabel="Keep Editing"
+          variant="danger"
+          onConfirm={() => {
+            setShowAddModal(false)
+            setConfirmAction(null)
+            setFeedback({ type: 'info', message: 'Changes discarded' })
+          }}
+          onCancel={() => setConfirmAction(null)}
+        />
       </div>
     </section>
   )

@@ -4,7 +4,7 @@ import ProjectDetailModal from '../components/ProjectDetailModal'
 import ConfirmDialog from '../components/ConfirmDialog'
 import type { ReportProject } from '../types'
 import Portal from '../components/Portal'
-import { fetchProjectsApi, createProjectApi, fetchProjectByIdApi, deleteProjectApi } from '../services/api'
+import { fetchProjectsApi, createProjectApi, updateProjectApi, deleteProjectApi } from '../services/api'
 
 interface SKProjectsProps { user?: UserAccount | null }
 
@@ -12,18 +12,18 @@ const STATUS_OPTIONS = ['ongoing', 'upcoming', 'completed', 'cancelled'] as cons
 const CATEGORY_OPTIONS = ['Health & Wellness', 'Education', 'Sports & Recreation', 'Infrastructure', 'Environment', 'Livelihood', 'Capacity Building', 'Peace & Order', 'Other']
 
 const CATEGORY_IMAGES: Record<string, string> = {
-  'Education':            'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=640&q=75',
-  'Health':               'https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=640&q=75',
-  'Sports':               'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=640&q=75',
-  'Environment':          'https://images.unsplash.com/photo-1588880331179-bc9b93a8cb5e?w=640&q=75',
-  'Infrastructure':       'https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=640&q=75',
-  'Livelihood':           'https://images.unsplash.com/photo-1556761175-b413da4baf72?w=640&q=75',
-  'Capacity Building':    'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=640&q=75',
-  'Peace & Order':        'https://images.unsplash.com/photo-1589994160839-163cd867cfe8?w=640&q=75',
-  'Arts & Culture':       'https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=640&q=75',
-  'Disaster Preparedness':'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=640&q=75',
-  'Governance':           'https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?w=640&q=75',
-  'Other':                'https://images.unsplash.com/photo-1532629345422-7515f3d16bb6?w=640&q=75',
+  'Education': 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=640&q=75',
+  'Health': 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=640&q=75',
+  'Sports': 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=640&q=75',
+  'Environment': 'https://images.unsplash.com/photo-1588880331179-bc9b93a8cb5e?w=640&q=75',
+  'Infrastructure': 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=640&q=75',
+  'Livelihood': 'https://images.unsplash.com/photo-1556761175-b413da4baf72?w=640&q=75',
+  'Capacity Building': 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=640&q=75',
+  'Peace & Order': 'https://images.unsplash.com/photo-1589994160839-163cd867cfe8?w=640&q=75',
+  'Arts & Culture': 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=640&q=75',
+  'Disaster Preparedness': 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=640&q=75',
+  'Governance': 'https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?w=640&q=75',
+  'Other': 'https://images.unsplash.com/photo-1532629345422-7515f3d16bb6?w=640&q=75',
 }
 const CATEGORY_GRAD: Record<string, string> = {
   'Education': 'linear-gradient(135deg,#1d4ed8,#1e40af)',
@@ -37,8 +37,11 @@ const CATEGORY_GRAD: Record<string, string> = {
 }
 
 function getCover(cat?: string) { return CATEGORY_IMAGES[cat ?? 'Other'] ?? CATEGORY_IMAGES['Other'] }
-function getGrad(cat?: string)  { return CATEGORY_GRAD[cat ?? 'default']  ?? CATEGORY_GRAD['default'] }
+function getGrad(cat?: string) { return CATEGORY_GRAD[cat ?? 'default'] ?? CATEGORY_GRAD['default'] }
 
+// Merged in from the remote version — normalizes raw API status strings
+// (which may say things like "For Approval" or "Posted") into the four
+// statuses this UI actually renders, instead of just lowercasing blindly.
 function mapApiProjectToReportProject(project: any, fallbackBarangay: string): ReportProject {
   const rawStatus = String(project?.projectStatus || project?.status || 'ongoing')
   const normalizedStatus = rawStatus.toLowerCase()
@@ -46,7 +49,9 @@ function mapApiProjectToReportProject(project: any, fallbackBarangay: string): R
     ? 'completed'
     : normalizedStatus.includes('approval') || normalizedStatus.includes('finance') || normalizedStatus.includes('draft')
       ? 'upcoming'
-      : 'ongoing'
+      : normalizedStatus.includes('cancel')
+        ? 'cancelled'
+        : 'ongoing'
 
   const proposedBudget = Number(project?.projectBudget ?? project?.proposedBudget ?? 0)
   const spent = Number(project?.projectBreakdown ?? project?.spent ?? 0)
@@ -55,7 +60,6 @@ function mapApiProjectToReportProject(project: any, fallbackBarangay: string): R
 
   return {
     id: String(project?.projectID || project?.id || ''),
-    projectId: project?.projectID ? Number(project.projectID) : undefined,
     title: project?.projectName || project?.title || 'Untitled Project',
     barangay: project?.projectLocation || project?.barangay || fallbackBarangay,
     category: project?.projectCategory || project?.category || 'Education',
@@ -68,32 +72,42 @@ function mapApiProjectToReportProject(project: any, fallbackBarangay: string): R
     startDate: startDateValue ? new Date(startDateValue).toISOString().split('T')[0] : '',
     endDate: endDateValue ? new Date(endDateValue).toISOString().split('T')[0] : '',
     description: project?.projectDescription || project?.description || '',
-    projectStatus: project?.projectStatus || project?.status,
-    projectDescription: project?.projectDescription || project?.description || '',
-    projectCategory: project?.projectCategory || project?.category || 'Education',
-    projectBudget: proposedBudget,
-    projectBreakdown: spent,
-    projectProgress: Number(project?.projectProgress ?? project?.progress ?? 0),
-    projectStartTime: startDateValue,
-    projectEndTime: endDateValue,
+    receipts: project?.receipts ?? [],
   }
 }
 
+type Feedback = { type: 'success' | 'info'; message: string }
+
 export default function SKProjects({ user }: SKProjectsProps) {
-  const barangay  = user?.barangay || 'Balibago'
-  const position  = user?.skPosition || 'Chairperson'
-  const canEdit   = position === 'Chairperson' || position === 'Secretary'
+  const barangay = user?.barangay || 'Balibago'
+  const position = user?.skPosition || 'Chairperson'
+  const canEdit = position === 'Chairperson' || position === 'Secretary'
+  const canAttachReceipt = position === 'Chairperson' || position === 'Treasurer'
+  const canShowActions = canEdit || canAttachReceipt
 
   const [filterStatus, setFilterStatus] = useState<'all' | 'ongoing' | 'upcoming' | 'completed' | 'cancelled'>('all')
   const [search, setSearch] = useState('')
-  const [showModal, setShowModal] = useState(false)
+  const [formMode, setFormMode] = useState<'new' | ReportProject | null>(null)
   const [selectedProject, setSelectedProject] = useState<ReportProject | null>(null)
+  const [openReceiptDirect, setOpenReceiptDirect] = useState(false)
+  const [openEditDirect, setOpenEditDirect] = useState(false)
   const [projectToDelete, setProjectToDelete] = useState<ReportProject | null>(null)
   const [localProjects, setLocalProjects] = useState<ReportProject[]>([])
+
+  // Merged in from the remote version — surfaces loading/error state for
+  // the project list instead of failing silently.
   const [isLoadingProjects, setIsLoadingProjects] = useState(false)
   const [projectsError, setProjectsError] = useState('')
+
+  // Merged in from the remote version — surfaces loading/error state for
+  // the delete action instead of failing silently.
   const [isDeletingProject, setIsDeletingProject] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+
+  // Feedback banner (glass-style, portal-rendered — success = green, info = maroon)
+  const [feedback, setFeedback] = useState<Feedback | null>(null)
+  // Discard-changes confirmation for the Add/Edit Project form
+  const [confirmAction, setConfirmAction] = useState<'cancel' | null>(null)
 
   // Load live API projects
   useEffect(() => {
@@ -116,17 +130,30 @@ export default function SKProjects({ user }: SKProjectsProps) {
     loadProjects()
   }, [barangay])
 
-  // New project form
+  // Auto-dismiss feedback banner after 3 seconds
+  useEffect(() => {
+    if (!feedback) return
+    const timer = setTimeout(() => setFeedback(null), 3000)
+    return () => clearTimeout(timer)
+  }, [feedback])
+
+  // Project form (shared between Add and Edit)
   const [newTitle, setNewTitle] = useState('')
-  const [newCat, setNewCat]     = useState('Education')
-  const [newDesc, setNewDesc]   = useState('')
+  const [newCat, setNewCat] = useState('Education')
+  const [newDesc, setNewDesc] = useState('')
   const [newBudget, setNewBudget] = useState('')
   const [newStart, setNewStart] = useState('')
-  const [newEnd, setNewEnd]     = useState('')
+  const [newEnd, setNewEnd] = useState('')
   const [formError, setFormError] = useState('')
 
-  // Proposal file attachment state
+  // Proposal file attachment state (create mode only)
   const [proposalFile, setProposalFile] = useState<File | null>(null)
+
+  // Snapshot of the form's values right after opening — used to detect
+  // whether the user actually changed anything before requesting a close.
+  const [initialSnapshot, setInitialSnapshot] = useState({
+    title: '', cat: 'Education', desc: '', budget: '', start: '', end: '', hasFile: false,
+  })
 
   const filtered = localProjects.filter(p => {
     const matchStatus = filterStatus === 'all' || p.status === filterStatus
@@ -144,73 +171,229 @@ export default function SKProjects({ user }: SKProjectsProps) {
   }
 
   const totalBudget = localProjects.reduce((s, p) => s + p.proposedBudget, 0)
-  const totalSpent  = localProjects.reduce((s, p) => s + p.spent, 0)
+  const totalSpent = localProjects.reduce((s, p) => s + p.spent, 0)
 
-  const handleAddProject = async (e: FormEvent) => {
+  const openAddForm = () => {
+    setNewTitle(''); setNewCat('Education'); setNewDesc('')
+    setNewBudget(''); setNewStart(''); setNewEnd('')
+    setProposalFile(null); setFormError('')
+    setInitialSnapshot({ title: '', cat: 'Education', desc: '', budget: '', start: '', end: '', hasFile: false })
+    setFormMode('new')
+  }
+
+  const openEditForm = (p: ReportProject) => {
+    setNewTitle(p.title)
+    setNewCat(p.category || 'Education')
+    setNewDesc(p.description)
+    setNewBudget(String(p.proposedBudget))
+    setNewStart(p.startDate)
+    setNewEnd(p.endDate)
+    setProposalFile(null)
+    setFormError('')
+    setInitialSnapshot({
+      title: p.title, cat: p.category || 'Education', desc: p.description,
+      budget: String(p.proposedBudget), start: p.startDate, end: p.endDate, hasFile: false,
+    })
+    setFormMode(p)
+  }
+
+  const isFormDirty = () => {
+    if (newTitle !== initialSnapshot.title) return true
+    if (newCat !== initialSnapshot.cat) return true
+    if (newDesc !== initialSnapshot.desc) return true
+    if (newBudget !== initialSnapshot.budget) return true
+    if (newStart !== initialSnapshot.start) return true
+    if (newEnd !== initialSnapshot.end) return true
+    if (!!proposalFile !== initialSnapshot.hasFile) return true
+    return false
+  }
+
+  const hasChanges = isFormDirty();
+
+  const requestCloseModal = () => {
+    if (isFormDirty()) {
+      setConfirmAction('cancel')
+    } else {
+      setFormMode(null)
+    }
+  }
+
+  const handleSubmitProject = async (e: FormEvent) => {
     e.preventDefault()
     if (!newTitle.trim() || !newBudget || !newStart || !newEnd) { setFormError('Please fill in all required fields.'); return }
 
-    try {
-      const created = await createProjectApi({
-        projectName: newTitle.trim(),
-        projectDescription: newDesc.trim(),
-        projectStartTime: new Date(newStart).toISOString(),
-        projectEndTime: new Date(newEnd).toISOString(),
-        projectLocation: barangay,
-        projectBudget: parseFloat(newBudget),
-        projectCategory: newCat,
-      })
-      const res: any = created
-      const np: ReportProject = mapApiProjectToReportProject({
-        ...res,
-        projectName: res.projectName || newTitle.trim(),
-        projectLocation: res.projectLocation || barangay,
-        projectCategory: res.projectCategory || newCat,
-        projectBudget: res.projectBudget || newBudget,
-        projectDescription: res.projectDescription || newDesc.trim(),
-        projectStartTime: newStart,
-        projectEndTime: newEnd,
-      }, barangay)
-
-      setLocalProjects(prev => [np, ...prev])
-      setShowModal(false)
-      setNewTitle('')
-      setNewDesc('')
-      setNewBudget('')
-      setNewStart('')
-      setNewEnd('')
-      setProposalFile(null)
-      setFormError('')
-    } catch (err: any) {
-      setFormError(err.message || 'Failed to create project draft')
+    if (formMode === 'new') {
+      try {
+        const created = await createProjectApi({
+          projectName: newTitle.trim(),
+          projectDescription: newDesc.trim(),
+          projectStartTime: new Date(newStart).toISOString(),
+          projectEndTime: new Date(newEnd).toISOString(),
+          projectLocation: barangay,
+          projectBudget: parseFloat(newBudget),
+          projectCategory: newCat,
+        })
+        const np: ReportProject = mapApiProjectToReportProject({
+          ...created,
+          projectName: (created as any).projectName || newTitle.trim(),
+          projectLocation: (created as any).projectLocation || barangay,
+          projectCategory: (created as any).projectCategory || newCat,
+          projectBudget: (created as any).projectBudget || newBudget,
+          projectDescription: (created as any).projectDescription || newDesc.trim(),
+          projectStartTime: newStart,
+          projectEndTime: newEnd,
+        }, barangay)
+        setLocalProjects(prev => [np, ...prev])
+        setFormMode(null)
+        setFormError('')
+        setFeedback({ type: 'success', message: 'Project created successfully' })
+      } catch (err: any) {
+        setFormError(err.message || 'Failed to create project draft')
+      }
+    } else if (formMode) {
+      // EDIT MODE
+      const editingId = formMode.id
+      try {
+        const updated = await updateProjectApi(editingId, {
+          projectName: newTitle.trim(),
+          projectDescription: newDesc.trim(),
+          projectStartTime: new Date(newStart).toISOString(),
+          projectEndTime: new Date(newEnd).toISOString(),
+          projectLocation: barangay,
+          projectBudget: parseFloat(newBudget),
+          projectCategory: newCat,
+        })
+        const res: any = updated
+        setLocalProjects(prev => prev.map(proj =>
+          proj.id === editingId
+            ? {
+              ...proj,
+              title: res.projectName || newTitle.trim(),
+              category: res.projectCategory || newCat,
+              description: res.projectDescription || newDesc.trim(),
+              proposedBudget: Number(res.projectBudget || newBudget),
+              startDate: newStart,
+              endDate: newEnd,
+            }
+            : proj
+        ))
+        setFormMode(null)
+        setFormError('')
+        setFeedback({ type: 'success', message: 'Project updated successfully' })
+      } catch (err: any) {
+        setFormError(err.message || 'Failed to save changes')
+      }
     }
   }
 
   const handleDeleteProject = (p: ReportProject) => setProjectToDelete(p)
-  const handleProjectUpdated = (updated: ReportProject) => {
-    setSelectedProject(updated)
-    setLocalProjects(prev => prev.map(p => (p.id === updated.id ? updated : p)))
-  }
 
+  // Merged in from the remote version — loading/error state around delete,
+  // and safer id resolution (falls back to .id if .projectId isn't set).
   const confirmDelete = async () => {
     if (!projectToDelete) return
     setIsDeletingProject(true)
     setDeleteError('')
     try {
-      const projectId = projectToDelete.projectId ?? projectToDelete.id
+      const projectId = (projectToDelete as any).projectId ?? projectToDelete.id
       await deleteProjectApi(projectId)
       setLocalProjects(prev => prev.filter(p => p.id !== projectToDelete.id))
+      setFeedback({ type: 'success', message: 'Project deleted successfully' })
       setProjectToDelete(null)
     } catch (err: any) {
       setDeleteError(err.message || 'Unable to delete project right now.')
+      setFeedback({ type: 'info', message: err.message || 'Failed to delete project' })
     } finally {
       setIsDeletingProject(false)
     }
   }
 
+  // Handles a new receipt attached from ProjectDetailModal — updates the
+  // project's receipts, spent, and remaining budget in local state so the
+  // card, totals, and modal all stay in sync immediately.
+  const handleAddReceipt = (projectId: string, receipt: any) => {
+    setLocalProjects(prev => prev.map(p =>
+      p.id === projectId
+        ? {
+          ...p,
+          receipts: [...(p.receipts ?? []), receipt],
+          spent: p.spent + receipt.amount,
+          remainingBudget: Math.max(0, p.proposedBudget - (p.spent + receipt.amount)),
+        }
+        : p
+    ))
+  }
+
+  // Merged in from the remote version — lets ProjectDetailModal push back
+  // an updated project (e.g. if it ever handles edits internally too).
+  const handleProjectUpdated = (updated: ReportProject) => {
+    setSelectedProject(updated)
+    setLocalProjects(prev => prev.map(p => (p.id === updated.id ? updated : p)))
+  }
+
+  // Keep the modal's project prop live — selectedProject is a snapshot from
+  // click-time, so after handleAddReceipt updates localProjects we re-derive
+  // the current version here instead of holding a stale copy.
+  const liveSelectedProject = selectedProject
+    ? localProjects.find(p => p.id === selectedProject.id) ?? selectedProject
+    : null
+
   return (
     <section className="section">
       <div className="container">
+
+        {/* ── Feedback Banner ── */}
+        {feedback && (
+          <Portal>
+            <div
+              style={{
+                position: 'fixed',
+                top: 'calc(var(--header-height, 78px) + 1rem)',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                zIndex: 10000,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.6rem',
+                background: feedback.type === 'success' ? 'rgba(22, 101, 52, 0.22)' : 'rgba(118, 0, 49, 0.18)',
+                backdropFilter: 'blur(16px) saturate(1.6)',
+                WebkitBackdropFilter: 'blur(16px) saturate(1.6)',
+                color: feedback.type === 'success' ? '#0d3d20' : '#5c0026',
+                fontFamily: 'var(--font-display)',
+                fontWeight: 700,
+                fontSize: '0.9rem',
+                padding: '0.9rem 1.4rem',
+                borderRadius: '14px',
+                border: '1.5px solid rgba(255, 255, 255, 0.35)',
+                boxShadow: feedback.type === 'success'
+                  ? '0 12px 32px rgba(22,101,52,0.25), inset 0 1px 0 rgba(255,255,255,0.4)'
+                  : '0 12px 32px rgba(118,0,49,0.18), inset 0 1px 0 rgba(255,255,255,0.4)',
+                maxWidth: '90vw',
+                animation: 'toastPop 220ms ease-out',
+              }}
+            >
+              {feedback.type === 'success' ? (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0 }}>
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M8 12l3 3 5-6" />
+                </svg>
+              ) : (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0 }}>
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M12 8v5" />
+                  <path d="M12 16h.01" />
+                </svg>
+              )}
+              <span>{feedback.message}</span>
+            </div>
+            <style>{`
+              @keyframes toastPop {
+                from { opacity: 0; transform: translateX(-50%) translateY(-12px) scale(0.96); }
+                to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+              }
+            `}</style>
+          </Portal>
+        )}
 
         {/* ── Page Intro ── */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.8rem' }}>
@@ -223,7 +406,7 @@ export default function SKProjects({ user }: SKProjectsProps) {
           </div>
           <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignSelf: 'flex-start', marginTop: '0.4rem' }}>
             {canEdit && (
-              <button className="btn btn-primary btn-sm" onClick={() => setShowModal(true)}>+ New Project</button>
+              <button className="btn btn-primary btn-sm" onClick={openAddForm}>+ Add Project</button>
             )}
           </div>
         </div>
@@ -267,7 +450,7 @@ export default function SKProjects({ user }: SKProjectsProps) {
           <div className="toolbar-left">
             <div className="search-wrap">
               <svg className="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
               </svg>
               <input className="search-input" type="text" placeholder="Search title or category…"
                 value={search} onChange={e => setSearch(e.target.value)} />
@@ -281,12 +464,18 @@ export default function SKProjects({ user }: SKProjectsProps) {
         </div>
 
         {/* ── Project Grid ── */}
+        {isLoadingProjects && (
+          <div className="card" style={{ textAlign: 'center', padding: '2rem', color: 'var(--muted)', marginBottom: '1rem' }}>
+            Loading projects…
+          </div>
+        )}
+        {!isLoadingProjects && projectsError && (
+          <div className="alert-error" style={{ marginBottom: '1rem' }}>{projectsError}</div>
+        )}
         {filtered.length > 0 ? (
           <div className="card-grid card-grid-3">
-            {isLoadingProjects && <div className="card" style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '1.4rem', color: 'var(--muted)' }}>Loading projects…</div>}
-            {!isLoadingProjects && projectsError && <div className="alert-error" style={{ gridColumn: '1 / -1' }}>{projectsError}</div>}
             {filtered.map(p => (
-              <div key={p.id} className="v-card" onClick={() => setSelectedProject(p)}>
+              <div key={p.id} className="v-card" onClick={() => { setSelectedProject(p); setOpenReceiptDirect(false) }}>
                 <div className="v-card-img-wrap">
                   <img
                     src={getCover(p.category)}
@@ -324,15 +513,26 @@ export default function SKProjects({ user }: SKProjectsProps) {
                       <div className="v-card-budget-label">Budget</div>
                     </div>
                     {/* SK actions */}
-                    {canEdit && (
-                      <div style={{ display: 'flex', gap: '0.35rem' }} onClick={e => e.stopPropagation()}>
-                        <button className="btn btn-secondary btn-sm" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }} onClick={e => { e.stopPropagation(); setSelectedProject(p) }}>
-                          Edit
-                        </button>
-                        <button className="btn btn-danger btn-sm" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }}
-                          onClick={e => { e.stopPropagation(); handleDeleteProject(p) }}>
-                          Delete
-                        </button>
+                    {canShowActions && (
+                      <div className="v-card-actions" style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }} onClick={e => e.stopPropagation()}>
+                        {canAttachReceipt && (
+                          <button className="btn btn-gold btn-sm" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }}
+                            onClick={() => { setSelectedProject(p); setOpenReceiptDirect(true) }}>
+                            Attach Receipt
+                          </button>
+                        )}
+                        {canEdit && (
+                          <>
+                            <button className="btn btn-secondary btn-sm" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }}
+                              onClick={e => { e.stopPropagation(); setSelectedProject(p); setOpenReceiptDirect(false); setOpenEditDirect(true) }}>
+                              Edit
+                            </button>
+                            <button className="btn btn-danger btn-sm" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }}
+                              onClick={e => { e.stopPropagation(); handleDeleteProject(p) }}>
+                              Delete
+                            </button>
+                          </>
+                        )}
                       </div>
                     )}
                   </div>
@@ -341,102 +541,159 @@ export default function SKProjects({ user }: SKProjectsProps) {
             ))}
           </div>
         ) : (
-          <div className="card" style={{ textAlign: 'center', padding: '3rem', color: 'var(--muted)' }}>
-            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, marginBottom: '0.3rem' }}>No projects found</div>
-            {canEdit && <div style={{ fontSize: '0.85rem' }}>Create a new project to get started.</div>}
-          </div>
+          !isLoadingProjects && (
+            <div className="card" style={{ textAlign: 'center', padding: '3rem', color: 'var(--muted)' }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, marginBottom: '0.3rem' }}>No projects found</div>
+              {canEdit && <div style={{ fontSize: '0.85rem' }}>Create a new project to get started.</div>}
+            </div>
+          )
         )}
 
-        {/* ── Add Project Modal ── */}
-        {showModal && canEdit && (
+        {/* ── Add / Edit Project Modal ── */}
+        {formMode && canEdit && (
           <Portal>
-          <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowModal(false) }}>
-            <div className="modal" style={{ width: 'min(560px, 100%)' }}>
-              <div className="modal-header">
-                <div className="modal-title">Add New Project</div>
-                <button className="modal-close" onClick={() => setShowModal(false)}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
-                </button>
-              </div>
-              <form onSubmit={handleAddProject}>
-                <div className="modal-body">
-                  {formError && <div className="alert-error">{formError}</div>}
+            <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) requestCloseModal() }}>
+              <div className="modal" style={{ width: 'min(560px, 100%)' }}>
+                <div className="modal-header">
+                  <div className="modal-title">{formMode === 'new' ? 'Add New Project' : 'Edit Project'}</div>
+                  <button className="modal-close" onClick={requestCloseModal}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12" /></svg>
+                  </button>
+                </div>
+                <form onSubmit={handleSubmitProject}>
+                  <div className="modal-body">
+                    {formError && <div className="alert-error">{formError}</div>}
 
-                  {/* Proposal File Attachment */}
-                  <div style={{ marginBottom: '1rem', border: '1.5px dashed var(--maroon)', padding: '0.9rem 1rem', background: 'rgba(118,0,49,0.02)', borderRadius: '8px' }}>
-                    <div style={{ fontSize: '0.8rem', fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--maroon)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                      Attach Proposal Document (Optional)
-                    </div>
-                    {proposalFile ? (
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '0.82rem', fontFamily: 'var(--font-display)' }}>
-                          <strong>{proposalFile.name}</strong> ({(proposalFile.size / 1024).toFixed(1)} KB)
-                        </span>
-                        <button type="button" className="btn btn-secondary btn-sm" onClick={() => setProposalFile(null)}>Remove</button>
+                    {/* Proposal File Attachment — create mode only */}
+                    {formMode === 'new' && (
+                      <div style={{ marginBottom: '1rem', border: '1.5px dashed var(--maroon)', padding: '0.9rem 1rem', background: 'rgba(118,0,49,0.02)', borderRadius: '8px' }}>
+                        <div style={{ fontSize: '0.8rem', fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--maroon)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
+                          Attach Proposal Document (Optional)
+                        </div>
+                        {proposalFile ? (
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: '0.82rem', fontFamily: 'var(--font-display)' }}>
+                              <strong>{proposalFile.name}</strong> ({(proposalFile.size / 1024).toFixed(1)} KB)
+                            </span>
+                            <button type="button" className="btn btn-secondary btn-sm" onClick={() => setProposalFile(null)}>Remove</button>
+                          </div>
+                        ) : (
+                          <label style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <input
+                              type="file"
+                              accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
+                              style={{ display: 'none' }}
+                              onChange={e => { if (e.target.files?.[0]) setProposalFile(e.target.files[0]) }}
+                            />
+                            <span className="btn btn-secondary btn-sm" style={{ pointerEvents: 'none' }}>Browse File</span>
+                            <span style={{ fontSize: '0.78rem', color: 'var(--muted)' }}>PDF, DOC, or Image</span>
+                          </label>
+                        )}
                       </div>
+                    )}
+
+                    <div className="form-group">
+                      <label className="form-label">Project Title *</label>
+                      <input className="form-input" value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="e.g. Youth Digital Literacy Workshop" />
+                    </div>
+                    <div className="form-row-2">
+                      <div className="form-group">
+                        <label className="form-label">Category *</label>
+                        <select
+                          className="form-input"
+                          value={newCat}
+                          onChange={e => setNewCat(e.target.value)}
+                          style={{
+                            appearance: 'none',
+                            WebkitAppearance: 'none',
+                            MozAppearance: 'none',
+                            backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23760031' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E\")",
+                            backgroundRepeat: 'no-repeat',
+                            backgroundPosition: 'right 0.85rem center',
+                            paddingRight: '2.2rem',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {CATEGORY_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Proposed Budget (₱) *</label>
+                        <input className="form-input" value={newBudget} onChange={e => setNewBudget(e.target.value)} placeholder="e.g. 250000" />
+                      </div>
+                    </div>
+                    <div className="form-row-2">
+                      <div className="form-group">
+                        <label className="form-label">Start Date *</label>
+                        <input className="form-input" type="date" value={newStart} onChange={e => setNewStart(e.target.value)} />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">End Date *</label>
+                        <input className="form-input" type="date" value={newEnd} onChange={e => setNewEnd(e.target.value)} />
+                      </div>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Description</label>
+                      <textarea className="form-input" rows={3} value={newDesc} onChange={e => setNewDesc(e.target.value)} placeholder="Brief description of the project…" style={{ resize: 'vertical', fontFamily: 'var(--font-body)' }} />
+                    </div>
+                  </div>
+                  <div className="modal-footer" style={{ display: 'flex', alignItems: 'center' }}>
+                    {formMode !== 'new' && !hasChanges && (
+                      <span style={{
+                        fontSize: '0.78rem',
+                        color: 'var(--maroon)',
+                        fontFamily: 'var(--font-display)',
+                        fontWeight: 600,
+                        marginRight: 'auto',
+                        lineHeight: 1,
+                      }}>
+                        Edit a field to enable saving
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={requestCloseModal}
+                    >
+                      Cancel
+                    </button>
+
+                    {formMode === 'new' ? (
+                      <button type="submit" className="btn btn-primary">
+                        Create Project
+                      </button>
                     ) : (
-                      <label style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <input
-                          type="file"
-                          accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
-                          style={{ display: 'none' }}
-                          onChange={e => { if (e.target.files?.[0]) setProposalFile(e.target.files[0]) }}
-                        />
-                        <span className="btn btn-secondary btn-sm" style={{ pointerEvents: 'none' }}>Browse File</span>
-                        <span style={{ fontSize: '0.78rem', color: 'var(--muted)' }}>PDF, DOC, or Image</span>
-                      </label>
+                      hasChanges && (
+                        <button type="submit" className="btn btn-primary">
+                          Save Changes
+                        </button>
+                      )
                     )}
                   </div>
-
-                  <div className="form-group">
-                    <label className="form-label">Project Title *</label>
-                    <input className="form-input" value={newTitle} onChange={e => setNewTitle(e.target.value)} placeholder="e.g. Youth Digital Literacy Workshop" />
-                  </div>
-                  <div className="form-row-2">
-                    <div className="form-group">
-                      <label className="form-label">Category *</label>
-                      <select className="form-input" value={newCat} onChange={e => setNewCat(e.target.value)}>
-                        {CATEGORY_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
-                      </select>
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">Proposed Budget (₱) *</label>
-                      <input className="form-input" value={newBudget} onChange={e => setNewBudget(e.target.value)} placeholder="e.g. 250000" />
-                    </div>
-                  </div>
-                  <div className="form-row-2">
-                    <div className="form-group">
-                      <label className="form-label">Start Date *</label>
-                      <input className="form-input" type="date" value={newStart} onChange={e => setNewStart(e.target.value)} />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">End Date *</label>
-                      <input className="form-input" type="date" value={newEnd} onChange={e => setNewEnd(e.target.value)} />
-                    </div>
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Description</label>
-                    <textarea className="form-input" rows={3} value={newDesc} onChange={e => setNewDesc(e.target.value)} placeholder="Brief description of the project…" style={{ resize: 'vertical', fontFamily: 'var(--font-body)' }} />
-                  </div>
-                </div>
-                <div className="modal-footer">
-                  <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-                  <button type="submit" className="btn btn-primary">Create Project</button>
-                </div>
-              </form>
+                </form>
+              </div>
             </div>
-          </div>
           </Portal>
         )}
 
         {/* ── Project Detail Modal ── */}
-        {selectedProject && (
-          <ProjectDetailModal project={selectedProject} user={user} onClose={() => setSelectedProject(null)} onProjectUpdated={handleProjectUpdated} />
+        {liveSelectedProject && (
+          <ProjectDetailModal
+            key={`${liveSelectedProject.id}-${openReceiptDirect ? 'receipt' : openEditDirect ? 'edit' : 'view'}`}
+            project={liveSelectedProject}
+            user={user}
+            initialTab={openReceiptDirect ? 'finance' : 'overview'}
+            autoShowReceiptForm={openReceiptDirect}
+            autoEditProject={openEditDirect}
+            onClose={() => { setSelectedProject(null); setOpenReceiptDirect(false); setOpenEditDirect(false) }}
+            onAddReceipt={handleAddReceipt}
+            onProjectUpdated={handleProjectUpdated}
+          />
         )}
 
         {/* ── Delete Confirmation ── */}
-        {deleteError && <div className="alert-error" style={{ marginTop: '1rem' }}>{deleteError}</div>}
+        {deleteError && <div className="alert-error" style={{ marginBottom: '1rem' }}>{deleteError}</div>}
         <ConfirmDialog
           isOpen={!!projectToDelete}
           title="Delete Project"
@@ -446,6 +703,22 @@ export default function SKProjects({ user }: SKProjectsProps) {
           danger={true}
           onConfirm={confirmDelete}
           onCancel={() => setProjectToDelete(null)}
+        />
+
+        {/* ── Discard Changes Confirmation ── */}
+        <ConfirmDialog
+          isOpen={confirmAction === 'cancel'}
+          title="Discard Changes"
+          message="Any unsaved changes will be lost. Are you sure you want to close this form?"
+          confirmLabel="Discard"
+          cancelLabel="Keep Editing"
+          variant="danger"
+          onConfirm={() => {
+            setFormMode(null)
+            setConfirmAction(null)
+            setFeedback({ type: 'info', message: 'Changes discarded' })
+          }}
+          onCancel={() => setConfirmAction(null)}
         />
       </div>
     </section>

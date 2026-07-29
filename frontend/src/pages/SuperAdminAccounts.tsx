@@ -3,9 +3,11 @@ import { BARANGAYS } from '../constants'
 import type { Role, UserAccount } from '../types'
 import ConfirmDialog from '../components/ConfirmDialog'
 import Portal from '../components/Portal'
-import { fetchUserAccountsApi, createUserAccountApi, toggleUserStatusApi } from '../services/api'
+import { fetchUserAccountsApi, createUserAccountApi, toggleUserStatusApi, updateUserAccountApi } from '../services/api'
 
 const ROLE_OPTIONS: (Role | 'all')[] = ['all', 'superadmin', 'sk', 'citizen']
+
+type Feedback = { type: 'success' | 'info'; message: string }
 
 interface SuperAdminAccountsProps {
   selectedBarangay?: string
@@ -16,19 +18,25 @@ export default function SuperAdminAccounts({ selectedBarangay }: SuperAdminAccou
   const [filterRole, setFilterRole] = useState<Role | 'all'>('all')
   const [filterBrgy, setFilterBrgy] = useState('All')
   const [search, setSearch] = useState('')
-  const [showModal, setShowModal] = useState(false)
+  const [formMode, setFormMode] = useState<'new' | UserAccount | null>(null)
   const [suspendTarget, setSuspendTarget] = useState<UserAccount | null>(null)
+  const [confirmAction, setConfirmAction] = useState<'cancel' | null>(null)
 
-  // New SK form states
+  const [feedback, setFeedback] = useState<Feedback | null>(null)
+
   const [newFullName, setNewFullName] = useState('')
   const [newEmail, setNewEmail] = useState('')
   const [newBrgy, setNewBrgy] = useState('Balibago')
   const [newPosition, setNewPosition] = useState('Chairperson')
   const [newPassword, setNewPassword] = useState('Sk2026!')
+  const [newIsStaRosa, setNewIsStaRosa] = useState(true)
   const [formError, setFormError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  // Load live user accounts from backend
+  const [initialSnapshot, setInitialSnapshot] = useState({
+    name: '', email: '', brgy: 'Balibago', position: 'Chairperson', isStaRosa: true, password: 'Sk2026!',
+  })
+
   useEffect(() => {
     async function loadAccounts() {
       try {
@@ -58,6 +66,12 @@ export default function SuperAdminAccounts({ selectedBarangay }: SuperAdminAccou
     loadAccounts()
   }, [])
 
+  useEffect(() => {
+    if (!feedback) return
+    const timer = setTimeout(() => setFeedback(null), 3000)
+    return () => clearTimeout(timer)
+  }, [feedback])
+
   const activeBrgy = selectedBarangay && selectedBarangay !== '' ? selectedBarangay : filterBrgy
 
   const filtered = users.filter(u => {
@@ -78,11 +92,182 @@ export default function SuperAdminAccounts({ selectedBarangay }: SuperAdminAccou
   const roleBadge: Record<string, string> = { superadmin: 'badge-superadmin', sk: 'badge-sk', citizen: 'badge-citizen' }
   const roleColor: Record<string, string> = { superadmin: '#760031', sk: '#b45309', citizen: '#7a6200' }
 
+  const openAddForm = () => {
+    setNewFullName(''); setNewEmail(''); setNewBrgy('Balibago')
+    setNewPosition('Chairperson'); setNewPassword('Sk2026!')
+    setNewIsStaRosa(true)
+    setFormError('')
+    setInitialSnapshot({ name: '', email: '', brgy: 'Balibago', position: 'Chairperson', isStaRosa: true, password: 'Sk2026!' })
+    setFormMode('new')
+  }
+
+  const openEditForm = (u: UserAccount) => {
+    setNewFullName(u.name)
+    setNewEmail(u.email)
+    setNewBrgy(u.barangay || 'Balibago')
+    setNewPosition(u.skPosition || 'Chairperson')
+    setNewPassword('')
+    setNewIsStaRosa(u.isStaRosa ?? true)
+    setFormError('')
+    setInitialSnapshot({
+      name: u.name, email: u.email, brgy: u.barangay || 'Balibago',
+      position: u.skPosition || 'Chairperson', isStaRosa: u.isStaRosa ?? true, password: '',
+    })
+    setFormMode(u)
+  }
+
+  const editingRole: Role | null = formMode && formMode !== 'new' ? formMode.role : null
+
+  const isFormDirty = () => {
+    if (newPassword !== initialSnapshot.password) return true
+    if (newFullName !== initialSnapshot.name) return true
+    if (newEmail !== initialSnapshot.email) return true
+    if ((formMode === 'new' || editingRole === 'sk') && (newBrgy !== initialSnapshot.brgy || newPosition !== initialSnapshot.position)) return true
+    if (editingRole === 'citizen' && (newBrgy !== initialSnapshot.brgy || newIsStaRosa !== initialSnapshot.isStaRosa)) return true
+    return false
+  }
+
+  const requestCloseModal = () => {
+    if (isFormDirty()) {
+      setConfirmAction('cancel')
+    } else {
+      setFormMode(null)
+    }
+  }
+
+  const executeSave = async () => {
+    setIsSubmitting(true)
+    setFormError('')
+
+    if (formMode === 'new') {
+      try {
+        const roleStr = `SK ${newPosition}`
+        const created = await createUserAccountApi({
+          userName: newFullName.trim(),
+          userEmail: newEmail.trim(),
+          userPassword: newPassword,
+          userRole: roleStr,
+          userLocation: newBrgy,
+          userIsSK: true,
+        })
+
+        const newAcc: UserAccount = {
+          id: String(created.userID || Date.now()),
+          name: created.userName || newFullName.trim(),
+          email: created.userEmail || newEmail.trim(),
+          username: newFullName.trim().toLowerCase().replace(/\s+/g, ''),
+          role: 'sk',
+          barangay: newBrgy,
+          skPosition: newPosition as any,
+          isStaRosa: true,
+          isActive: true,
+        }
+
+        setUsers(prev => [newAcc, ...prev])
+        setFormMode(null)
+        setNewFullName('')
+        setNewEmail('')
+        setFormError('')
+        setFeedback({ type: 'success', message: 'Account created successfully' })
+      } catch (err: any) {
+        setFormError(err.message || 'Failed to create SK account')
+      } finally {
+        setIsSubmitting(false)
+      }
+    } else if (formMode) {
+      const editingId = formMode.id
+      const role = formMode.role
+      try {
+        const payload: any = {
+          userName: newFullName.trim(),
+          userEmail: newEmail.trim(),
+          ...(newPassword ? { userPassword: newPassword } : {}),
+        }
+        if (role === 'sk') {
+          payload.userRole = `SK ${newPosition}`
+          payload.userLocation = newBrgy
+        } else if (role === 'citizen') {
+          payload.userLocation = newBrgy
+          payload.userIsStaRosa = newIsStaRosa
+        }
+
+        const updated = await updateUserAccountApi(Number(editingId), payload)
+        const res: any = updated
+
+        setUsers(prev => prev.map(u => {
+          if (u.id !== editingId) return u
+          const base = { ...u, name: res.userName || newFullName.trim(), email: res.userEmail || newEmail.trim() }
+          if (role === 'sk') return { ...base, barangay: newBrgy, skPosition: newPosition as any }
+          if (role === 'citizen') return { ...base, barangay: newBrgy, isStaRosa: newIsStaRosa }
+          return base
+        }))
+        setFormMode(null)
+        setFormError('')
+        setFeedback({ type: 'success', message: 'Account updated successfully' })
+      } catch (err: any) {
+        setFormError(err.message || 'Failed to save changes')
+      } finally {
+        setIsSubmitting(false)
+      }
+    }
+  }
+
   return (
     <section className="section section-accent-flow" style={{ paddingTop: '2.5rem', paddingBottom: '3.5rem' }}>
       <div className="container">
 
-        {/* ── Page Intro Banner ── */}
+        {feedback && (
+          <Portal>
+            <div
+              style={{
+                position: 'fixed',
+                top: 'calc(var(--header-height, 78px) + 1rem)',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                zIndex: 10000,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.6rem',
+                background: feedback.type === 'success' ? 'rgba(22, 101, 52, 0.22)' : 'rgba(118, 0, 49, 0.18)',
+                backdropFilter: 'blur(16px) saturate(1.6)',
+                WebkitBackdropFilter: 'blur(16px) saturate(1.6)',
+                color: feedback.type === 'success' ? '#0d3d20' : '#5c0026',
+                fontFamily: 'var(--font-display)',
+                fontWeight: 700,
+                fontSize: '0.9rem',
+                padding: '0.9rem 1.4rem',
+                borderRadius: '14px',
+                border: '1.5px solid rgba(255, 255, 255, 0.35)',
+                boxShadow: feedback.type === 'success'
+                  ? '0 12px 32px rgba(22,101,52,0.25), inset 0 1px 0 rgba(255,255,255,0.4)'
+                  : '0 12px 32px rgba(118,0,49,0.18), inset 0 1px 0 rgba(255,255,255,0.4)',
+                maxWidth: '90vw',
+                animation: 'toastPop 220ms ease-out',
+              }}
+            >
+              {feedback.type === 'success' ? (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0 }}>
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M8 12l3 3 5-6" />
+                </svg>
+              ) : (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0 }}>
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M12 8v5" />
+                  <path d="M12 16h.01" />
+                </svg>
+              )}
+              <span>{feedback.message}</span>
+            </div>
+            <style>{`
+              @keyframes toastPop {
+                from { opacity: 0; transform: translateX(-50%) translateY(-12px) scale(0.96); }
+                to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+              }
+            `}</style>
+          </Portal>
+        )}
+
         <div className="page-intro reveal section-glass-grid" style={{ padding: '1.5rem 1.8rem', borderRadius: '12px', marginBottom: '1.8rem', background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(250,244,235,0.9) 100%)' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
             <div>
@@ -99,13 +284,12 @@ export default function SuperAdminAccounts({ selectedBarangay }: SuperAdminAccou
                 Manage all Super Admin, SK Officer, and Citizen accounts across Santa Rosa City's 18 barangays.
               </p>
             </div>
-            <button className="btn btn-primary" style={{ alignSelf: 'flex-start', marginTop: '0.4rem' }} onClick={() => setShowModal(true)}>
+            <button className="btn btn-primary" style={{ alignSelf: 'flex-start', marginTop: '0.4rem' }} onClick={openAddForm}>
               + Create SK Account
             </button>
           </div>
         </div>
 
-        {/* ── Stat Cards ── */}
         <div className="card-grid card-grid-4 reveal" style={{ marginBottom: '1.5rem' }}>
           <div className="stat-card card-accent">
             <div className="stat-value">{counts.all}</div>
@@ -125,7 +309,6 @@ export default function SuperAdminAccounts({ selectedBarangay }: SuperAdminAccou
           </div>
         </div>
 
-        {/* ── Filter Tabs ── */}
         <div className="filter-tabs">
           {ROLE_OPTIONS.map(r => (
             <button key={r} className={`filter-tab${filterRole === r ? ' active' : ''}`} onClick={() => setFilterRole(r)}>
@@ -134,12 +317,11 @@ export default function SuperAdminAccounts({ selectedBarangay }: SuperAdminAccou
           ))}
         </div>
 
-        {/* ── Toolbar ── */}
         <div className="toolbar">
           <div className="toolbar-left">
             <div className="search-wrap">
               <svg className="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
               </svg>
               <input className="search-input" type="text" placeholder="Search by name, email, or username…"
                 value={search} onChange={e => setSearch(e.target.value)} />
@@ -155,13 +337,11 @@ export default function SuperAdminAccounts({ selectedBarangay }: SuperAdminAccou
           </span>
         </div>
 
-        {/* ── Account Cards Grid ── */}
         {filtered.length > 0 ? (
           <div className="card-grid card-grid-3">
             {filtered.map(u => (
               <div key={u.id} className="card">
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.85rem', marginBottom: '0.75rem' }}>
-                  {/* Avatar */}
                   <div style={{
                     width: '44px', height: '44px', flexShrink: 0,
                     background: `${roleColor[u.role]}18`,
@@ -183,16 +363,16 @@ export default function SuperAdminAccounts({ selectedBarangay }: SuperAdminAccou
                 <div style={{ display: 'grid', gap: '0.28rem', fontSize: '0.8rem', color: 'var(--muted)', fontFamily: 'var(--font-display)', marginBottom: '0.75rem' }}>
                   {u.username && <div>@{u.username}</div>}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></svg>
                     {u.email}
                   </div>
                   {u.barangay && <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>
                     Brgy. {u.barangay}
                   </div>}
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem', borderTop: '1px solid rgba(118,0,49,0.08)', paddingTop: '0.65rem' }}>
-                  <button className="btn btn-secondary btn-sm" style={{ flex: 1 }}>Edit</button>
+                  <button className="btn btn-secondary btn-sm" style={{ flex: 1 }} onClick={() => openEditForm(u)}>Edit</button>
                   <button className={`btn btn-sm ${u.isActive ? 'btn-danger' : 'btn-secondary'}`} style={{ flex: 1 }}
                     onClick={() => setSuspendTarget(u)}>
                     {u.isActive ? 'Suspend' : 'Reactivate'}
@@ -207,101 +387,113 @@ export default function SuperAdminAccounts({ selectedBarangay }: SuperAdminAccou
           </div>
         )}
 
-        {/* ── Create SK Account Modal ── */}
-        {showModal && (
+        {formMode && (
           <Portal>
-          <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowModal(false) }}>
-            <div className="modal">
-              <div className="modal-header">
-                <span className="modal-title">Create SK Account</span>
-                <button className="modal-close" onClick={() => setShowModal(false)}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
-                </button>
-              </div>
-              <form onSubmit={async (e) => {
-                e.preventDefault()
-                if (!newFullName.trim() || !newEmail.trim() || !newPassword) {
-                  setFormError('Please fill in all required fields.')
-                  return
-                }
-                setIsSubmitting(true)
-                setFormError('')
-                try {
-                  const roleStr = `SK ${newPosition}`
-                  const created = await createUserAccountApi({
-                    userName: newFullName.trim(),
-                    userEmail: newEmail.trim(),
-                    userPassword: newPassword,
-                    userRole: roleStr,
-                    userLocation: newBrgy,
-                    userIsSK: true,
-                  })
-
-                  const newAcc: UserAccount = {
-                    id: String(created.userID || Date.now()),
-                    name: created.userName || newFullName.trim(),
-                    email: created.userEmail || newEmail.trim(),
-                    username: newFullName.trim().toLowerCase().replace(/\s+/g, ''),
-                    role: 'sk',
-                    barangay: newBrgy,
-                    skPosition: newPosition as any,
-                    isStaRosa: true,
-                    isActive: true,
-                  }
-
-                  setUsers(prev => [newAcc, ...prev])
-                  setShowModal(false)
-                  setNewFullName('')
-                  setNewEmail('')
-                  setFormError('')
-                } catch (err: any) {
-                  setFormError(err.message || 'Failed to create SK account')
-                } finally {
-                  setIsSubmitting(false)
-                }
-              }}>
-                <div className="modal-body">
-                  {formError && <div className="notice error">{formError}</div>}
-                  <div className="field-group">
-                    <label className="field-label">Full Name *</label>
-                    <input className="input" type="text" value={newFullName} onChange={e => setNewFullName(e.target.value)} placeholder="Maria Santos" required />
-                  </div>
-                  <div className="field-group">
-                    <label className="field-label">Email Address *</label>
-                    <input className="input" type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="msantos.balibago@sk.gov.ph" required />
-                  </div>
-                  <div className="field-group">
-                    <label className="field-label">Temporary Password *</label>
-                    <input className="input" type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} required />
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
-                    <div className="field-group">
-                      <label className="field-label">Barangay *</label>
-                      <select className="input" value={newBrgy} onChange={e => setNewBrgy(e.target.value)}>
-                        {BARANGAYS.map(b => <option key={b} value={b}>{b}</option>)}
-                      </select>
-                    </div>
-                    <div className="field-group">
-                      <label className="field-label">Position *</label>
-                      <select className="input" value={newPosition} onChange={e => setNewPosition(e.target.value)}>
-                        {['Chairperson','Secretary','Treasurer','Kagawad'].map(p => <option key={p} value={p}>{p}</option>)}
-                      </select>
-                    </div>
-                  </div>
-                </div>
-                <div className="modal-footer">
-                  <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-                  <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-                    {isSubmitting ? 'Creating...' : 'Create Account'}
+            <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) requestCloseModal() }}>
+              <div className="modal">
+                <div className="modal-header">
+                  <span className="modal-title">
+                    {formMode === 'new' ? 'Create SK Account' :
+                      editingRole === 'superadmin' ? 'Edit Super Admin Account' :
+                        editingRole === 'citizen' ? 'Edit Citizen Account' : 'Edit SK Account'}
+                  </span>
+                  <button className="modal-close" onClick={requestCloseModal}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12" /></svg>
                   </button>
                 </div>
-              </form>
+                <form onSubmit={(e) => {
+                  e.preventDefault()
+                  if (!newFullName.trim() || !newEmail.trim() || (formMode === 'new' && !newPassword)) {
+                    setFormError('Please fill in all required fields.')
+                    return
+                  }
+                  setFormError('')
+                  executeSave()
+                }}>
+                  <div className="modal-body">
+                    {formError && <div className="notice error">{formError}</div>}
+
+                    <div className="field-group">
+                      <label className="field-label">Full Name *</label>
+                      <input className="input" type="text" value={newFullName} onChange={e => setNewFullName(e.target.value)} placeholder="Maria Santos" required />
+                    </div>
+                    <div className="field-group">
+                      <label className="field-label">Email Address *</label>
+                      <input className="input" type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="msantos.balibago@sk.gov.ph" required />
+                    </div>
+                    <div className="field-group">
+                      <label className="field-label">
+                        {formMode === 'new' ? 'Temporary Password *' : 'New Password (optional)'}
+                      </label>
+                      <input className="input" type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)}
+                        placeholder={formMode === 'new' ? '' : 'Leave blank to keep current password'}
+                        required={formMode === 'new'} />
+                    </div>
+
+                    {(formMode === 'new' || editingRole === 'sk') && (
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
+                        <div className="field-group">
+                          <label className="field-label">Barangay *</label>
+                          <select className="input" value={newBrgy} onChange={e => setNewBrgy(e.target.value)}>
+                            {BARANGAYS.map(b => <option key={b} value={b}>{b}</option>)}
+                          </select>
+                        </div>
+                        <div className="field-group">
+                          <label className="field-label">Position *</label>
+                          <select className="input" value={newPosition} onChange={e => setNewPosition(e.target.value)}>
+                            {['Chairperson', 'Secretary', 'Treasurer', 'Kagawad'].map(p => <option key={p} value={p}>{p}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                    )}
+
+                    {editingRole === 'citizen' && (
+                      <>
+                        <div className="field-group">
+                          <label className="field-label">Barangay *</label>
+                          <select className="input" value={newBrgy} onChange={e => setNewBrgy(e.target.value)}>
+                            {BARANGAYS.map(b => <option key={b} value={b}>{b}</option>)}
+                          </select>
+                        </div>
+                        <div className="checkbox-row">
+                          <input type="checkbox" checked={newIsStaRosa} onChange={() => setNewIsStaRosa(v => !v)} />
+                          Santa Rosa City Resident
+                        </div>
+                      </>
+                    )}
+
+                    {editingRole === 'superadmin' && (
+                      <p style={{ fontSize: '0.8rem', color: 'var(--muted)', fontFamily: 'var(--font-display)' }}>
+                        Super Admin accounts have city-wide access and no barangay assignment.
+                      </p>
+                    )}
+                  </div>
+                  <div className="modal-footer" style={{ display: 'flex', alignItems: 'center' }}>
+                    {formMode !== 'new' && !isFormDirty() && (
+                      <span style={{
+                        fontSize: '0.78rem',
+                        color: 'var(--maroon)',
+                        fontFamily: 'var(--font-display)',
+                        fontWeight: 600,
+                        marginRight: 'auto',
+                        lineHeight: 1,
+                      }}>
+                        Edit a field to enable saving
+                      </span>
+                    )}
+                    <button type="button" className="btn btn-secondary" onClick={requestCloseModal}>Cancel</button>
+                    {(formMode === 'new' || isFormDirty()) && (
+                      <button type="submit" className={`btn ${formMode === 'new' ? 'btn-primary' : 'btn-save'}`} disabled={isSubmitting}>
+                        {isSubmitting ? (formMode === 'new' ? 'Creating...' : 'Saving...') : (formMode === 'new' ? 'Create Account' : 'Save Changes')}
+                      </button>
+                    )}
+                  </div>
+                </form>
+              </div>
             </div>
-          </div>
           </Portal>
         )}
 
-        {/* ── Suspend/Reactivate Confirmation ── */}
         <ConfirmDialog
           isOpen={!!suspendTarget}
           title={suspendTarget?.isActive ? 'Suspend Account' : 'Reactivate Account'}
@@ -310,7 +502,7 @@ export default function SuperAdminAccounts({ selectedBarangay }: SuperAdminAccou
             : `Reactivate ${suspendTarget?.name}'s account? They will regain access to eSKala.`}
           confirmLabel={suspendTarget?.isActive ? 'Suspend' : 'Reactivate'}
           cancelLabel="Cancel"
-          danger={!!suspendTarget?.isActive}
+          variant={suspendTarget?.isActive ? 'danger' : 'success'}
           onConfirm={async () => {
             if (!suspendTarget) return
             const newActive = !suspendTarget.isActive
@@ -321,8 +513,27 @@ export default function SuperAdminAccounts({ selectedBarangay }: SuperAdminAccou
             }
             setUsers(prev => prev.map(u => u.id === suspendTarget.id ? { ...u, isActive: newActive } : u))
             setSuspendTarget(null)
+            setFeedback({
+              type: newActive ? 'success' : 'info',
+              message: newActive ? 'Account reactivated successfully' : 'Account suspended successfully'
+            })
           }}
           onCancel={() => setSuspendTarget(null)}
+        />
+
+        <ConfirmDialog
+          isOpen={confirmAction === 'cancel'}
+          title="Discard Changes"
+          message="Any unsaved changes will be lost. Are you sure you want to close this form?"
+          confirmLabel="Discard"
+          cancelLabel="Keep Editing"
+          variant="danger"
+          onConfirm={() => {
+            setFormMode(null)
+            setConfirmAction(null)
+            setFeedback({ type: 'info', message: 'Changes discarded' })
+          }}
+          onCancel={() => setConfirmAction(null)}
         />
 
       </div>

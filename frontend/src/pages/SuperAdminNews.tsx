@@ -2,15 +2,18 @@ import { useState, useEffect, FormEvent, ChangeEvent } from 'react'
 import type { NewsItem } from '../types'
 import ConfirmDialog from '../components/ConfirmDialog'
 import Portal from '../components/Portal'
-import { fetchNewsApi, createNewsletterApi, deleteNewsletterApi, uploadNewsImageApi } from '../services/api'
+import { fetchNewsApi, createNewsletterApi, updateNewsletterApi, deleteNewsletterApi, uploadNewsImageApi } from '../services/api'
 
 const CATEGORIES = ['Transparency', 'Youth Programs', 'SK Update', 'Health', 'Education', 'Environment', 'Sports', 'City News', 'Emergency']
+
+type Feedback = { type: 'success' | 'info'; message: string }
 
 export default function SuperAdminNews() {
   const [articles, setArticles] = useState<NewsItem[]>([])
   const [showModal, setShowModal] = useState(false)
   const [editTarget, setEditTarget] = useState<NewsItem | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<NewsItem | null>(null)
+  const [confirmAction, setConfirmAction] = useState<'cancel' | null>(null)
   const [search, setSearch] = useState('')
   const [filterCat, setFilterCat] = useState('All')
 
@@ -21,7 +24,17 @@ export default function SuperAdminNews() {
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imageUrl, setImageUrl] = useState('')
   const [uploading, setUploading] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
   const [formError, setFormError] = useState('')
+
+  // Snapshot of the form's values right after opening — used to detect
+  // whether the user actually changed anything before requesting a close
+  const [initialSnapshot, setInitialSnapshot] = useState({
+    title: '', cat: 'SK Update', summary: '', date: '', imageUrl: '',
+  })
+
+  // Feedback banner (glass-style, portal-rendered — see below)
+  const [feedback, setFeedback] = useState<Feedback | null>(null)
 
   async function loadNews() {
     try {
@@ -45,6 +58,13 @@ export default function SuperAdminNews() {
     loadNews()
   }, [])
 
+  // Auto-dismiss feedback banner after 3 seconds
+  useEffect(() => {
+    if (!feedback) return
+    const timer = setTimeout(() => setFeedback(null), 3000)
+    return () => clearTimeout(timer)
+  }, [feedback])
+
   const allCats = ['All', ...Array.from(new Set(articles.map(a => a.category)))]
 
   const filtered = articles.filter(a => {
@@ -56,18 +76,44 @@ export default function SuperAdminNews() {
 
   const openModal = (item?: NewsItem) => {
     if (item) {
+      const todayStr = new Date().toISOString().split('T')[0]
       setEditTarget(item)
       setFormTitle(item.title)
       setFormCat(item.category)
       setFormSummary(item.summary ?? '')
-      setFormDate(item.date)
+      setFormDate(todayStr)
       setImageUrl(item.image ?? '')
       setImageFile(null)
+      setInitialSnapshot({ title: item.title, cat: item.category, summary: item.summary ?? '', date: todayStr, imageUrl: item.image ?? '' })
     } else {
+      const today = new Date().toISOString().split('T')[0]
       setEditTarget(null)
-      setFormTitle(''); setFormCat('SK Update'); setFormSummary(''); setFormDate(''); setImageUrl(''); setImageFile(null); setFormError('')
+      setFormTitle(''); setFormCat('SK Update'); setFormSummary('')
+      setFormDate(today)
+      setImageUrl(''); setImageFile(null); setFormError('')
+      setInitialSnapshot({ title: '', cat: 'SK Update', summary: '', date: today, imageUrl: '' })
     }
+    setFormError('')
     setShowModal(true)
+  }
+
+  // Returns true if any field differs from the snapshot taken when the modal opened
+  const isFormDirty = () =>
+    formTitle !== initialSnapshot.title ||
+    formCat !== initialSnapshot.cat ||
+    formSummary !== initialSnapshot.summary ||
+    formDate !== initialSnapshot.date ||
+    imageUrl !== initialSnapshot.imageUrl
+
+  // X button, overlay click, and Cancel button all request a close.
+  // If nothing was actually changed, close immediately — only prompt
+  // the "Discard Changes" confirmation when the form is dirty.
+  const requestCloseModal = () => {
+    if (isFormDirty()) {
+      setConfirmAction('cancel')
+    } else {
+      setShowModal(false)
+    }
   }
 
   const handleImageChange = async (e: ChangeEvent<HTMLInputElement>) => {
@@ -88,8 +134,13 @@ export default function SuperAdminNews() {
 
   const handleSave = async (e: FormEvent) => {
     e.preventDefault()
+    if (isSaving) return // guard against rapid double-submits
     setFormError('')
     if (!formTitle.trim()) { setFormError('Article Title is required.'); return }
+    if (!formSummary.trim()) { setFormError('Summary / Body is required.'); return }
+
+    const isEditing = !!editTarget
+    setIsSaving(true)
 
     try {
       let finalImg = imageUrl
@@ -99,29 +150,41 @@ export default function SuperAdminNews() {
         finalImg = uploaded.imageURL
       }
 
-      await createNewsletterApi({
+      const payload = {
         title: formTitle.trim(),
         summary: formSummary.trim(),
         category: formCat,
         imageURL: finalImg || undefined,
-      })
+      }
+
+      if (isEditing && editTarget) {
+        // Update the existing article instead of creating a new one
+        await updateNewsletterApi(Number(editTarget.id), payload)
+      } else {
+        await createNewsletterApi(payload)
+      }
 
       await loadNews()
       setShowModal(false)
+      setFeedback({ type: 'success', message: isEditing ? 'Article updated successfully' : 'Article published successfully' })
     } catch (err: any) {
-      setFormError(`Failed to publish news: ${err.message}`)
+      setFormError(`Failed to ${isEditing ? 'update' : 'publish'} news: ${err.message}`)
     } finally {
       setUploading(false)
+      setIsSaving(false)
     }
   }
 
   const confirmDelete = async () => {
     if (!deleteTarget) return
+    const deletedTitle = deleteTarget.title
     try {
       await deleteNewsletterApi(Number(deleteTarget.id))
       await loadNews()
+      setFeedback({ type: 'success', message: `"${deletedTitle}" deleted successfully` })
     } catch (err) {
       setArticles(prev => prev.filter(a => a.id !== deleteTarget.id))
+      setFeedback({ type: 'info', message: `"${deletedTitle}" removed locally — sync may be delayed` })
     } finally {
       setDeleteTarget(null)
     }
@@ -130,6 +193,59 @@ export default function SuperAdminNews() {
   return (
     <section className="section">
       <div className="container">
+
+        {/* ── Feedback Banner ── */}
+        {feedback && (
+          <Portal>
+            <div
+              style={{
+                position: 'fixed',
+                top: 'calc(var(--header-height, 78px) + 1rem)',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                zIndex: 10000,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.6rem',
+                background: feedback.type === 'success' ? 'rgba(22, 101, 52, 0.22)' : 'rgba(118, 0, 49, 0.18)',
+                backdropFilter: 'blur(16px) saturate(1.6)',
+                WebkitBackdropFilter: 'blur(16px) saturate(1.6)',
+                color: feedback.type === 'success' ? '#0d3d20' : '#5c0026',
+                fontFamily: 'var(--font-display)',
+                fontWeight: 700,
+                fontSize: '0.9rem',
+                padding: '0.9rem 1.4rem',
+                borderRadius: '14px',
+                border: '1.5px solid rgba(255, 255, 255, 0.35)',
+                boxShadow: feedback.type === 'success'
+                  ? '0 12px 32px rgba(22,101,52,0.25), inset 0 1px 0 rgba(255,255,255,0.4)'
+                  : '0 12px 32px rgba(118,0,49,0.18), inset 0 1px 0 rgba(255,255,255,0.4)',
+                maxWidth: '90vw',
+                animation: 'toastPop 220ms ease-out',
+              }}
+            >
+              {feedback.type === 'success' ? (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0 }}>
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M8 12l3 3 5-6" />
+                </svg>
+              ) : (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0 }}>
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M12 8v5" />
+                  <path d="M12 16h.01" />
+                </svg>
+              )}
+              <span>{feedback.message}</span>
+            </div>
+            <style>{`
+              @keyframes toastPop {
+                from { opacity: 0; transform: translateX(-50%) translateY(-12px) scale(0.96); }
+                to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+              }
+            `}</style>
+          </Portal>
+        )}
 
         {/* ── Page Intro ── */}
         <div className="page-intro reveal" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.8rem' }}>
@@ -213,11 +329,11 @@ export default function SuperAdminNews() {
         {/* ── Publish / Edit Modal ── */}
         {showModal && (
           <Portal>
-            <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setShowModal(false) }}>
+            <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) requestCloseModal() }}>
               <div className="modal">
                 <div className="modal-header">
                   <span className="modal-title">{editTarget ? 'Edit Article' : 'Publish New Article'}</span>
-                  <button className="modal-close" onClick={() => setShowModal(false)}>
+                  <button className="modal-close" onClick={requestCloseModal}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12" /></svg>
                   </button>
                 </div>
@@ -256,16 +372,34 @@ export default function SuperAdminNews() {
                     </div>
 
                     <div className="form-group">
-                      <label className="form-label">Summary / Body</label>
+                      <label className="form-label">Summary / Body *</label>
                       <textarea className="form-input" value={formSummary} onChange={e => setFormSummary(e.target.value)}
-                        placeholder="Brief description of the announcement…" style={{ minHeight: '110px', resize: 'vertical' }} />
+                        placeholder="Brief description of the announcement…" style={{ minHeight: '110px', resize: 'vertical' }} required />
                     </div>
                   </div>
-                  <div className="modal-footer">
-                    <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-                    <button type="submit" className="btn btn-primary" disabled={uploading}>
-                      {uploading ? 'Uploading Image…' : editTarget ? 'Save Changes' : 'Publish Article'}
-                    </button>
+                  <div className="modal-footer" style={{ display: 'flex', alignItems: 'center' }}>
+                    {editTarget && !isFormDirty() && (
+                      <span style={{
+                        fontSize: '0.78rem',
+                        color: 'var(--maroon)',
+                        fontFamily: 'var(--font-display)',
+                        fontWeight: 600,
+                        marginRight: 'auto',
+                        lineHeight: 1,
+                      }}>
+                        Edit a field to enable saving
+                      </span>
+                    )}
+                    <button type="button" className="btn btn-secondary" onClick={requestCloseModal} disabled={isSaving}>Cancel</button>
+                    {(!editTarget || isFormDirty()) && (
+                      <button type="submit" className="btn btn-primary" disabled={uploading || isSaving}>
+                        {uploading
+                          ? 'Uploading Image…'
+                          : isSaving
+                            ? (editTarget ? 'Saving…' : 'Publishing…')
+                            : (editTarget ? 'Save Changes' : 'Publish Article')}
+                      </button>
+                    )}
                   </div>
                 </form>
               </div>
@@ -283,6 +417,22 @@ export default function SuperAdminNews() {
           danger={true}
           onConfirm={confirmDelete}
           onCancel={() => setDeleteTarget(null)}
+        />
+
+        {/* ── Discard Changes Confirmation ── */}
+        <ConfirmDialog
+          isOpen={confirmAction === 'cancel'}
+          title="Discard Changes"
+          message="Any unsaved changes will be lost. Are you sure you want to close this form?"
+          confirmLabel="Discard"
+          cancelLabel="Keep Editing"
+          variant="danger"
+          onConfirm={() => {
+            setShowModal(false)
+            setConfirmAction(null)
+            setFeedback({ type: 'info', message: 'Changes discarded' })
+          }}
+          onCancel={() => setConfirmAction(null)}
         />
 
       </div>

@@ -285,6 +285,12 @@ export async function createUserAccountApi(payload: {
   })
 }
 
+// TEMPORARY STUB — replace once backend implements PUT/PATCH /users/:id
+export async function updateUserAccountApi(id: number, payload: any) {
+  console.warn('updateUserAccountApi stub — backend endpoint not yet implemented', id, payload)
+  return { userID: id, ...payload }
+}
+
 export async function toggleUserStatusApi(userId: number, isActive: boolean): Promise<any> {
   void isActive
   return request(`/admin/accounts/${userId}/toggle-active`, {
@@ -408,6 +414,12 @@ export async function createNewsletterApi(payload: {
     method: 'POST',
     body: JSON.stringify(payload),
   })
+}
+
+// TEMPORARY STUB — replace once backend implements PUT/PATCH /newsletter/:id
+export async function updateNewsletterApi(newsletterId: number, payload: any) {
+  console.warn('updateNewsletterApi stub — backend endpoint not yet implemented', newsletterId, payload)
+  return { newsletterID: newsletterId, ...payload }
 }
 
 export async function uploadNewsImageApi(file: File): Promise<{ imageURL: string }> {
