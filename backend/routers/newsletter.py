@@ -28,48 +28,10 @@ def list_newsletters(
     category: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
     skip: int = Query(0, ge=0),
-    limit: int = Query(20, ge=1, le=100),
+    limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_optional_user),
 ):
-    # Auto-seed initial city news entries if newsletter table is empty
-    total_count = db.query(Newsletter).filter(Newsletter.isDeleted == False).count()
-    if total_count == 0:
-        default_items = [
-            Newsletter(
-                title="CYDO Santa Rosa Youth Leadership Summit 2025 Successfully Launched",
-                summary="Over 400 youth leaders across all 18 barangays gathered at the Santa Rosa Multi-Purpose Complex for the annual CYDO Leadership Summit.",
-                fullContent="The City Youth Development Office (CYDO) of Santa Rosa City, Laguna, in partnership with the Sangguniang Kabataan Federation, successfully hosted the annual Youth Leadership Summit 2025.",
-                category="Youth Programs",
-                projectLocation="Santa Rosa City",
-                imageURL="https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=700&q=80",
-                isPublished=True,
-                isDeleted=False,
-            ),
-            Newsletter(
-                title="eSKala Financial Transparency Portal Officially Deployed for All 18 Barangays",
-                summary="The City Youth Development Office and SK Federation introduce eSKala, enabling Santa Rosa citizens to track SK fund utilization, ABYIP budgets, and project receipts in real-time.",
-                fullContent="In compliance with Republic Act No. 10742 (SK Reform Act of 2015) and DILG Full Disclosure policies, Santa Rosa City launches eSKala.",
-                category="Transparency",
-                projectLocation="Santa Rosa City",
-                imageURL="https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=700&q=80",
-                isPublished=True,
-                isDeleted=False,
-            ),
-            Newsletter(
-                title="Santa Rosa SK Federation Approves Enhanced Sports & Digital Literacy Programs",
-                summary="Targeting youth development across education, health, and sports for FY 2025 under RA 10742 and RA 11768 guidelines.",
-                fullContent="The SK Federation of Santa Rosa City passed landmark resolutions authorizing sports tournament sponsorships and digital literacy workshops.",
-                category="SK Update",
-                projectLocation="Santa Rosa City",
-                imageURL="https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=700&q=80",
-                isPublished=True,
-                isDeleted=False,
-            ),
-        ]
-        db.add_all(default_items)
-        db.commit()
-
     query = db.query(Newsletter).filter(
         Newsletter.isDeleted == False,
         or_(Newsletter.isPublished == True, Newsletter.isPublished.is_(None)),

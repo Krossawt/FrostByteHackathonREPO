@@ -426,6 +426,17 @@ export async function voteCommentApi(commentId: number): Promise<any> {
 
 // ─── NEWSLETTER / CITY NEWS ──────────────────────────────────────────────────
 
+export function resolveImageUrl(rawUrl?: string): string {
+  if (!rawUrl) return ''
+  if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://') || rawUrl.startsWith('data:')) {
+    return rawUrl
+  }
+  const apiOrigin = (import.meta as any).env?.VITE_API_URL
+    ? (import.meta as any).env.VITE_API_URL.replace(/\/api\/v1\/?$/, '')
+    : 'https://frostbytehackathonrepo.onrender.com'
+  return `${apiOrigin}${rawUrl.startsWith('/') ? '' : '/'}${rawUrl}`
+}
+
 export async function fetchNewsApi(): Promise<NewsItem[]> {
   try {
     const res = await request<any>('/newsletter')
@@ -437,14 +448,17 @@ export async function fetchNewsApi(): Promise<NewsItem[]> {
     else if (res && Array.isArray(res.newsletters)) rawList = res.newsletters
     else if (res && Array.isArray(res.results)) rawList = res.results
 
-    return rawList.map((n: any) => ({
-      id: String(n.newsletterID || n.id || `news-${Math.random()}`),
-      title: n.title || 'City News Update',
-      category: n.category || 'City News',
-      summary: n.summary || n.fullContent || n.details || '',
-      date: n.publishedAt ? new Date(n.publishedAt).toLocaleDateString() : 'Today',
-      image: n.imageURL || n.image_url || n.image || undefined,
-    }))
+    return rawList.map((n: any) => {
+      const rawImg = n.imageURL || n.image_url || n.image || ''
+      return {
+        id: String(n.newsletterID || n.id || `news-${Math.random()}`),
+        title: n.title || 'City News Update',
+        category: n.category || 'City News',
+        summary: n.summary || n.fullContent || n.details || '',
+        date: n.publishedAt ? new Date(n.publishedAt).toLocaleDateString() : 'Today',
+        image: rawImg ? resolveImageUrl(rawImg) : undefined,
+      }
+    })
   } catch (err) {
     console.warn('fetchNewsApi error:', err)
     return []

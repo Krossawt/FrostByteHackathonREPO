@@ -48,40 +48,13 @@ function useScrollReveal() {
 
 
 
-const DEFAULT_FALLBACK_NEWS: NewsItem[] = [
-  {
-    id: 'news-fallback-1',
-    title: 'CYDO Santa Rosa Youth Leadership Summit 2025 Successfully Launched',
-    category: 'Youth Programs',
-    summary: 'Over 400 youth leaders across all 18 barangays gathered at the Santa Rosa Multi-Purpose Complex for the annual CYDO Leadership Summit.',
-    date: 'Today',
-    image: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=700&q=80',
-  },
-  {
-    id: 'news-fallback-2',
-    title: 'eSKala Financial Transparency Portal Officially Deployed for All 18 Barangays',
-    category: 'Transparency',
-    summary: 'The City Youth Development Office and SK Federation introduce eSKala, enabling Santa Rosa citizens to track SK fund utilization, ABYIP budgets, and project receipts in real-time.',
-    date: 'Today',
-    image: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=700&q=80',
-  },
-  {
-    id: 'news-fallback-3',
-    title: 'Santa Rosa SK Federation Approves Enhanced Sports & Digital Literacy Programs',
-    category: 'SK Update',
-    summary: 'Targeting youth development across education, health, and sports for FY 2025 under RA 10742 and RA 11768 guidelines.',
-    date: 'Today',
-    image: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=700&q=80',
-  },
-]
-
 export default function Landing() {
   useScrollReveal()
 
   const [navOpen, setNavOpen] = useState(false)
 
-  // Live API States (defaults to fallback city news so carousel is never blank)
-  const [liveNews, setLiveNews] = useState<NewsItem[]>(DEFAULT_FALLBACK_NEWS)
+  // Live API States (strictly loaded from backend database)
+  const [liveNews, setLiveNews] = useState<NewsItem[]>([])
   const [liveProjects, setLiveProjects] = useState<ReportProject[]>([])
   const [summaryData, setSummaryData] = useState<{
     totalBudget: number
@@ -133,10 +106,8 @@ export default function Landing() {
           setSummaryData(prev => ({ ...prev, skOfficialsCount }))
         }
 
-        if (Array.isArray(newsRes) && newsRes.length > 0) {
+        if (Array.isArray(newsRes)) {
           setLiveNews(newsRes)
-        } else {
-          setLiveNews(DEFAULT_FALLBACK_NEWS)
         }
 
         if (Array.isArray(projRes)) {
@@ -700,7 +671,7 @@ export default function Landing() {
           {newsList.length > 0 ? (
             <>
               <div
-                className="news-carousel-outer reveal"
+                className="news-carousel-outer"
                 onMouseEnter={pauseAuto}
                 onMouseLeave={resumeAuto}
               >
@@ -709,13 +680,7 @@ export default function Landing() {
                   style={{ transform: `translateX(calc(-${newsIdx * (320 + 20)}px))` }}
                 >
                   {(newsList.length > 2 ? [...newsList, ...newsList] : newsList).map((item: any, i: number) => {
-                    const apiOrigin = (import.meta as any).env?.VITE_API_URL
-                      ? (import.meta as any).env.VITE_API_URL.replace(/\/api\/v1\/?$/, '')
-                      : 'https://frostbytehackathonrepo.onrender.com'
-                    const rawImg = item.image || item.imageURL || item.image_url
-                    const imgSrc = rawImg
-                      ? (rawImg.startsWith('http') ? rawImg : `${apiOrigin}${rawImg.startsWith('/') ? '' : '/'}${rawImg}`)
-                      : 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=700&q=80'
+                    const imgSrc = item.image || item.imageURL || item.image_url || 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=700&q=80'
 
                     return (
                       <div key={`${item.id}-${i}`} className="news-carousel-item">
