@@ -42,6 +42,17 @@ function getGrad(cat?: string) { return CATEGORY_GRAD[cat ?? 'default'] ?? CATEG
 // Merged in from the remote version — normalizes raw API status strings
 // (which may say things like "For Approval" or "Posted") into the four
 // statuses this UI actually renders, instead of just lowercasing blindly.
+const STATUS_LEVELS: Record<string, number> = {
+  'Incoming': 1, 'incoming': 1, 'upcoming': 1,
+  'In Progress': 2, 'in progress': 2, 'ongoing': 2,
+  'Completed': 3, 'completed': 3, 'posted': 3,
+}
+
+function getStatusLevel(st?: string): number {
+  if (!st) return 1
+  return STATUS_LEVELS[st] || 1
+}
+
 function mapApiProjectToReportProject(project: any, fallbackBarangay: string): ReportProject {
   const rawStatus = String(project?.projectStatus || project?.status || 'In Progress')
   const normalizedStatus = rawStatus.toLowerCase()
@@ -145,6 +156,7 @@ export default function SKProjects({ user }: SKProjectsProps) {
   const [newStart, setNewStart] = useState('')
   const [newEnd, setNewEnd] = useState('')
   const [newStatus, setNewStatus] = useState<string>('Incoming')
+  const [pendingStatusConfirm, setPendingStatusConfirm] = useState<string | null>(null)
   const [formError, setFormError] = useState('')
 
   // Proposal file attachment state (create mode only)
@@ -525,10 +537,16 @@ export default function SKProjects({ user }: SKProjectsProps) {
                     {canShowActions && (
                       <div className="v-card-actions" style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }} onClick={e => e.stopPropagation()}>
                         {canAttachReceipt && (
-                          <button className="btn btn-gold btn-sm" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }}
-                            onClick={() => { setSelectedProject(p); setOpenReceiptDirect(true) }}>
-                            Attach Receipt
-                          </button>
+                          getStatusLevel(p.projectStatus || p.status) === 3 ? (
+                            <button className="btn btn-secondary btn-sm" disabled style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem', opacity: 0.65, cursor: 'not-allowed' }} title="Receipt attachment locked — project is completed">
+                              🔒 Receipts Locked
+                            </button>
+                          ) : (
+                            <button className="btn btn-gold btn-sm" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }}
+                              onClick={() => { setSelectedProject(p); setOpenReceiptDirect(true) }}>
+                              Attach Receipt
+                            </button>
+                          )
                         )}
                         {canEdit && (
                           <>
@@ -653,28 +671,77 @@ export default function SKProjects({ user }: SKProjectsProps) {
                         )}
                       </div>
                     </div>
-                    <div className="form-group">
-                      <label className="form-label">Project Status *</label>
-                      <select
-                        className="form-input"
-                        value={newStatus}
-                        onChange={e => setNewStatus(e.target.value)}
-                        style={{
-                          appearance: 'none',
-                          WebkitAppearance: 'none',
-                          MozAppearance: 'none',
-                          backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23760031' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E\")",
-                          backgroundRepeat: 'no-repeat',
-                          backgroundPosition: 'right 0.85rem center',
-                          paddingRight: '2.2rem',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        <option value="Incoming">Incoming</option>
-                        <option value="In Progress">In Progress</option>
-                        <option value="Completed">Completed</option>
-                      </select>
-                    </div>
+                    {/* ── Status Progression — edit mode only (creation defaults automatically to Incoming) ── */}
+                    {formMode !== 'new' && (
+                      <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+                        <label className="form-label" style={{ fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+                          Change Project Status
+                        </label>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem' }}>
+                          {[
+                            { key: 'Incoming', label: 'Incoming', level: 1, icon: '📌' },
+                            { key: 'In Progress', label: 'In Progress', level: 2, icon: '⚡' },
+                            { key: 'Completed', label: 'Completed', level: 3, icon: '✓' },
+                          ].map(st => {
+                            const currentLevel = getStatusLevel(initialSnapshot.status || (formMode as ReportProject)?.projectStatus || (formMode as ReportProject)?.status)
+                            const isCurrent = newStatus === st.key
+                            const isBackward = currentLevel > st.level
+                            const isDisabled = isBackward
+
+                            return (
+                              <button
+                                key={st.key}
+                                type="button"
+                                disabled={isDisabled}
+                                onClick={() => {
+                                  if (!isCurrent && !isDisabled) {
+                                    setPendingStatusConfirm(st.key)
+                                  }
+                                }}
+                                style={{
+                                  padding: '0.65rem 0.5rem',
+                                  fontSize: '0.8rem',
+                                  fontFamily: 'var(--font-display)',
+                                  fontWeight: 800,
+                                  borderRadius: '8px',
+                                  border: isCurrent
+                                    ? '2px solid var(--maroon)'
+                                    : isDisabled
+                                    ? '1px dashed #ccc'
+                                    : '1.5px solid rgba(118,0,49,0.25)',
+                                  background: isCurrent
+                                    ? 'var(--maroon)'
+                                    : isDisabled
+                                    ? '#f5f5f5'
+                                    : '#fff',
+                                  color: isCurrent
+                                    ? '#fff'
+                                    : isDisabled
+                                    ? '#aaa'
+                                    : 'var(--maroon)',
+                                  cursor: isDisabled ? 'not-allowed' : 'pointer',
+                                  opacity: isDisabled ? 0.55 : 1,
+                                  transition: 'all 150ms ease',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'center',
+                                  gap: '0.2rem',
+                                }}
+                                title={isDisabled ? 'Status cannot be moved backwards' : isCurrent ? 'Current Status' : `Advance status to ${st.label}`}
+                              >
+                                <span style={{ fontSize: '1rem' }}>{st.icon}</span>
+                                <span>{st.label}</span>
+                                {isCurrent && <span style={{ fontSize: '0.62rem', opacity: 0.9, textTransform: 'uppercase' }}>(Current)</span>}
+                                {isDisabled && <span style={{ fontSize: '0.62rem', textTransform: 'uppercase' }}>(Locked)</span>}
+                              </button>
+                            )
+                          })}
+                        </div>
+                        <div style={{ fontSize: '0.74rem', color: 'var(--muted)', marginTop: '0.4rem', fontFamily: 'var(--font-display)' }}>
+                          ⚠️ Project status moves strictly forward (Incoming → In Progress → Completed). Past statuses cannot be reversed.
+                        </div>
+                      </div>
+                    )}
                     <div className="form-group">
                       <label className="form-label">Description</label>
                       <textarea className="form-input" rows={3} value={newDesc} onChange={e => setNewDesc(e.target.value)} placeholder="Brief description of the project…" style={{ resize: 'vertical', fontFamily: 'var(--font-body)' }} />
@@ -761,6 +828,23 @@ export default function SKProjects({ user }: SKProjectsProps) {
             setFeedback({ type: 'info', message: 'Changes discarded' })
           }}
           onCancel={() => setConfirmAction(null)}
+        />
+
+        {/* ── Status Progression Confirmation ── */}
+        <ConfirmDialog
+          isOpen={!!pendingStatusConfirm}
+          title="Confirm Project Status Change"
+          message={`Are you sure you want to advance the project status to "${pendingStatusConfirm}"? Status progression is permanent and cannot be reversed.`}
+          confirmLabel="Yes, Advance Status"
+          cancelLabel="Cancel"
+          danger={false}
+          onConfirm={() => {
+            if (pendingStatusConfirm) {
+              setNewStatus(pendingStatusConfirm)
+            }
+            setPendingStatusConfirm(null)
+          }}
+          onCancel={() => setPendingStatusConfirm(null)}
         />
       </div>
     </section>
