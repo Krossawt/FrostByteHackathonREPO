@@ -100,10 +100,6 @@ def get_project(
     current_user: Optional[User] = Depends(get_optional_user),
 ):
     project = _project_or_404(db, project_id)
-    # Non-SK users can only view Posted projects
-    if (current_user is None or current_user.userRole.value in {"Guest", "System"}):
-        if project.projectStatus != ProjectStatus.POSTED:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Project not yet published")
     return ProjectResponse.model_validate(project)
 
 

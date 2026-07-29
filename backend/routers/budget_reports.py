@@ -11,6 +11,7 @@ import uuid
 import random
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, Form
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from database import get_db
 from models import User, AnnualBudgetReport, AuditLog
@@ -67,8 +68,8 @@ def list_budget_reports(
     current_user: User = Depends(require_authenticated),
 ):
     query = db.query(AnnualBudgetReport)
-    if barangay:
-        query = query.filter(AnnualBudgetReport.budgetBarangay == barangay)
+    if barangay and barangay.strip() and barangay.strip() not in {"Santa Rosa City", "All", "all"}:
+        query = query.filter(func.lower(func.trim(AnnualBudgetReport.budgetBarangay)) == barangay.strip().lower())
     if year:
         query = query.filter(AnnualBudgetReport.budgetYear == year)
 

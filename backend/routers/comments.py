@@ -62,11 +62,6 @@ def get_comments(
     if not project:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
 
-    # Public can view comments on Posted projects only
-    if (current_user is None or current_user.userRole.value == "Guest"):
-        if project.projectStatus != ProjectStatus.POSTED:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Project not yet published")
-
     comments = (
         db.query(Comment)
         .filter(Comment.commentFor == project_id)
