@@ -401,10 +401,18 @@ export default function SuperAdminAccounts({ selectedBarangay }: SuperAdminAccou
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12" /></svg>
                   </button>
                 </div>
-                <form onSubmit={(e) => {
+                <form noValidate onSubmit={(e) => {
                   e.preventDefault()
-                  if (!newFullName.trim() || !newEmail.trim() || (formMode === 'new' && !newPassword)) {
-                    setFormError('Please fill in all required fields.')
+                  if (!newFullName.trim()) {
+                    setFormError('Please enter the full name.')
+                    return
+                  }
+                  if (!newEmail.trim()) {
+                    setFormError('Please enter an email address.')
+                    return
+                  }
+                  if (formMode === 'new' && !newPassword) {
+                    setFormError('Please enter a temporary password.')
                     return
                   }
                   setFormError('')
