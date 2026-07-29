@@ -17,6 +17,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [navOpen, setNavOpen] = useState(false)
   const [projectCount, setProjectCount] = useState(0)
+  const [totalBudget, setTotalBudget] = useState(0)
 
   useEffect(() => {
     async function loadProjectCount() {
@@ -24,6 +25,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
         const summary = await fetchExecutiveSummaryApi().catch(() => null)
         if (summary) {
           setProjectCount(Number(summary.totalProjects || 0))
+          setTotalBudget(Number(summary.totalBudget || 0))
         }
       } catch (err) {
         console.warn('Unable to load project count for login page:', err)
@@ -132,14 +134,16 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
           </p>
 
           <div className="landing-stats-section">
-            <p className="landing-stats-caption">As of 2025:</p>
+            <p className="landing-stats-caption">As of 2026:</p>
             <div className="landing-stats-row">
               <div className="landing-stat-item">
                 <span className="landing-stat-number">18</span>
                 <div className="landing-stat-label">Barangays<br />Joined</div>
               </div>
               <div className="landing-stat-item">
-                <span className="landing-stat-number">₱39M</span>
+                <span className="landing-stat-number">
+                  {totalBudget === 0 ? '₱0' : `₱${(totalBudget / 1_000_000).toFixed(1)}M`}
+                </span>
                 <div className="landing-stat-label-small">
                   Total SK Funds<br />
                   Released for<br />

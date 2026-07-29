@@ -89,6 +89,41 @@ export default function SuperAdminActivity({ selectedBarangay }: SuperAdminActiv
     return matchBrgy && matchAction && matchQ
   })
 
+  const exportLogsToCsv = () => {
+    const headers = ['ID', 'Actor', 'Action', 'Barangay', 'Date', 'Description']
+    const rows = filtered.map((log: any) => [
+      log.id ?? '',
+      log.actor ?? '',
+      log.action ?? '',
+      log.barangay ?? '',
+      log.date ?? '',
+      log.description ?? ''
+    ])
+
+    const escapeCsvValue = (value: string) => {
+      const stringValue = String(value ?? '')
+      if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n') || stringValue.includes('\r')) {
+        return `"${stringValue.replace(/"/g, '""')}"`
+      }
+      return stringValue
+    }
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(escapeCsvValue).join(','))
+    ].join('\n')
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `audit-logs-${new Date().toISOString().slice(0, 10)}.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+  }
+
   return (
     <section className="section section-accent-flow" style={{ paddingTop: '2.5rem', paddingBottom: '3.5rem' }}>
       <div className="container">
@@ -110,7 +145,11 @@ export default function SuperAdminActivity({ selectedBarangay }: SuperAdminActiv
                 Full audit trail of all actions taken by SK officers, citizens, and admins across all 18 barangays. Compliant with RA 10742 audit requirements.
               </p>
             </div>
-            <button className="btn btn-secondary" style={{ alignSelf: 'flex-start', marginTop: '0.4rem' }}>
+            <button
+              className="btn btn-secondary"
+              style={{ alignSelf: 'flex-start', marginTop: '0.4rem' }}
+              onClick={exportLogsToCsv}
+            >
               Export to CSV
             </button>
           </div>

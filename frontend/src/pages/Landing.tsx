@@ -201,7 +201,7 @@ export default function Landing() {
           <line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
         </svg>
       ),
-      val: totalBudget === 0 ? '₱0' : `₱${(totalBudget / 1_000_000).toFixed(1)}M`, lbl: 'Total SK Budget FY 2025',
+      val: totalBudget === 0 ? '₱0' : `₱${(totalBudget / 1_000_000).toFixed(1)}M`, lbl: 'Total SK Funds Released',
     },
     {
       icon: (
@@ -302,14 +302,14 @@ export default function Landing() {
 
             {/* Stats row */}
             <div className="landing-stats-section">
-              <p className="landing-stats-caption">As of 2025 · BSKE 2023–2025 Term:</p>
+              <p className="landing-stats-caption">As of 2026 · BSKE 2023–2026 Term:</p>
               <div className="landing-stats-row">
                 <div className="landing-stat-item">
                   <span className="landing-stat-number">18</span>
                   <div className="landing-stat-label">Barangays<br />Covered</div>
                 </div>
                 <div className="landing-stat-item">
-                  <span className="landing-stat-number">₱39M</span>
+                  <span className="landing-stat-number">{totalBudget === 0 ? '₱0' : `₱${(totalBudget / 1_000_000).toFixed(1)}M`}</span>
                   <div className="landing-stat-label-small">
                     Total SK Funds<br />Released for Youth<br />Programs
                   </div>
@@ -395,7 +395,7 @@ export default function Landing() {
               <div className="landing-section-label" style={{ color: 'var(--gold)' }}>Barangay Transparency Dashboard</div>
               <div className="brgy-view-name">Barangay {selectedBrgy}</div>
               <div className="brgy-view-sub">
-                City of Santa Rosa, Laguna · BSKE 2023–2025 Term · {brgyProj.length} projects · ₱{(brgyData?.annualBudget ?? 0).toLocaleString()} budget
+                City of Santa Rosa, Laguna · BSKE 2023–2026 Term · {brgyProj.length} projects · ₱{(brgyData?.annualBudget ?? 0).toLocaleString()} budget
               </div>
             </div>
             <div style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -420,7 +420,7 @@ export default function Landing() {
             <div className="stat-card card-accent">
               <div className="stat-value">{(brgyData?.annualBudget ?? 0) === 0 ? '₱0' : `₱${((brgyData?.annualBudget ?? 0) / 1_000_000).toFixed(2)}M`}</div>
               <div className="stat-label">Annual Allocation</div>
-              <div className="stat-sub">FY 2025 SK Fund</div>
+              <div className="stat-sub">FY 2026 SK Fund</div>
             </div>
             <div className="stat-card" style={{ borderLeft: '3px solid #b45309' }}>
               <div className="stat-value" style={{ color: '#b45309' }}>{(brgyData?.spent ?? 0) === 0 ? '₱0' : `₱${((brgyData?.spent ?? 0) / 1_000_000).toFixed(2)}M`}</div>
@@ -481,7 +481,7 @@ export default function Landing() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 0.9rem', background: 'rgba(255,255,255,0.9)', border: '1px solid rgba(118,0,49,0.1)' }}>
                   <div>
                     <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.86rem' }}>SK Official Council</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>Serving BSKE 2023–2025 Term</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>Serving BSKE 2023–2026 Term</div>
                   </div>
                   <Link to="/sks" className="btn btn-secondary btn-sm">View Directory</Link>
                 </div>
@@ -561,7 +561,7 @@ export default function Landing() {
             <div className="landing-section-title">Santa Rosa SK at a Glance</div>
             <div className="landing-section-sub">
               Consolidated financial and project data for all 18 barangays of Santa Rosa City, Laguna.
-              Data reflects the 2023–2025 BSKE term under RA 10742 as amended by RA 11768.
+              Data reflects the 2023–2026 BSKE term under RA 10742 as amended by RA 11768.
             </div>
           </div>
 

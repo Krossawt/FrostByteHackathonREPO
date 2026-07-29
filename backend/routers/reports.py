@@ -29,7 +29,8 @@ BARANGAYS = [
 @router.get("/summary", response_model=CityConsolidatedReport, include_in_schema=False)
 def get_consolidated_report(db: Session = Depends(get_db)):
     barangay_summaries = []
-    total_budget = 0.0
+    total_budget_sum = db.query(func.coalesce(func.sum(AnnualBudgetReport.budgetValue), 0.0)).scalar()
+    total_budget = float(total_budget_sum or 0.0)
     total_spent = 0.0
     total_projects = 0
     ongoing_count = 0
@@ -98,7 +99,6 @@ def get_consolidated_report(db: Session = Depends(get_db)):
             completedCount=barangay_completed,
         ))
 
-        total_budget += annual_budget
         total_spent += spent
         total_projects += len(all_projects)
         ongoing_count += barangay_ongoing

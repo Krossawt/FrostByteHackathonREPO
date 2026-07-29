@@ -3,7 +3,7 @@ import { DonutChart } from '../components/MiniChart'
 import ProjectDetailModal from '../components/ProjectDetailModal'
 import type { ReportProject } from '../types'
 import Portal from '../components/Portal'
-import { fetchProjectsApi, fetchExecutiveSummaryApi, fetchAuditLogsApi, postApprovedAbyipApi } from '../services/api'
+import { fetchProjectsApi, fetchExecutiveSummaryApi, fetchAuditLogsApi, postApprovedAbyipApi, createNewsletterApi } from '../services/api'
 
 // ── Category cover images (same palette as SKProjects) ──────────────────────
 const CATEGORY_IMAGES: Record<string, string> = {
@@ -24,6 +24,15 @@ const CATEGORY_IMAGES: Record<string, string> = {
 }
 function getCover(cat?: string) {
   return CATEGORY_IMAGES[cat ?? 'Other'] ?? CATEGORY_IMAGES['Other']
+}
+
+function formatMillionsTruncate(amount: number, decimals = 2) {
+  if (amount === 0) {
+    return '₱0'
+  }
+  const factor = Math.pow(10, decimals)
+  const truncatedValue = Math.floor((amount * factor) / 1_000_000) / factor
+  return `₱${truncatedValue.toFixed(decimals)}M`
 }
 
 interface SuperAdminHomeProps {
@@ -134,6 +143,15 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
         budgetFileURL: `/static/uploads/${selectedFile.name}`
       })
 
+      await createNewsletterApi({
+        title: `ABYIP Approved for Barangay ${selectedBarangay}`,
+        summary: `Barangay ${selectedBarangay} receives ₱${budgetVal.toLocaleString()} as their annual budget for the fiscal year ${parseInt(annualYear) || 2026}.`,
+        category: 'ABYIP',
+        projectLocation: selectedBarangay,
+      }).catch((newsErr: any) => {
+        console.warn('Failed to auto-create ABYIP newsletter:', newsErr)
+      })
+
       setBarangayList((prev: any[]) =>
         prev.map((b: any) =>
           b.barangay === selectedBarangay
@@ -143,7 +161,7 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
       )
 
       setIsSubmitting(false)
-      setSuccessMessage(`ABYIP (FY ${annualYear}) for Barangay ${selectedBarangay} — ₱${budgetVal.toLocaleString()} has been successfully posted to live database!`)
+      setSuccessMessage(`ABYIP (FY ${annualYear}) for Barangay ${selectedBarangay} — ₱${budgetVal.toLocaleString()} has been successfully posted to live database! A newsletter announcement has been generated.`)
     } catch (err: any) {
       setIsSubmitting(false)
       setErrorMessage(err.message || 'Failed to post approved ABYIP to backend')
@@ -239,12 +257,12 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
         {/* ── Stat Cards (always show, data changes by context) ── */}
         <div className="card-grid card-grid-4" style={{ marginBottom: '1.5rem' }}>
           <div className="stat-card card-accent">
-            <div className="stat-value">{displayBudget === 0 ? '₱0' : `₱${(displayBudget / 1_000_000).toFixed(2)}M`}</div>
+            <div className="stat-value">{formatMillionsTruncate(displayBudget, 2)}</div>
             <div className="stat-label">{selectedBarangay ? `Barangay ${selectedBarangay} ABYIP Budget` : 'Total SK Budget FY 2025'}</div>
             <div className="stat-sub">{selectedBarangay ? 'FY 2025 Allocation' : '18 Barangays combined'}</div>
           </div>
           <div className="stat-card" style={{ borderLeft: '3px solid #b45309' }}>
-            <div className="stat-value" style={{ color: '#b45309' }}>{displaySpent === 0 ? '₱0' : `₱${(displaySpent / 1_000_000).toFixed(2)}M`}</div>
+            <div className="stat-value" style={{ color: '#b45309' }}>{formatMillionsTruncate(displaySpent, 2)}</div>
             <div className="stat-label">Total Disbursed</div>
             <div className="stat-sub">{displayUsage}% utilization rate</div>
           </div>
@@ -272,9 +290,9 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
                 <div style={{ flex: 1 }}>
                   <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.88rem', marginBottom: '0.5rem' }}>City-Wide SK Fund Utilization</div>
                   {[
-                    { label: 'Total Budget', val: totalBudget === 0 ? '₱0' : `₱${(totalBudget/1_000_000).toFixed(1)}M`, color: 'var(--maroon)' },
-                    { label: 'Disbursed',    val: totalSpent === 0 ? '₱0' : `₱${(totalSpent/1_000_000).toFixed(1)}M`,  color: '#b45309' },
-                    { label: 'Remaining',   val: (totalBudget-totalSpent) === 0 ? '₱0' : `₱${((totalBudget-totalSpent)/1_000_000).toFixed(1)}M`, color: '#166534' },
+                    { label: 'Total Budget', val: formatMillionsTruncate(totalBudget, 1), color: 'var(--maroon)' },
+                    { label: 'Disbursed',    val: formatMillionsTruncate(totalSpent, 1),  color: '#b45309' },
+                    { label: 'Remaining',   val: formatMillionsTruncate(totalBudget - totalSpent, 1), color: '#166534' },
                   ].map(item => (
                     <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontFamily: 'var(--font-display)', marginBottom: '0.25rem' }}>
                       <span style={{ color: 'var(--muted)' }}>{item.label}</span>
@@ -327,8 +345,8 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
                           <div className="progress-fill" style={{ width: `${pct}%`, background: pct >= 70 ? 'linear-gradient(90deg, #b45309, #f59e0b)' : undefined }} />
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.4rem', fontSize: '0.72rem', color: 'var(--muted)', fontFamily: 'var(--font-display)' }}>
-                          <span>{b.spent === 0 ? '₱0' : `₱${(b.spent / 1_000_000).toFixed(2)}M`}</span>
-                          <span>{b.annualBudget === 0 ? '₱0' : `₱${(b.annualBudget / 1_000_000).toFixed(2)}M`}</span>
+                          <span>{formatMillionsTruncate(b.spent, 2)}</span>
+                          <span>{formatMillionsTruncate(b.annualBudget, 2)}</span>
                         </div>
                       </div>
                     )
@@ -398,14 +416,14 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
                       Barangay {selectedBarangay}
                     </div>
                     <div style={{ fontSize: '0.82rem', color: 'rgba(255,255,255,0.7)', marginTop: '0.2rem' }}>
-                      {bSummary.projects} project{bSummary.projects !== 1 ? 's' : ''} · ABYIP Allocation: {bSummary.annualBudget === 0 ? '₱0' : `₱${(bSummary.annualBudget / 1_000_000).toFixed(2)}M`}
+                      {bSummary.projects} project{bSummary.projects !== 1 ? 's' : ''} · ABYIP Allocation: {formatMillionsTruncate(bSummary.annualBudget, 2)}
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
                     {[
-                      { label: 'Budget', val: bSummary.annualBudget === 0 ? '₱0' : `₱${(bSummary.annualBudget/1_000_000).toFixed(2)}M`, color: '#fef3c7' },
-                      { label: 'Disbursed', val: bSummary.spent === 0 ? '₱0' : `₱${(bSummary.spent/1_000_000).toFixed(2)}M`, color: '#fed7aa' },
-                      { label: 'Remaining', val: bSummary.remaining === 0 ? '₱0' : `₱${(bSummary.remaining/1_000_000).toFixed(2)}M`, color: '#bbf7d0' },
+                      { label: 'Budget', val: formatMillionsTruncate(bSummary.annualBudget, 2), color: '#fef3c7' },
+                      { label: 'Disbursed', val: formatMillionsTruncate(bSummary.spent, 2), color: '#fed7aa' },
+                      { label: 'Remaining', val: formatMillionsTruncate(bSummary.remaining, 2), color: '#bbf7d0' },
                     ].map(item => (
                       <div key={item.label} style={{ textAlign: 'center', background: 'rgba(255,255,255,0.12)', padding: '0.5rem 0.9rem', borderRadius: '8px' }}>
                         <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: '1rem', color: item.color }}>{item.val}</div>
@@ -429,9 +447,9 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
                       ABYIP Fund Utilization — Barangay {selectedBarangay}
                     </div>
                     {[
-                      { label: 'ABYIP Budget', val: bSummary.annualBudget === 0 ? '₱0' : `₱${(bSummary.annualBudget/1_000_000).toFixed(2)}M`, color: 'var(--maroon)' },
-                      { label: 'Disbursed',    val: bSummary.spent === 0 ? '₱0' : `₱${(bSummary.spent/1_000_000).toFixed(2)}M`, color: '#b45309' },
-                      { label: 'Remaining',   val: bSummary.remaining === 0 ? '₱0' : `₱${(bSummary.remaining/1_000_000).toFixed(2)}M`, color: '#166534' },
+                      { label: 'ABYIP Budget', val: formatMillionsTruncate(bSummary.annualBudget, 2), color: 'var(--maroon)' },
+                      { label: 'Disbursed',    val: formatMillionsTruncate(bSummary.spent, 2), color: '#b45309' },
+                      { label: 'Remaining',   val: formatMillionsTruncate(bSummary.remaining, 2), color: '#166534' },
                     ].map(item => (
                       <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontFamily: 'var(--font-display)', marginBottom: '0.25rem' }}>
                         <span style={{ color: 'var(--muted)' }}>{item.label}</span>
