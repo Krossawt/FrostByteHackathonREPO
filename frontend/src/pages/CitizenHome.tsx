@@ -4,13 +4,11 @@ import ProjectDetailModal from '../components/ProjectDetailModal'
 import BarangayTransactionsModal from '../components/BarangayTransactionsModal'
 import { DonutChart } from '../components/MiniChart'
 import SingleNewsCarousel from '../components/SingleNewsCarousel'
-import { fetchProjectsApi, fetchBarangayReportApi, fetchNewsApi } from '../services/api'
-import Portal from '../components/Portal'
+import { fetchProjectsApi, fetchBarangayReportApi, fetchNewsApi, postCommentApi } from '../services/api'import Portal from '../components/Portal'
 
 function formatPeso(amount: number) {
   return `₱${Math.round(amount || 0).toLocaleString('en-PH')}`
 }
-
 interface CitizenHomeProps { user?: UserAccount | null }
 
 const CATEGORY_IMAGES: Record<string, string> = {
@@ -119,21 +117,30 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
         setNews(mappedNews)
 
         if (Array.isArray(projRes)) {
-          setLocalProjects(projRes.map((p: any) => ({
-            id: String(p.projectID || p.id),
-            title: p.projectName || p.title,
-            barangay: p.projectLocation || barangay,
-            category: p.projectCategory || 'Education',
-            status: p.projectStatus ? p.projectStatus.toLowerCase() as any : 'ongoing',
-            proposedBudget: Number(p.projectBudget || 0),
-            spent: Number(p.projectBreakdown || 0),
-            remainingBudget: Math.max(0, Number(p.projectBudget || 0) - Number(p.projectBreakdown || 0)),
-            progress: p.projectProgress || 0,
-            progressPercent: p.projectProgress || 0,
-            startDate: p.projectStartTime ? new Date(p.projectStartTime).toISOString().split('T')[0] : '',
-            endDate: p.projectEndTime ? new Date(p.projectEndTime).toISOString().split('T')[0] : '',
-            description: p.projectDescription || '',
-          })))
+          setLocalProjects(projRes.map((p: any) => {
+            const rawSt = String(p.projectStatus || p.status || 'ongoing').toLowerCase()
+            const mappedStatus: 'ongoing' | 'upcoming' | 'completed' = rawSt.includes('post') || rawSt.includes('complete')
+              ? 'completed'
+              : rawSt.includes('draft') || rawSt.includes('finance') || rawSt.includes('approval')
+                ? 'upcoming'
+                : 'ongoing'
+
+            return {
+              id: String(p.projectID || p.id),
+              title: p.projectName || p.title,
+              barangay: p.projectLocation || barangay,
+              category: p.projectCategory || 'Education',
+              status: mappedStatus,
+              proposedBudget: Number(p.projectBudget || 0),
+              spent: Number(p.projectBreakdown || 0),
+              remainingBudget: Math.max(0, Number(p.projectBudget || 0) - Number(p.projectBreakdown || 0)),
+              progress: p.projectProgress || 0,
+              progressPercent: p.projectProgress || 0,
+              startDate: p.projectStartTime ? new Date(p.projectStartTime).toISOString().split('T')[0] : '',
+              endDate: p.projectEndTime ? new Date(p.projectEndTime).toISOString().split('T')[0] : '',
+              description: p.projectDescription || '',
+            }
+          }))
         }
 
         if (repRes) {
@@ -173,9 +180,23 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
   const remain = summary.remaining
   const usagePct = budget > 0 ? Math.min(Math.round((spent / budget) * 100), 100) : 0
 
-  const handleComment = (e: FormEvent) => {
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false)
+
+  const handleComment = async (e: FormEvent) => {
     e.preventDefault()
-    if (comment.trim()) {
+    if (!comment.trim()) return
+    const targetProject = localProjects.length > 0 ? localProjects[0] : null
+    const targetProjectId = targetProject ? Number(targetProject.id) : 1
+    setIsSubmittingComment(true)
+
+    try {
+      if (!isNaN(targetProjectId) && targetProjectId > 0) {
+        await postCommentApi({
+          commentFor: targetProjectId,
+          commentDetails: `[${suggestionCat}] ${comment.trim()}`,
+          commentType: 'suggestion',
+        })
+      }
       const newC = {
         id: `C-${Date.now()}`,
         barangay,
@@ -189,6 +210,10 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
       setSubmitted(true)
       setComment('')
       setTimeout(() => setSubmitted(false), 4000)
+    } catch (err: any) {
+      console.warn('API error posting suggestion:', err)
+    } finally {
+      setIsSubmittingComment(false)
     }
   }
 
