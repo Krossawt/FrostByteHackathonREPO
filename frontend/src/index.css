@@ -3913,3 +3913,14 @@ tbody tr:last-child td {
 .btn-save:hover {
   background: rgba(22, 101, 52, 0.14);
 }
+
+@media (max-width: 480px) {
+  .modal-footer {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .modal-footer .btn {
+    width: 100%;
+  }
+}

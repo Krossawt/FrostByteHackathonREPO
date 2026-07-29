@@ -1,26 +1,27 @@
 import { useState, useEffect } from 'react'
 import { DonutChart } from '../components/MiniChart'
 import ProjectDetailModal from '../components/ProjectDetailModal'
+import ConfirmDialog from '../components/ConfirmDialog'
 import type { ReportProject } from '../types'
 import Portal from '../components/Portal'
 import { fetchProjectsApi, fetchExecutiveSummaryApi, fetchAuditLogsApi, postApprovedAbyipApi, createNewsletterApi } from '../services/api'
 
 // ── Category cover images (same palette as SKProjects) ──────────────────────
 const CATEGORY_IMAGES: Record<string, string> = {
-  'Education':            'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=640&q=75',
-  'Health':               'https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=640&q=75',
-  'Sports':               'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=640&q=75',
-  'Sports & Recreation':  'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=640&q=75',
-  'Environment':          'https://images.unsplash.com/photo-1588880331179-bc9b93a8cb5e?w=640&q=75',
-  'Infrastructure':       'https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=640&q=75',
-  'Livelihood':           'https://images.unsplash.com/photo-1556761175-b413da4baf72?w=640&q=75',
-  'Capacity Building':    'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=640&q=75',
-  'Peace & Order':        'https://images.unsplash.com/photo-1589994160839-163cd867cfe8?w=640&q=75',
-  'Arts & Culture':       'https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=640&q=75',
-  'Disaster Preparedness':'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=640&q=75',
-  'Governance':           'https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?w=640&q=75',
-  'Health & Wellness':    'https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=640&q=75',
-  'Other':                'https://images.unsplash.com/photo-1532629345422-7515f3d16bb6?w=640&q=75',
+  'Education': 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=640&q=75',
+  'Health': 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=640&q=75',
+  'Sports': 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=640&q=75',
+  'Sports & Recreation': 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=640&q=75',
+  'Environment': 'https://images.unsplash.com/photo-1588880331179-bc9b93a8cb5e?w=640&q=75',
+  'Infrastructure': 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=640&q=75',
+  'Livelihood': 'https://images.unsplash.com/photo-1556761175-b413da4baf72?w=640&q=75',
+  'Capacity Building': 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=640&q=75',
+  'Peace & Order': 'https://images.unsplash.com/photo-1589994160839-163cd867cfe8?w=640&q=75',
+  'Arts & Culture': 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=640&q=75',
+  'Disaster Preparedness': 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=640&q=75',
+  'Governance': 'https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?w=640&q=75',
+  'Health & Wellness': 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=640&q=75',
+  'Other': 'https://images.unsplash.com/photo-1532629345422-7515f3d16bb6?w=640&q=75',
 }
 function getCover(cat?: string) {
   return CATEGORY_IMAGES[cat ?? 'Other'] ?? CATEGORY_IMAGES['Other']
@@ -39,6 +40,8 @@ interface SuperAdminHomeProps {
   selectedBarangay: string
   setSelectedBarangay: (b: string) => void
 }
+
+type Feedback = { type: 'success' | 'info'; message: string }
 
 export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }: SuperAdminHomeProps) {
   const [view, setView] = useState<'city' | 'barangay'>(selectedBarangay ? 'barangay' : 'city')
@@ -60,6 +63,12 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
   const [successMessage, setSuccessMessage] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
 
+  // Discard-changes confirmation for the ABYIP modal
+  const [confirmAction, setConfirmAction] = useState<'cancel' | null>(null)
+
+  // Feedback banner (glass-style, portal-rendered — success = green, info = maroon)
+  const [feedback, setFeedback] = useState<Feedback | null>(null)
+
   const openBudgetModal = () => setShowBudgetModal(true)
 
   const handleCloseBudgetModal = () => {
@@ -69,6 +78,27 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
     setSelectedFile(null)
     setSuccessMessage('')
     setErrorMessage('')
+  }
+
+  // Form is only considered "dirty" if the user actually changed something
+  // from the defaults — nothing entered means Cancel closes immediately.
+  const isBudgetFormDirty = () => {
+    return !!selectedFile || approvedBudget !== '' || annualYear !== '2025'
+  }
+
+  // X button, overlay click, and Cancel button all route through here.
+  // Already on the success screen → just close, nothing to lose.
+  // Otherwise → only prompt when the form actually has unsaved input.
+  const requestCloseBudgetModal = () => {
+    if (successMessage) {
+      handleCloseBudgetModal()
+      return
+    }
+    if (isBudgetFormDirty()) {
+      setConfirmAction('cancel')
+    } else {
+      handleCloseBudgetModal()
+    }
   }
 
   // Live API State
@@ -114,6 +144,13 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
     }
     loadLiveData()
   }, [])
+
+  // Auto-dismiss feedback banner after 3 seconds
+  useEffect(() => {
+    if (!feedback) return
+    const timer = setTimeout(() => setFeedback(null), 3000)
+    return () => clearTimeout(timer)
+  }, [feedback])
 
   const handleSubmitBudget = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -162,6 +199,7 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
 
       setIsSubmitting(false)
       setSuccessMessage(`ABYIP (FY ${annualYear}) for Barangay ${selectedBarangay} — ₱${budgetVal.toLocaleString()} has been successfully posted to live database! A newsletter announcement has been generated.`)
+      setFeedback({ type: 'success', message: 'Post Approved ABYIP successfully' })
     } catch (err: any) {
       setIsSubmitting(false)
       setErrorMessage(err.message || 'Failed to post approved ABYIP to backend')
@@ -170,17 +208,17 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
 
   // ── Computed values ──────────────────────────────────────────────────────
   const totalBudget = barangayList.reduce((s: number, b: any) => s + (b.annualBudget || 0), 0)
-  const totalSpent  = barangayList.reduce((s: number, b: any) => s + (b.spent || 0), 0)
-  const totalProj   = liveProjects.length
-  const usagePct    = totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0
+  const totalSpent = barangayList.reduce((s: number, b: any) => s + (b.spent || 0), 0)
+  const totalProj = liveProjects.length
+  const usagePct = totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0
 
-  const bSummary  = selectedBarangay ? barangayList.find((b: any) => b.barangay === selectedBarangay) : null
+  const bSummary = selectedBarangay ? barangayList.find((b: any) => b.barangay === selectedBarangay) : null
   const bProjects = selectedBarangay ? liveProjects.filter((p: any) => p.barangay === selectedBarangay || p.projectLocation === selectedBarangay) : []
 
   const displayBudget = selectedBarangay && bSummary ? bSummary.annualBudget : totalBudget
-  const displaySpent  = selectedBarangay && bSummary ? bSummary.spent : totalSpent
-  const displayProj   = selectedBarangay ? bProjects.length : totalProj
-  const displayUsage  = displayBudget > 0 ? Math.min(Math.round((displaySpent / displayBudget) * 100), 100) : 0
+  const displaySpent = selectedBarangay && bSummary ? bSummary.spent : totalSpent
+  const displayProj = selectedBarangay ? bProjects.length : totalProj
+  const displayUsage = displayBudget > 0 ? Math.min(Math.round((displaySpent / displayBudget) * 100), 100) : 0
 
   const recentLogs = logs.slice(0, 10)
 
@@ -192,6 +230,59 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
   return (
     <section className="section section-accent-flow" style={{ paddingTop: '2.5rem', paddingBottom: '3.5rem' }}>
       <div className="container">
+
+        {/* ── Feedback Banner ── */}
+        {feedback && (
+          <Portal>
+            <div
+              style={{
+                position: 'fixed',
+                top: 'calc(var(--header-height, 78px) + 1rem)',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                zIndex: 10000,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.6rem',
+                background: feedback.type === 'success' ? 'rgba(22, 101, 52, 0.22)' : 'rgba(118, 0, 49, 0.18)',
+                backdropFilter: 'blur(16px) saturate(1.6)',
+                WebkitBackdropFilter: 'blur(16px) saturate(1.6)',
+                color: feedback.type === 'success' ? '#0d3d20' : '#5c0026',
+                fontFamily: 'var(--font-display)',
+                fontWeight: 700,
+                fontSize: '0.9rem',
+                padding: '0.9rem 1.4rem',
+                borderRadius: '14px',
+                border: '1.5px solid rgba(255, 255, 255, 0.35)',
+                boxShadow: feedback.type === 'success'
+                  ? '0 12px 32px rgba(22,101,52,0.25), inset 0 1px 0 rgba(255,255,255,0.4)'
+                  : '0 12px 32px rgba(118,0,49,0.18), inset 0 1px 0 rgba(255,255,255,0.4)',
+                maxWidth: '90vw',
+                animation: 'toastPop 220ms ease-out',
+              }}
+            >
+              {feedback.type === 'success' ? (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0 }}>
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M8 12l3 3 5-6" />
+                </svg>
+              ) : (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0 }}>
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M12 8v5" />
+                  <path d="M12 16h.01" />
+                </svg>
+              )}
+              <span>{feedback.message}</span>
+            </div>
+            <style>{`
+              @keyframes toastPop {
+                from { opacity: 0; transform: translateX(-50%) translateY(-12px) scale(0.96); }
+                to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+              }
+            `}</style>
+          </Portal>
+        )}
 
         {/* ── Back breadcrumb: only when a barangay is selected ── */}
         {selectedBarangay && (
@@ -214,7 +305,7 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
                 color: 'var(--maroon)', padding: 0,
               }}
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
               City Overview
             </button>
             <span style={{ color: 'var(--muted)', fontSize: '0.78rem' }}>/</span>
@@ -247,7 +338,7 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
                 onClick={openBudgetModal}
                 style={{ alignSelf: 'flex-start', marginTop: '0.4rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14"/></svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14" /></svg>
                 Post Approved ABYIP
               </button>
             )}
@@ -291,8 +382,8 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
                   <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.88rem', marginBottom: '0.5rem' }}>City-Wide SK Fund Utilization</div>
                   {[
                     { label: 'Total Budget', val: formatMillionsTruncate(totalBudget, 1), color: 'var(--maroon)' },
-                    { label: 'Disbursed',    val: formatMillionsTruncate(totalSpent, 1),  color: '#b45309' },
-                    { label: 'Remaining',   val: formatMillionsTruncate(totalBudget - totalSpent, 1), color: '#166534' },
+                    { label: 'Disbursed', val: formatMillionsTruncate(totalSpent, 1), color: '#b45309' },
+                    { label: 'Remaining', val: formatMillionsTruncate(totalBudget - totalSpent, 1), color: '#166534' },
                   ].map(item => (
                     <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontFamily: 'var(--font-display)', marginBottom: '0.25rem' }}>
                       <span style={{ color: 'var(--muted)' }}>{item.label}</span>
@@ -304,8 +395,8 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
               <div className="chart-card">
                 <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.88rem', marginBottom: '0.75rem' }}>Project Status Breakdown</div>
                 {[
-                  { label: 'Ongoing',   count: liveProjects.filter((p: any) => p.status === 'ongoing').length,   color: 'var(--maroon)' },
-                  { label: 'Upcoming',  count: liveProjects.filter((p: any) => p.status === 'upcoming').length,  color: '#1d4ed8' },
+                  { label: 'Ongoing', count: liveProjects.filter((p: any) => p.status === 'ongoing').length, color: 'var(--maroon)' },
+                  { label: 'Upcoming', count: liveProjects.filter((p: any) => p.status === 'upcoming').length, color: '#1d4ed8' },
                   { label: 'Completed', count: liveProjects.filter((p: any) => p.status === 'completed').length, color: '#166534' },
                 ].map(s => (
                   <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.6rem' }}>
@@ -448,8 +539,8 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
                     </div>
                     {[
                       { label: 'ABYIP Budget', val: formatMillionsTruncate(bSummary.annualBudget, 2), color: 'var(--maroon)' },
-                      { label: 'Disbursed',    val: formatMillionsTruncate(bSummary.spent, 2), color: '#b45309' },
-                      { label: 'Remaining',   val: formatMillionsTruncate(bSummary.remaining, 2), color: '#166534' },
+                      { label: 'Disbursed', val: formatMillionsTruncate(bSummary.spent, 2), color: '#b45309' },
+                      { label: 'Remaining', val: formatMillionsTruncate(bSummary.remaining, 2), color: '#166534' },
                     ].map(item => (
                       <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontFamily: 'var(--font-display)', marginBottom: '0.25rem' }}>
                         <span style={{ color: 'var(--muted)' }}>{item.label}</span>
@@ -570,148 +661,164 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
         {/* ── Post Approved ABYIP Modal ── */}
         {showBudgetModal && selectedBarangay && (
           <Portal>
-          <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) handleCloseBudgetModal() }}>
-            <div className="modal" style={{ maxWidth: '520px' }}>
-              <div className="modal-header">
-                <span className="modal-title">Post Approved ABYIP — Barangay {selectedBarangay}</span>
-                <button className="modal-close" onClick={handleCloseBudgetModal}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
-                </button>
-              </div>
-              <form onSubmit={handleSubmitBudget}>
-                <div className="modal-body">
-                  {/* Context banner */}
-                  {!successMessage && (
-                    <div className="notice info" style={{ fontSize: '0.82rem' }}>
-                      Annual Barangay Youth Investment Program (ABYIP) for <strong>Barangay {selectedBarangay}</strong>.
-                      Upload the official approved document first — budget details will then appear.
-                    </div>
-                  )}
-
-                  {successMessage && (
-                    <div className="notice success">{successMessage}</div>
-                  )}
-                  {errorMessage && (
-                    <div className="notice error">{errorMessage}</div>
-                  )}
-
-                  {!successMessage && (
-                    <>
-                      {/* ── STEP 1: Upload Document (always visible) ── */}
-                      <div className="field-group">
-                        <label className="field-label">
-                          Step 1 — Upload Approved ABYIP Document *
-                        </label>
-                        {selectedFile ? (
-                          <div style={{
-                            border: '1.5px dashed var(--maroon)',
-                            background: 'rgba(118, 0, 49, 0.03)',
-                            padding: '1rem',
-                            borderRadius: '8px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            gap: '1rem'
-                          }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--maroon)" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
-                              <div style={{ textAlign: 'left' }}>
-                                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.85rem', color: 'var(--ink)' }}>{selectedFile.name}</div>
-                                <div style={{ fontSize: '0.74rem', color: 'var(--muted)' }}>{(selectedFile.size / 1024).toFixed(1)} KB — Document attached ✓</div>
-                              </div>
-                            </div>
-                            <button type="button" className="btn btn-secondary btn-sm" style={{ padding: '0.3rem 0.6rem' }} onClick={() => setSelectedFile(null)}>
-                              Remove
-                            </button>
-                          </div>
-                        ) : (
-                          <label className="upload-zone">
-                            <input
-                              type="file"
-                              style={{ display: 'none' }}
-                              accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
-                              onChange={e => {
-                                if (e.target.files && e.target.files[0]) {
-                                  setSelectedFile(e.target.files[0])
-                                }
-                              }}
-                            />
-                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--maroon)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                            <div>
-                              <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.85rem', color: 'var(--maroon)' }}>Click to upload ABYIP document</span> or drag and drop
-                            </div>
-                            <span style={{ fontSize: '0.72rem', color: 'var(--muted)' }}>PDF, DOCX, XLSX, or Image — up to 10MB</span>
-                          </label>
-                        )}
+            <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) requestCloseBudgetModal() }}>
+              <div className="modal" style={{ maxWidth: '520px' }}>
+                <div className="modal-header">
+                  <span className="modal-title">Post Approved ABYIP — Barangay {selectedBarangay}</span>
+                  <button className="modal-close" onClick={requestCloseBudgetModal}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12" /></svg>
+                  </button>
+                </div>
+                <form onSubmit={handleSubmitBudget}>
+                  <div className="modal-body">
+                    {/* Context banner */}
+                    {!successMessage && (
+                      <div className="notice info" style={{ fontSize: '0.82rem' }}>
+                        Annual Barangay Youth Investment Program (ABYIP) for <strong>Barangay {selectedBarangay}</strong>.
+                        Upload the official approved document first — budget details will then appear.
                       </div>
+                    )}
 
-                      {/* ── STEP 2: Budget details — ONLY visible after file is uploaded ── */}
-                      {selectedFile && (
-                        <>
-                          <div className="field-group">
-                            <label className="field-label">Target Barangay</label>
-                            <input
-                              type="text"
-                              className="input"
-                              value={`Barangay ${selectedBarangay}`}
-                              disabled
-                              style={{ background: 'rgba(0,0,0,0.04)', fontWeight: 700, color: 'var(--maroon)' }}
-                            />
-                          </div>
+                    {successMessage && (
+                      <div className="notice success">{successMessage}</div>
+                    )}
+                    {errorMessage && (
+                      <div className="notice error">{errorMessage}</div>
+                    )}
 
-                          <div className="field-group">
-                            <label className="field-label">Step 2 — Fiscal Year (FY) *</label>
-                            <select
-                              className="input"
-                              value={annualYear}
-                              onChange={e => setAnnualYear(e.target.value)}
-                              required
-                            >
-                              <option value="2023">2023</option>
-                              <option value="2024">2024</option>
-                              <option value="2025">2025</option>
-                              <option value="2026">2026</option>
-                            </select>
-                          </div>
+                    {!successMessage && (
+                      <>
+                        {/* ── STEP 1: Upload Document (always visible) ── */}
+                        <div className="field-group">
+                          <label className="field-label">
+                            Step 1 — Upload Approved ABYIP Document *
+                          </label>
+                          {selectedFile ? (
+                            <div style={{
+                              border: '1.5px dashed var(--maroon)',
+                              background: 'rgba(118, 0, 49, 0.03)',
+                              padding: '1rem',
+                              borderRadius: '8px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: '1rem'
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--maroon)" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                                <div style={{ textAlign: 'left' }}>
+                                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.85rem', color: 'var(--ink)' }}>{selectedFile.name}</div>
+                                  <div style={{ fontSize: '0.74rem', color: 'var(--muted)' }}>{(selectedFile.size / 1024).toFixed(1)} KB — Document attached ✓</div>
+                                </div>
+                              </div>
+                              <button type="button" className="btn btn-secondary btn-sm" style={{ padding: '0.3rem 0.6rem' }} onClick={() => setSelectedFile(null)}>
+                                Remove
+                              </button>
+                            </div>
+                          ) : (
+                            <label className="upload-zone">
+                              <input
+                                type="file"
+                                style={{ display: 'none' }}
+                                accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+                                onChange={e => {
+                                  if (e.target.files && e.target.files[0]) {
+                                    setSelectedFile(e.target.files[0])
+                                  }
+                                }}
+                              />
+                              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--maroon)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                              <div>
+                                <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.85rem', color: 'var(--maroon)' }}>Click to upload ABYIP document</span> or drag and drop
+                              </div>
+                              <span style={{ fontSize: '0.72rem', color: 'var(--muted)' }}>PDF, DOCX, XLSX, or Image — up to 10MB</span>
+                            </label>
+                          )}
+                        </div>
 
-                          <div className="field-group">
-                            <label className="field-label">Step 3 — Approved ABYIP Budget Amount (₱) *</label>
-                            <input
-                              type="number"
-                              className="input"
-                              placeholder="e.g. 2500000"
-                              value={approvedBudget}
-                              onChange={e => setApprovedBudget(e.target.value)}
-                              min="1"
-                              required
-                            />
-                          </div>
-                        </>
-                      )}
-                    </>
-                  )}
-                </div>
-                <div className="modal-footer">
-                  {successMessage ? (
-                    <button type="button" className="btn btn-primary" onClick={handleCloseBudgetModal}>
-                      Close
-                    </button>
-                  ) : (
-                    <>
-                      <button type="button" className="btn btn-secondary" onClick={handleCloseBudgetModal} disabled={isSubmitting}>
-                        Cancel
+                        {/* ── STEP 2: Budget details — ONLY visible after file is uploaded ── */}
+                        {selectedFile && (
+                          <>
+                            <div className="field-group">
+                              <label className="field-label">Target Barangay</label>
+                              <input
+                                type="text"
+                                className="input"
+                                value={`Barangay ${selectedBarangay}`}
+                                disabled
+                                style={{ background: 'rgba(0,0,0,0.04)', fontWeight: 700, color: 'var(--maroon)' }}
+                              />
+                            </div>
+
+                            <div className="field-group">
+                              <label className="field-label">Step 2 — Fiscal Year (FY) *</label>
+                              <select
+                                className="input"
+                                value={annualYear}
+                                onChange={e => setAnnualYear(e.target.value)}
+                                required
+                              >
+                                <option value="2023">2023</option>
+                                <option value="2024">2024</option>
+                                <option value="2025">2025</option>
+                                <option value="2026">2026</option>
+                              </select>
+                            </div>
+
+                            <div className="field-group">
+                              <label className="field-label">Step 3 — Approved ABYIP Budget Amount (₱) *</label>
+                              <input
+                                type="number"
+                                className="input"
+                                placeholder="e.g. 2500000"
+                                value={approvedBudget}
+                                onChange={e => setApprovedBudget(e.target.value)}
+                                min="1"
+                                required
+                              />
+                            </div>
+                          </>
+                        )}
+                      </>
+                    )}
+                  </div>
+                  <div className="modal-footer">
+                    {successMessage ? (
+                      <button type="button" className="btn btn-primary" onClick={requestCloseBudgetModal}>
+                        Close
                       </button>
-                      <button type="submit" className="btn btn-primary" disabled={isSubmitting || !selectedFile}>
-                        {isSubmitting ? 'Posting ABYIP...' : 'Post Approved ABYIP'}
-                      </button>
-                    </>
-                  )}
-                </div>
-              </form>
+                    ) : (
+                      <>
+                        <button type="button" className="btn btn-secondary" onClick={requestCloseBudgetModal} disabled={isSubmitting}>
+                          Cancel
+                        </button>
+                        <button type="submit" className="btn btn-primary" disabled={isSubmitting || !selectedFile}>
+                          {isSubmitting ? 'Posting ABYIP...' : 'Post Approved ABYIP'}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </form>
+              </div>
             </div>
-          </div>
           </Portal>
         )}
+
+        {/* ── Discard Changes Confirmation ── */}
+        <ConfirmDialog
+          isOpen={confirmAction === 'cancel'}
+          title="Discard Changes"
+          message="Any unsaved changes will be lost. Are you sure you want to close this form?"
+          confirmLabel="Discard"
+          cancelLabel="Keep Editing"
+          variant="danger"
+          onConfirm={() => {
+            handleCloseBudgetModal()
+            setConfirmAction(null)
+            setFeedback({ type: 'info', message: 'Changes discarded' })
+          }}
+          onCancel={() => setConfirmAction(null)}
+        />
 
       </div>
     </section>
