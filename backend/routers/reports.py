@@ -48,46 +48,18 @@ def get_consolidated_report(db: Session = Depends(get_db)):
         annual_budget = float(budget_row.budgetValue) if budget_row else 0.0
 
         # Get projects for this barangay (case-insensitive & whitespace trimmed)
-        posted_projects = (
-            db.query(Project)
-            .filter(
-                func.lower(func.trim(Project.projectLocation)) == barangay.lower(),
-                Project.isDeleted == False,
-                Project.projectStatus == ProjectStatus.POSTED,
-            )
-            .all()
-        )
-
         all_projects = (
             db.query(Project)
             .filter(func.lower(func.trim(Project.projectLocation)) == barangay.lower(), Project.isDeleted == False)
             .all()
         )
 
-        # Compute spending from posted project breakdowns
-        spent = sum(float(p.projectBreakdown or 0) for p in posted_projects)
+        # Compute spending from project breakdown or proposed budget spent
+        spent = sum(float(p.projectBreakdown or 0) for p in all_projects)
 
-        # Classify projects
-        from datetime import datetime as dt, timezone
-        now = dt.now(timezone.utc)
-
-        def _make_utc(d):
-          if d is None: return None
-          return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
-
-        barangay_ongoing = sum(
-            1 for p in posted_projects
-            if p.projectStartTime and p.projectEndTime
-            and _make_utc(p.projectStartTime) <= now <= _make_utc(p.projectEndTime)
-        )
-        barangay_completed = sum(
-            1 for p in posted_projects
-            if p.projectEndTime and _make_utc(p.projectEndTime) < now
-        )
-        barangay_upcoming = sum(
-            1 for p in posted_projects
-            if p.projectStartTime and _make_utc(p.projectStartTime) > now
-        )
+        barangay_ongoing = sum(1 for p in all_projects if p.projectStatus == ProjectStatus.IN_PROGRESS)
+        barangay_completed = sum(1 for p in all_projects if p.projectStatus == ProjectStatus.COMPLETED)
+        barangay_upcoming = sum(1 for p in all_projects if p.projectStatus == ProjectStatus.INCOMING)
 
         barangay_summaries.append(BarangaySummary(
             barangay=barangay,
@@ -162,8 +134,7 @@ def get_barangay_report(barangay_name: str, db: Session = Depends(get_db)):
     from datetime import datetime as dt
     now = dt.utcnow()
 
-    posted_projects = [p for p in projects if p.projectStatus == ProjectStatus.POSTED]
-    spent = sum(float(p.projectBreakdown or 0) for p in posted_projects)
+    spent = sum(float(p.projectBreakdown or 0) for p in projects)
 
     return {
         "barangay": barangay_name,

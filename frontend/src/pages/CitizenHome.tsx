@@ -48,15 +48,11 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
     async function loadCitizenData() {
       try {
         const [projRes, repRes, newsRes] = await Promise.all([
-          fetchProjectsApi({ barangay }).catch(() => []),
+          // Citizens only see publicly Posted projects from their barangay
+          fetchProjectsApi({ barangay, public_only: true }).catch(() => []),
           fetchBarangayReportApi(barangay).catch(() => null),
           fetchNewsApi().catch(() => []),
         ])
-
-        console.log("newsRes =", newsRes)
-        console.log("projRes:", projRes)
-        console.log("repRes:", repRes)
-        console.log("newsRes:", newsRes)
 
         const rawNews = Array.isArray(newsRes)
           ? newsRes
@@ -114,8 +110,6 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
             },
           ]
         }
-
-        console.log("mappedNews:", mappedNews)
 
         setNews(mappedNews)
 

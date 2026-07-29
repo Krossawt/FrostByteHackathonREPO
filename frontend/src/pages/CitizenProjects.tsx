@@ -57,7 +57,8 @@ export default function CitizenProjects({ user }: CitizenProjectsProps) {
   useEffect(() => {
     async function loadCitizenProjects() {
       try {
-        const res = await fetchProjectsApi({ public_only: false })
+        // Citizens only see publicly Posted projects from their own barangay
+        const res = await fetchProjectsApi({ barangay: userBarangay, public_only: true })
         if (Array.isArray(res)) {
           setLiveProjects(res.map((p: any) => {
             const rawSt = String(p.projectStatus || p.status || 'ongoing').toLowerCase()

@@ -38,11 +38,11 @@ function getCover(cat?: string) {
 // Raw API statuses like "Posted", "Drafted", "For Finance Update" are mapped
 // to the four values the UI renders: ongoing | upcoming | completed | cancelled.
 function mapApiProjectToReportProject(project: any): ReportProject {
-  const rawStatus = String(project?.projectStatus || project?.status || 'ongoing')
+  const rawStatus = String(project?.projectStatus || project?.status || 'In Progress')
   const normalizedStatus = rawStatus.toLowerCase()
-  const status: ReportProject['status'] = normalizedStatus.includes('posted') || normalizedStatus.includes('completed')
+  const status: ReportProject['status'] = normalizedStatus.includes('completed') || normalizedStatus.includes('posted')
     ? 'completed'
-    : normalizedStatus.includes('approval') || normalizedStatus.includes('finance') || normalizedStatus.includes('draft')
+    : normalizedStatus.includes('incoming') || normalizedStatus.includes('draft') || normalizedStatus.includes('approval') || normalizedStatus.includes('finance')
       ? 'upcoming'
       : normalizedStatus.includes('cancel')
         ? 'cancelled'
@@ -194,6 +194,8 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
 
   // Live API State
   const [liveProjects, setLiveProjects] = useState<ReportProject[]>([])
+  // Stores top-level totals from /reports/summary for authoritative city-wide display
+  const [execSummary, setExecSummary] = useState<{ totalBudget: number; totalSpent: number; totalRemaining: number; totalProjects: number } | null>(null)
 
   useEffect(() => {
     async function loadLiveData() {
@@ -205,6 +207,16 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
           fetchAuditLogsApi().catch(() => []),
           fetchNewsApi().catch(() => []),
         ])
+
+        if (sumRes) {
+          // Store top-level authoritative totals for city-wide display
+          setExecSummary({
+            totalBudget: Number(sumRes.totalBudget || 0),
+            totalSpent: Number(sumRes.totalSpent || 0),
+            totalRemaining: Number(sumRes.totalRemaining || 0),
+            totalProjects: Number(sumRes.totalProjects || 0),
+          })
+        }
 
         if (sumRes && sumRes.barangays) {
           setBarangayList(sumRes.barangays.map((b: any) => ({
@@ -311,9 +323,11 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
   }
 
   // ── Computed values ──────────────────────────────────────────────────────
-  const totalBudget = barangayList.reduce((s: number, b: any) => s + (b.annualBudget || 0), 0)
-  const totalSpent = barangayList.reduce((s: number, b: any) => s + (b.spent || 0), 0)
-  const totalProj = liveProjects.length
+  // For city-wide view, prefer the API's authoritative totals from execSummary;
+  // fall back to summing barangayList only if execSummary is unavailable.
+  const totalBudget = execSummary ? execSummary.totalBudget : barangayList.reduce((s: number, b: any) => s + (b.annualBudget || 0), 0)
+  const totalSpent = execSummary ? execSummary.totalSpent : barangayList.reduce((s: number, b: any) => s + (b.spent || 0), 0)
+  const totalProj = execSummary ? execSummary.totalProjects : liveProjects.length
   const usagePct = totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0
 
   const bSummary = selectedBarangay ? barangayList.find((b: any) => b.barangay === selectedBarangay) : null

@@ -25,10 +25,9 @@ class UserRole(str, enum.Enum):
 
 
 class ProjectStatus(str, enum.Enum):
-    DRAFTED        = "Drafted"
-    FINANCE_UPDATE = "Finance Update"
-    FOR_APPROVAL   = "For Approval"
-    POSTED         = "Posted"
+    INCOMING   = "Incoming"
+    IN_PROGRESS = "In Progress"
+    COMPLETED  = "Completed"
 
 
 class OrderType(str, enum.Enum):

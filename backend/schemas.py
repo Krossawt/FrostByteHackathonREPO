@@ -136,8 +136,10 @@ class ProjectUpdate(BaseModel):
     projectBudget: Optional[float] = Field(None, ge=0, le=1_000_000_000)
     projectCategory: Optional[str] = Field(None, max_length=100)
     projectProgress: Optional[int] = Field(None, ge=0, le=100)
+    projectStatus: Optional[ProjectStatus] = None  # Chairperson/Secretary can set: Incoming, In Progress, Completed
+    projectLocation: Optional[str] = Field(None, min_length=2, max_length=100)
 
-    @field_validator("projectName", "projectDescription", "projectCategory", mode="before")
+    @field_validator("projectName", "projectDescription", "projectCategory", "projectLocation", mode="before")
     @classmethod
     def clean_project_update_fields(cls, v: Optional[str]) -> Optional[str]:
         return sanitize_str(v)

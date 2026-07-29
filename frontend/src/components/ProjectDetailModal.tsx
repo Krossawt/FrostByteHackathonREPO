@@ -119,7 +119,7 @@ export default function ProjectDetailModal({
   // Snapshot of the edit form's values right after opening — used to detect
   // whether the user actually changed anything before requesting a close.
   const [editSnapshot, setEditSnapshot] = useState({
-    title: '', category: 'Education', budget: '', start: '', end: '', barangay: '', desc: '',
+    title: '', category: 'Education', budget: '', start: '', end: '', barangay: '', desc: '', status: '',
   })
 
   const handleCameraSnap = () => {
@@ -139,6 +139,7 @@ export default function ProjectDetailModal({
   const [editEnd, setEditEnd] = useState(project?.endDate || '')
   const [editDesc, setEditDesc] = useState(project?.description || '')
   const [editBarangay, setEditBarangay] = useState(project?.barangay || '')
+  const [editStatus, setEditStatus] = useState<string>(project?.projectStatus || 'In Progress')
 
   // Comment form state
   const [cText, setCText] = useState('')
@@ -171,6 +172,7 @@ export default function ProjectDetailModal({
     setEditEnd(safeProject.endDate || '')
     setEditDesc(safeProject.description || '')
     setEditBarangay(safeProject.barangay || '')
+    setEditStatus(safeProject.projectStatus || 'In Progress')
     setEditSnapshot({
       title: safeProject.title || '',
       category: safeProject.category || 'Education',
@@ -179,6 +181,7 @@ export default function ProjectDetailModal({
       end: safeProject.endDate || '',
       barangay: safeProject.barangay || '',
       desc: safeProject.description || '',
+      status: safeProject.projectStatus || 'In Progress',
     })
     setIsEditing(!!autoEditProject)
     setIsLoadingProject(true)
@@ -197,6 +200,7 @@ export default function ProjectDetailModal({
         setEditEnd(mapped.endDate || '')
         setEditDesc(mapped.description || '')
         setEditBarangay(mapped.barangay || '')
+        setEditStatus(mapped.projectStatus || 'In Progress')
         setEditSnapshot({
           title: mapped.title || '',
           category: mapped.category || 'Education',
@@ -205,6 +209,7 @@ export default function ProjectDetailModal({
           end: mapped.endDate || '',
           barangay: mapped.barangay || '',
           desc: mapped.description || '',
+          status: mapped.projectStatus || 'In Progress',
         })
       } catch (err: any) {
         if (!active) return
@@ -299,6 +304,7 @@ export default function ProjectDetailModal({
         projectLocation: editBarangay.trim() || undefined,
         projectBudget: Number(editBudget) || undefined,
         projectCategory: editCategory || undefined,
+        projectStatus: editStatus || undefined,
       }
       const res = await updateProjectApi(activeProject.projectId ?? activeProject.id, payload)
       const updated = mapApiProjectToReportProject(res, activeProject.barangay)
@@ -328,7 +334,8 @@ export default function ProjectDetailModal({
     editStart !== editSnapshot.start ||
     editEnd !== editSnapshot.end ||
     editBarangay !== editSnapshot.barangay ||
-    editDesc !== editSnapshot.desc
+    editDesc !== editSnapshot.desc ||
+    editStatus !== editSnapshot.status
 
   const editHasChanges = isEditing && isEditFormDirty()
 
@@ -627,9 +634,33 @@ export default function ProjectDetailModal({
                             <input className="form-input" type="date" value={editEnd} onChange={e => setEditEnd(e.target.value)} />
                           </div>
                         </div>
-                        <div className="form-group">
-                          <label className="form-label">Barangay</label>
-                          <input className="form-input" value={editBarangay} onChange={e => setEditBarangay(e.target.value)} />
+                        <div className="form-row-2">
+                          <div className="form-group">
+                            <label className="form-label">Project Status *</label>
+                            <select
+                              className="form-input"
+                              value={editStatus}
+                              onChange={e => setEditStatus(e.target.value)}
+                              style={{
+                                appearance: 'none',
+                                WebkitAppearance: 'none',
+                                MozAppearance: 'none',
+                                backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23760031' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E\")",
+                                backgroundRepeat: 'no-repeat',
+                                backgroundPosition: 'right 0.85rem center',
+                                paddingRight: '2.2rem',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              <option value="Incoming">Incoming</option>
+                              <option value="In Progress">In Progress</option>
+                              <option value="Completed">Completed</option>
+                            </select>
+                          </div>
+                          <div className="form-group">
+                            <label className="form-label">Barangay</label>
+                            <input className="form-input" value={editBarangay} onChange={e => setEditBarangay(e.target.value)} />
+                          </div>
                         </div>
                         <div className="form-group">
                           <label className="form-label">Description</label>
@@ -675,6 +706,7 @@ export default function ProjectDetailModal({
                           setEditEnd(activeProject.endDate || '')
                           setEditDesc(activeProject.description || '')
                           setEditBarangay(activeProject.barangay || '')
+                          setEditStatus(activeProject.projectStatus || 'In Progress')
                           setEditSnapshot({
                             title: activeProject.title || '',
                             category: activeProject.category || 'Education',
@@ -683,6 +715,7 @@ export default function ProjectDetailModal({
                             end: activeProject.endDate || '',
                             barangay: activeProject.barangay || '',
                             desc: activeProject.description || '',
+                            status: activeProject.projectStatus || 'In Progress',
                           })
                           setIsEditing(true)
                         }}

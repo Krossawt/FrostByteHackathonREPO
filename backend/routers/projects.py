@@ -1,19 +1,13 @@
 """
-eSKala — Projects Router
-Full 5-stage workflow + CRUD.
+eSKala — Projects Router (Simplified, No Staged Workflow)
 
 GET    /api/v1/projects
 GET    /api/v1/projects/{id}
-POST   /api/v1/projects
-PATCH  /api/v1/projects/{id}
-DELETE /api/v1/projects/{id}
+POST   /api/v1/projects          (Chairperson or Secretary — creates Incoming immediately)
+PATCH  /api/v1/projects/{id}     (Chairperson or Secretary — edit + set status directly)
+DELETE /api/v1/projects/{id}     (Chairperson only — soft delete)
 
-Workflow transitions:
-PATCH  /api/v1/projects/{id}/submit-to-finance    (Chairperson/Secretary → Treasurer)
-PATCH  /api/v1/projects/{id}/update-breakdown     (Treasurer adds budget breakdown)
-PATCH  /api/v1/projects/{id}/submit-for-approval  (Treasurer → Chairperson)
-PATCH  /api/v1/projects/{id}/approve-post         (Chairperson approves → auto Newsletter)
-PATCH  /api/v1/projects/{id}/reject               (Chairperson rejects → back to Finance Update)
+Status values: Incoming | In Progress | Completed
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
@@ -21,14 +15,14 @@ from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 from datetime import datetime
 from database import get_db
-from models import User, UserRole, Project, ProjectStatus, Newsletter, AuditLog
+from models import User, UserRole, Project, ProjectStatus, Newsletter
 from schemas import (
-    ProjectCreate, ProjectUpdate, ProjectBreakdownUpdate,
+    ProjectCreate, ProjectUpdate,
     ProjectResponse, MessageResponse
 )
 from auth import (
     require_authenticated, require_chairperson_or_secretary,
-    require_chairperson, require_treasurer, require_sk_officer,
+    require_chairperson, require_sk_officer,
     get_optional_user, log_action
 )
 
@@ -50,13 +44,13 @@ def _project_or_404(db: Session, project_id: int) -> Project:
 from sqlalchemy import func
 
 
-@router.get("", response_model=List[ProjectResponse], summary="List all projects (public)")
+@router.get("", response_model=List[ProjectResponse], summary="List all projects")
 def list_projects(
     barangay: Optional[str] = Query(None),
     status_param: Optional[str] = Query(None, alias="status"),
     search: Optional[str] = Query(None),
     category: Optional[str] = Query(None),
-    public_only: Optional[bool] = Query(None, description="If true, only return Posted projects"),
+    public_only: Optional[bool] = Query(None, description="If true, only return Completed and In Progress projects"),
     skip: int = Query(0, ge=0),
     limit: int = Query(200, ge=1, le=500),
     db: Session = Depends(get_db),
@@ -64,23 +58,26 @@ def list_projects(
 ):
     query = db.query(Project).options(joinedload(Project.purchase_orders)).filter(Project.isDeleted == False)
 
-    # Filter status flexibly if provided
+    # Optional status filter
     if status_param and status_param.strip() and status_param.strip().lower() != "all":
         st = status_param.strip().lower()
-        if "post" in st or "complete" in st:
-            query = query.filter(Project.projectStatus == ProjectStatus.POSTED)
-        elif "finance" in st:
-            query = query.filter(Project.projectStatus == ProjectStatus.FINANCE_UPDATE)
-        elif "approval" in st:
-            query = query.filter(Project.projectStatus == ProjectStatus.FOR_APPROVAL)
-        elif "draft" in st:
-            query = query.filter(Project.projectStatus == ProjectStatus.DRAFTED)
+        if "complete" in st:
+            query = query.filter(Project.projectStatus == ProjectStatus.COMPLETED)
+        elif "progress" in st or "ongoing" in st:
+            query = query.filter(Project.projectStatus == ProjectStatus.IN_PROGRESS)
+        elif "incoming" in st or "upcoming" in st or "draft" in st or "posted" in st:
+            query = query.filter(Project.projectStatus == ProjectStatus.INCOMING)
 
-    # Restrict to Posted projects only if public_only is explicitly True or for unauthenticated users when no status param is specified
+    # public_only=true → only In Progress + Completed (visible to public / citizens)
+    # public_only=None + unauthenticated → same restriction
     if public_only is True:
-        query = query.filter(Project.projectStatus == ProjectStatus.POSTED)
+        query = query.filter(
+            Project.projectStatus.in_([ProjectStatus.IN_PROGRESS, ProjectStatus.COMPLETED])
+        )
     elif public_only is None and current_user is None and not status_param:
-        query = query.filter(Project.projectStatus == ProjectStatus.POSTED)
+        query = query.filter(
+            Project.projectStatus.in_([ProjectStatus.IN_PROGRESS, ProjectStatus.COMPLETED])
+        )
 
     if barangay and barangay.strip() and barangay.strip() not in {"Santa Rosa City", "All", "all"}:
         query = query.filter(func.lower(func.trim(Project.projectLocation)) == barangay.strip().lower())
@@ -104,7 +101,7 @@ def get_project(
 
 
 @router.post("", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED,
-             summary="Create a project draft (Chairperson or Secretary)")
+             summary="Create a new project (Chairperson or Secretary) — defaults to Incoming")
 def create_project(
     payload: ProjectCreate,
     db: Session = Depends(get_db),
@@ -123,7 +120,7 @@ def create_project(
         projectCreatedBy=current_user.userID,
         projectBudget=payload.projectBudget,
         projectCategory=payload.projectCategory,
-        projectStatus=ProjectStatus.DRAFTED,
+        projectStatus=ProjectStatus.INCOMING,  # All projects start as Incoming immediately
         isDeleted=False,
     )
     db.add(project)
@@ -131,22 +128,25 @@ def create_project(
     db.refresh(project)
 
     log_action(db, current_user, "Project Created", "projects", str(project.projectID),
-               f"'{project.projectName}' created in {project.projectLocation} — status: Drafted")
+               f"'{project.projectName}' created in {project.projectLocation} — status: Incoming")
 
     return ProjectResponse.model_validate(project)
 
 
-@router.patch("/{project_id}", response_model=ProjectResponse, summary="Update project details")
+@router.patch("/{project_id}", response_model=ProjectResponse, summary="Update project details and/or status")
 def update_project(
     project_id: int,
     payload: ProjectUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_sk_officer),
+    current_user: User = Depends(require_chairperson_or_secretary),
 ):
+    """
+    Chairperson or Secretary can update any field including status.
+    Status options: Incoming | In Progress | Completed
+    """
     project = _project_or_404(db, project_id)
-    if project.projectStatus == ProjectStatus.POSTED:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                            detail="Cannot edit a posted project")
+
+    old_status = project.projectStatus.value if project.projectStatus else "Incoming"
 
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(project, field, value)
@@ -155,8 +155,28 @@ def update_project(
     db.commit()
     db.refresh(project)
 
+    new_status = project.projectStatus.value if project.projectStatus else old_status
+
+    # If status changed to Completed, auto-create/update a newsletter entry
+    if new_status == "Completed" and old_status != "Completed":
+        existing = db.query(Newsletter).filter(Newsletter.projectID == project_id).first()
+        if not existing:
+            newsletter_entry = Newsletter(
+                projectID=project.projectID,
+                title=f"[Completed] {project.projectName}",
+                summary=project.projectDescription or f"Project '{project.projectName}' has been completed in Barangay {project.projectLocation}.",
+                category="SK Project Update",
+                projectLocation=project.projectLocation,
+                projectBreakdown=project.projectBreakdown,
+                authorID=current_user.userID,
+                isPublished=True,
+                isDeleted=False,
+            )
+            db.add(newsletter_entry)
+            db.commit()
+
     log_action(db, current_user, "Project Updated", "projects", str(project_id),
-               f"Updated project '{project.projectName}'")
+               f"Updated '{project.projectName}' — status: {old_status} → {new_status}")
 
     return ProjectResponse.model_validate(project)
 
@@ -175,142 +195,3 @@ def delete_project(
                f"Soft-deleted: '{project.projectName}'")
 
     return {"message": f"Project '{project.projectName}' has been deleted"}
-
-
-# ─── WORKFLOW TRANSITIONS ─────────────────────────────────────────────────────
-
-@router.patch("/{project_id}/submit-to-finance", response_model=ProjectResponse,
-              summary="Stage 2: Submit project to Treasurer for finance update")
-def submit_to_finance(
-    project_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_chairperson_or_secretary),
-):
-    project = _project_or_404(db, project_id)
-    if project.projectStatus != ProjectStatus.DRAFTED:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                            detail=f"Project must be in 'Drafted' status. Current: {project.projectStatus.value}")
-
-    project.projectStatus = ProjectStatus.FINANCE_UPDATE
-    project.updatedAt = datetime.utcnow()
-    db.commit()
-    db.refresh(project)
-
-    log_action(db, current_user, "Project → Finance Update", "projects", str(project_id),
-               f"'{project.projectName}' submitted to Treasurer for finance update")
-
-    return ProjectResponse.model_validate(project)
-
-
-@router.patch("/{project_id}/update-breakdown", response_model=ProjectResponse,
-              summary="Stage 3: Treasurer adds financial breakdown to project")
-def update_breakdown(
-    project_id: int,
-    payload: ProjectBreakdownUpdate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_treasurer),
-):
-    project = _project_or_404(db, project_id)
-    if project.projectStatus != ProjectStatus.FINANCE_UPDATE:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                            detail=f"Project must be in 'Finance Update' status. Current: {project.projectStatus.value}")
-
-    project.projectBreakdown = payload.projectBreakdown
-    project.updatedAt = datetime.utcnow()
-    db.commit()
-    db.refresh(project)
-
-    log_action(db, current_user, "Project Breakdown Added", "projects", str(project_id),
-               f"Treasurer set breakdown ₱{payload.projectBreakdown:,.2f} for '{project.projectName}'")
-
-    return ProjectResponse.model_validate(project)
-
-
-@router.patch("/{project_id}/submit-for-approval", response_model=ProjectResponse,
-              summary="Stage 4: Treasurer submits project to Chairperson for final approval")
-def submit_for_approval(
-    project_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_treasurer),
-):
-    project = _project_or_404(db, project_id)
-    if project.projectStatus != ProjectStatus.FINANCE_UPDATE:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                            detail=f"Project must be in 'Finance Update' status. Current: {project.projectStatus.value}")
-    if project.projectBreakdown is None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                            detail="Project breakdown must be set before submitting for approval")
-
-    project.projectStatus = ProjectStatus.FOR_APPROVAL
-    project.updatedAt = datetime.utcnow()
-    db.commit()
-    db.refresh(project)
-
-    log_action(db, current_user, "Project → For Approval", "projects", str(project_id),
-               f"Treasurer submitted '{project.projectName}' for Chairperson approval")
-
-    return ProjectResponse.model_validate(project)
-
-
-@router.patch("/{project_id}/approve-post", response_model=ProjectResponse,
-              summary="Stage 5: Chairperson approves and posts the project (auto-creates Newsletter)")
-def approve_and_post(
-    project_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_chairperson),
-):
-    project = _project_or_404(db, project_id)
-    if project.projectStatus != ProjectStatus.FOR_APPROVAL:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                            detail=f"Project must be in 'For Approval' status. Current: {project.projectStatus.value}")
-
-    project.projectStatus = ProjectStatus.POSTED
-    project.updatedAt = datetime.utcnow()
-    db.commit()
-
-    # Auto-create Newsletter entry (System automation)
-    existing_newsletter = db.query(Newsletter).filter(Newsletter.projectID == project_id).first()
-    if not existing_newsletter:
-        newsletter_entry = Newsletter(
-            projectID=project.projectID,
-            title=f"[Posted] {project.projectName}",
-            summary=project.projectDescription or f"Project '{project.projectName}' has been officially approved and posted in Barangay {project.projectLocation}.",
-            category="SK Project Update",
-            projectLocation=project.projectLocation,
-            projectBreakdown=project.projectBreakdown,
-            authorID=current_user.userID,
-            isPublished=True,
-            isDeleted=False,
-        )
-        db.add(newsletter_entry)
-        db.commit()
-
-    db.refresh(project)
-
-    log_action(db, current_user, "Project Posted", "projects", str(project_id),
-               f"Chairperson approved and posted '{project.projectName}'. Newsletter auto-generated.")
-
-    return ProjectResponse.model_validate(project)
-
-
-@router.patch("/{project_id}/reject", response_model=ProjectResponse,
-              summary="Chairperson rejects project — returns to Finance Update status")
-def reject_project(
-    project_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_chairperson),
-):
-    project = _project_or_404(db, project_id)
-    if project.projectStatus != ProjectStatus.FOR_APPROVAL:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                            detail=f"Project must be in 'For Approval' status. Current: {project.projectStatus.value}")
-
-    project.projectStatus = ProjectStatus.FINANCE_UPDATE
-    project.updatedAt = datetime.utcnow()
-    db.commit()
-    db.refresh(project)
-
-    log_action(db, current_user, "Project Rejected", "projects", str(project_id),
-               f"Chairperson rejected '{project.projectName}' — returned to Finance Update")
-
-    return ProjectResponse.model_validate(project)

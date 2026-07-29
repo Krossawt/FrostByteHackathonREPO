@@ -266,8 +266,6 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
     })
   }
 
-  console.log("news state:", news)
-
   return (
     <section className="section">
       <div className="container">

@@ -188,6 +188,7 @@ export async function fetchProjectsApi(params?: {
   if (params?.search) query.append('search', params.search)
   if (params?.category) query.append('category', params.category)
   if (params?.public_only === false) query.append('public_only', 'false')
+  if (params?.public_only === true) query.append('public_only', 'true')
 
   const queryString = query.toString() ? `?${query.toString()}` : ''
   return request<ReportProject[]>(`/projects${queryString}`)
@@ -217,6 +218,7 @@ export interface UpdateProjectPayload {
   projectBudget?: number
   projectCategory?: string
   projectProgress?: number
+  projectStatus?: string
 }
 
 export async function fetchProjectByIdApi(projectId: number | string): Promise<any> {
