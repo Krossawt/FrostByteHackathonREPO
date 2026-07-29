@@ -201,7 +201,7 @@ export default function Landing() {
           <line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
         </svg>
       ),
-      val: totalBudget === 0 ? '₱0' : `₱${(totalBudget / 1_000_000).toFixed(1)}M`, lbl: 'Total SK Budget FY 2025',
+      val: totalBudget === 0 ? '₱0' : `₱${(totalBudget / 1_000_000).toFixed(1)}M`, lbl: 'Total SK Funds Released',
     },
     {
       icon: (
@@ -309,7 +309,7 @@ export default function Landing() {
                   <div className="landing-stat-label">Barangays<br />Covered</div>
                 </div>
                 <div className="landing-stat-item">
-                  <span className="landing-stat-number">₱39M</span>
+                  <span className="landing-stat-number">{totalBudget === 0 ? '₱0' : `₱${(totalBudget / 1_000_000).toFixed(1)}M`}</span>
                   <div className="landing-stat-label-small">
                     Total SK Funds<br />Released for Youth<br />Programs
                   </div>
