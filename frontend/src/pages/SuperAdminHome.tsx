@@ -3,7 +3,7 @@ import { DonutChart } from '../components/MiniChart'
 import ProjectDetailModal from '../components/ProjectDetailModal'
 import type { ReportProject } from '../types'
 import Portal from '../components/Portal'
-import { fetchProjectsApi, fetchExecutiveSummaryApi, fetchAuditLogsApi, postApprovedAbyipApi } from '../services/api'
+import { fetchProjectsApi, fetchExecutiveSummaryApi, fetchAuditLogsApi, postApprovedAbyipApi, createNewsletterApi } from '../services/api'
 
 // ── Category cover images (same palette as SKProjects) ──────────────────────
 const CATEGORY_IMAGES: Record<string, string> = {
@@ -143,6 +143,15 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
         budgetFileURL: `/static/uploads/${selectedFile.name}`
       })
 
+      await createNewsletterApi({
+        title: `ABYIP Approved for Barangay ${selectedBarangay}`,
+        summary: `Barangay ${selectedBarangay} receives ₱${budgetVal.toLocaleString()} as their annual budget for the fiscal year ${parseInt(annualYear) || 2026}.`,
+        category: 'ABYIP',
+        projectLocation: selectedBarangay,
+      }).catch((newsErr: any) => {
+        console.warn('Failed to auto-create ABYIP newsletter:', newsErr)
+      })
+
       setBarangayList((prev: any[]) =>
         prev.map((b: any) =>
           b.barangay === selectedBarangay
@@ -152,7 +161,7 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
       )
 
       setIsSubmitting(false)
-      setSuccessMessage(`ABYIP (FY ${annualYear}) for Barangay ${selectedBarangay} — ₱${budgetVal.toLocaleString()} has been successfully posted to live database!`)
+      setSuccessMessage(`ABYIP (FY ${annualYear}) for Barangay ${selectedBarangay} — ₱${budgetVal.toLocaleString()} has been successfully posted to live database! A newsletter announcement has been generated.`)
     } catch (err: any) {
       setIsSubmitting(false)
       setErrorMessage(err.message || 'Failed to post approved ABYIP to backend')
