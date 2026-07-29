@@ -136,8 +136,11 @@ export default function SuperAdminNews() {
     e.preventDefault()
     if (isSaving) return // guard against rapid double-submits
     setFormError('')
-    if (!formTitle.trim()) { setFormError('Article Title is required.'); return }
+    if (!formTitle.trim()) { setFormError('Article title is required.'); return }
+    if (formTitle.trim().length < 5) { setFormError('Article title must be at least 5 characters.'); return }
     if (!formSummary.trim()) { setFormError('Summary / Body is required.'); return }
+    if (formSummary.trim().length < 10) { setFormError('Summary must be at least 10 characters.'); return }
+    if (formSummary.trim().length > 2000) { setFormError('Summary must not exceed 2000 characters.'); return }
 
     const isEditing = !!editTarget
     setIsSaving(true)

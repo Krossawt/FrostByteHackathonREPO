@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import User, Comment, Project, ProjectStatus
 from schemas import CommentCreate, CommentResponse
-from auth import require_authenticated, get_optional_user
+from auth import require_authenticated, get_optional_user, log_action
 
 router = APIRouter(tags=["Comments & Suggestions"])
 
@@ -113,6 +113,9 @@ def create_comment(
     db.add(comment)
     db.commit()
     db.refresh(comment)
+
+    log_action(db, current_user, "Comment Submitted", "comments", str(comment.commentID),
+               f"{current_user.userName} submitted a {'suggestion' if payload.commentType == 'suggestion' else 'comment'} on project #{project_id}")
 
     return CommentResponse(
         commentID=comment.commentID,

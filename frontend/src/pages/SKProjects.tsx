@@ -220,7 +220,18 @@ export default function SKProjects({ user }: SKProjectsProps) {
 
   const handleSubmitProject = async (e: FormEvent) => {
     e.preventDefault()
-    if (!newTitle.trim() || !newBudget || !newStart || !newEnd) { setFormError('Please fill in all required fields.'); return }
+
+    // ─ Validation ─────────────────────────────────────────────────────────────
+    if (!newTitle.trim()) { setFormError('Project title is required.'); return }
+    if (newTitle.trim().length < 3) { setFormError('Project title must be at least 3 characters.'); return }
+    if (!newBudget || parseFloat(newBudget) <= 0) { setFormError('Budget must be a positive number.'); return }
+    if (!newStart) { setFormError('Start date is required.'); return }
+    if (!newEnd) { setFormError('End date is required.'); return }
+    if (new Date(newEnd) <= new Date(newStart)) {
+      setFormError('End date must be after the start date.')
+      return
+    }
+    // ─────────────────────────────────────────────────────────────────────────
 
     if (formMode === 'new') {
       try {
@@ -630,7 +641,18 @@ export default function SKProjects({ user }: SKProjectsProps) {
                       </div>
                       <div className="form-group">
                         <label className="form-label">End Date *</label>
-                        <input className="form-input" type="date" value={newEnd} onChange={e => setNewEnd(e.target.value)} />
+                        <input
+                          className="form-input"
+                          type="date"
+                          value={newEnd}
+                          min={newStart || undefined}
+                          onChange={e => setNewEnd(e.target.value)}
+                        />
+                        {newEnd && newStart && new Date(newEnd) <= new Date(newStart) && (
+                          <div style={{ fontSize: '0.75rem', color: '#b91c1c', fontFamily: 'var(--font-display)', fontWeight: 600, marginTop: '0.25rem' }}>
+                            End date must be after start date
+                          </div>
+                        )}
                       </div>
                     </div>
                     <div className="form-group">
