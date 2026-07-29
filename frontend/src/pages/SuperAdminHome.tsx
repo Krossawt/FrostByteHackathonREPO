@@ -744,11 +744,13 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
 
                           <div style={{ marginTop: '0.4rem' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
-                              <span style={{ fontSize: '0.72rem', color: 'var(--muted)', fontFamily: 'var(--font-display)', fontWeight: 600 }}>Progress</span>
-                              <span style={{ fontSize: '0.72rem', fontFamily: 'var(--font-display)', fontWeight: 800, color: 'var(--maroon)' }}>{p.progress}%</span>
+                              <span style={{ fontSize: '0.72rem', color: 'var(--muted)', fontFamily: 'var(--font-display)', fontWeight: 600 }}>Budget Used</span>
+                              <span style={{ fontSize: '0.72rem', fontFamily: 'var(--font-display)', fontWeight: 800, color: 'var(--maroon)' }}>
+                                {p.proposedBudget > 0 ? Math.round((p.spent / p.proposedBudget) * 100) : 0}%
+                              </span>
                             </div>
                             <div className="progress-bar">
-                              <div className="progress-fill" style={{ width: `${p.progress}%` }} />
+                              <div className="progress-fill" style={{ width: `${Math.min(100, p.proposedBudget > 0 ? (p.spent / p.proposedBudget) * 100 : 0)}%` }} />
                             </div>
                           </div>
 

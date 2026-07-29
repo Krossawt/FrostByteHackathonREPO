@@ -32,20 +32,15 @@ export function getStoredUser(): UserAccount | null {
   return readStoredUser(STORAGE_KEY) || readStoredUser(SESSION_KEY)
 }
 
-function storeUser(user: UserAccount | null, rememberMe: boolean) {
+function storeUser(user: UserAccount | null, _rememberMe = true) {
   if (!user) {
     window.localStorage.removeItem(STORAGE_KEY)
     window.sessionStorage.removeItem(SESSION_KEY)
     return
   }
   const payload = JSON.stringify(user)
-  if (rememberMe) {
-    window.localStorage.setItem(STORAGE_KEY, payload)
-    window.sessionStorage.removeItem(SESSION_KEY)
-  } else {
-    window.sessionStorage.setItem(SESSION_KEY, payload)
-    window.localStorage.removeItem(STORAGE_KEY)
-  }
+  window.localStorage.setItem(STORAGE_KEY, payload)
+  window.sessionStorage.setItem(SESSION_KEY, payload)
 }
 
 export async function loginAsync(emailOrUsername: string, password: string, rememberMe = false): Promise<UserAccount | null> {

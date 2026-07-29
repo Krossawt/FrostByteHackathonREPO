@@ -65,6 +65,37 @@ const positionColors: Record<string, string> = {
   Kagawad: '#374151',
 }
 
+function ProtectedRoute({
+  user,
+  allowedRoles,
+  children,
+}: {
+  user: UserAccount | null
+  allowedRoles: Role[]
+  children: React.ReactElement
+}) {
+  if (!user) {
+    return <Navigate to="/login" replace />
+  }
+  if (!allowedRoles.includes(user.role)) {
+    return <Navigate to={userHomePath(user)} replace />
+  }
+  return children
+}
+
+function PublicAuthRoute({
+  user,
+  children,
+}: {
+  user: UserAccount | null
+  children: React.ReactElement
+}) {
+  if (user) {
+    return <Navigate to={userHomePath(user)} replace />
+  }
+  return children
+}
+
 function App() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -271,21 +302,28 @@ function App() {
       <main style={{ position: 'relative', zIndex: 1, minHeight: isLanding ? undefined : 'calc(100vh - 140px)' }}>
         <Routes>
           <Route path="/" element={<Landing />} />
-          <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
-          <Route path="/register" element={<RegisterPage onRegister={handleRegister} />} />
-          <Route path="/home" element={<Navigate to="/" replace />} />
+          <Route path="/login" element={<PublicAuthRoute user={user}><LoginPage onLogin={handleLogin} /></PublicAuthRoute>} />
+          <Route path="/register" element={<PublicAuthRoute user={user}><RegisterPage onRegister={handleRegister} /></PublicAuthRoute>} />
+          <Route path="/home" element={<Navigate to={userHomePath(user)} replace />} />
           <Route path="/about" element={<About />} />
           <Route path="/sks" element={<SKsPage />} />
-          <Route path="/citizen/home" element={<CitizenHome user={user} />} />
-          <Route path="/citizen/projects" element={<CitizenProjects user={user} />} />
-          <Route path="/citizen/mysks" element={<CitizenMySKs user={user} />} />
-          <Route path="/sk/home" element={<SKHome user={user} />} />
-          <Route path="/sk/projects" element={<SKProjects user={user} />} />
-          <Route path="/superadmin/home" element={<SuperAdminHome selectedBarangay={selectedBarangay} setSelectedBarangay={setSelectedBarangay} />} />
-          <Route path="/superadmin/accounts" element={<SuperAdminAccounts selectedBarangay={selectedBarangay} />} />
-          <Route path="/superadmin/activity" element={<SuperAdminActivity selectedBarangay={selectedBarangay} />} />
-          <Route path="/superadmin/news" element={<SuperAdminNews />} />
-          <Route path="*" element={<Landing />} />
+
+          {/* Citizen Routes */}
+          <Route path="/citizen/home" element={<ProtectedRoute user={user} allowedRoles={['citizen']}><CitizenHome user={user} /></ProtectedRoute>} />
+          <Route path="/citizen/projects" element={<ProtectedRoute user={user} allowedRoles={['citizen']}><CitizenProjects user={user} /></ProtectedRoute>} />
+          <Route path="/citizen/mysks" element={<ProtectedRoute user={user} allowedRoles={['citizen']}><CitizenMySKs user={user} /></ProtectedRoute>} />
+
+          {/* SK Routes */}
+          <Route path="/sk/home" element={<ProtectedRoute user={user} allowedRoles={['sk']}><SKHome user={user} /></ProtectedRoute>} />
+          <Route path="/sk/projects" element={<ProtectedRoute user={user} allowedRoles={['sk']}><SKProjects user={user} /></ProtectedRoute>} />
+
+          {/* Super Admin Routes */}
+          <Route path="/superadmin/home" element={<ProtectedRoute user={user} allowedRoles={['superadmin']}><SuperAdminHome selectedBarangay={selectedBarangay} setSelectedBarangay={setSelectedBarangay} /></ProtectedRoute>} />
+          <Route path="/superadmin/accounts" element={<ProtectedRoute user={user} allowedRoles={['superadmin']}><SuperAdminAccounts selectedBarangay={selectedBarangay} /></ProtectedRoute>} />
+          <Route path="/superadmin/activity" element={<ProtectedRoute user={user} allowedRoles={['superadmin']}><SuperAdminActivity selectedBarangay={selectedBarangay} /></ProtectedRoute>} />
+          <Route path="/superadmin/news" element={<ProtectedRoute user={user} allowedRoles={['superadmin']}><SuperAdminNews /></ProtectedRoute>} />
+
+          <Route path="*" element={<Navigate to={userHomePath(user)} replace />} />
         </Routes>
       </main>
 

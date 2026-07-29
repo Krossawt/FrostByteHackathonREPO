@@ -145,7 +145,7 @@ def update_project(
     """
     project = _project_or_404(db, project_id)
 
-    old_status = project.projectStatus.value if project.projectStatus else "Incoming"
+    old_status = str(getattr(project.projectStatus, 'value', project.projectStatus) or "Incoming")
 
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(project, field, value)
@@ -154,7 +154,7 @@ def update_project(
     db.commit()
     db.refresh(project)
 
-    new_status = project.projectStatus.value if project.projectStatus else old_status
+    new_status = str(getattr(project.projectStatus, 'value', project.projectStatus) or old_status)
 
     # If status changed to Completed, auto-create/update a newsletter entry
     if new_status == "Completed" and old_status != "Completed":
