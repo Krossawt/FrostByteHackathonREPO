@@ -418,6 +418,28 @@ export async function createPurchaseOrderApi(payload: CreatePurchaseOrderPayload
   })
 }
 
+export async function uploadReceiptImageApi(orderId: string, file: File): Promise<{ receiptImageURL: string }> {
+  const token = getStoredToken()
+  const formData = new FormData()
+  formData.append('file', file)
+
+  const res = await fetch(`${API_BASE_URL}/purchase-orders/${encodeURIComponent(orderId)}/upload-receipt`, {
+    method: 'POST',
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: formData,
+  })
+
+  if (!res.ok) {
+    // Non-fatal: log but don't throw — receipt is already saved without image
+    console.warn(`[uploadReceiptImageApi] Image upload failed: HTTP ${res.status}`)
+    return { receiptImageURL: '' }
+  }
+  return res.json()
+}
+
+
 // ─── COMMENTS & SUGGESTIONS ──────────────────────────────────────────────────
 
 export async function fetchCommentsApi(projectId: number): Promise<any[]> {

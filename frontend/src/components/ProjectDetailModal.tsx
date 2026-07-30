@@ -4,11 +4,12 @@
  * Tabs: Overview | Finance & Receipts | Citizen Comments
  */
 import { useState, useEffect, FormEvent } from 'react'
+import Tesseract from 'tesseract.js'
 import type { ReportProject, Receipt, UserAccount } from '../types'
 import CameraCaptureModal from './CameraCaptureModal'
 import ConfirmDialog from './ConfirmDialog'
 import Portal from './Portal'
-import { fetchCommentsApi, fetchProjectByIdApi, updateProjectApi, postCommentApi, createPurchaseOrderApi } from '../services/api'
+import { fetchCommentsApi, fetchProjectByIdApi, updateProjectApi, postCommentApi, createPurchaseOrderApi, fetchPurchaseOrdersApi, uploadReceiptImageApi, resolveImageUrl } from '../services/api'
 
 const CATEGORY_IMAGES: Record<string, string> = {
   'Education': 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=800&q=80',
@@ -231,6 +232,31 @@ export default function ProjectDetailModal({
       }
     }
 
+    async function loadProjectReceipts() {
+      try {
+        const pId = Number(safeProject.id || (safeProject as any).projectId)
+        if (!isNaN(pId) && pId > 0) {
+          const orders = await fetchPurchaseOrdersApi(pId)
+          if (Array.isArray(orders)) {
+            const mapped = orders.map((o: any) => ({
+              id: String(o.orderID || o.id),
+              projectId: String(o.projectID),
+              vendor: o.orderName || o.supplierName || 'Unknown Vendor',
+              amount: Number(o.orderTotalPrice ?? o.orderPrice ?? 0),
+              date: o.createdAt ? new Date(o.createdAt).toISOString().slice(0, 10) : '',
+              status: (o.isApproved ? 'verified' : 'pending') as 'verified' | 'pending' | 'rejected',
+              ocrExtracted: !!o.isOCRScanned,
+              imageUrl: o.receiptImageURL ? resolveImageUrl(o.receiptImageURL) : undefined,
+              description: o.orderItemsDescription || '',
+            }))
+            if (active) setLocalReceipts(mapped)
+          }
+        }
+      } catch (err) {
+        console.warn('API fetch receipts warning:', err)
+      }
+    }
+
     async function loadProjectComments() {
       try {
         const pId = Number(project?.id)
@@ -252,6 +278,7 @@ export default function ProjectDetailModal({
       }
     }
     loadProjectDetails()
+    loadProjectReceipts()
     loadProjectComments()
     return () => {
       active = false
@@ -272,18 +299,114 @@ export default function ProjectDetailModal({
     (user?.skPosition === 'Chairperson' || user?.skPosition === 'Secretary' || user?.role === 'superadmin') &&
     (user?.barangay === activeProject.barangay || user?.role === 'superadmin')
 
-  // Simulated AI OCR Scan of uploaded receipt
-  const handleScanOcr = () => {
+  // Real Tesseract.js OCR scan of uploaded receipt image
+  const handleScanOcr = async () => {
+    if (!uploadedFile) return
     setScanningOcr(true)
-    setOcrMsg('Scanning receipt document with AI OCR intelligence…')
-    setTimeout(() => {
-      setRVendor('SM Supermarket Santa Rosa')
-      setRAmount('24500')
-      setRDate(new Date().toISOString().slice(0, 10))
-      setRDesc('Sports equipment & tournament supplies')
+    setOcrMsg('🔍 Initialising Tesseract OCR engine…')
+
+    try {
+      setOcrMsg('📄 Reading receipt image with Tesseract OCR…')
+      const { data: { text } } = await Tesseract.recognize(uploadedFile, 'eng', {
+        logger: (m) => {
+          if (m.status === 'recognizing text') {
+            const pct = Math.round((m.progress ?? 0) * 100)
+            setOcrMsg(`📄 Scanning receipt… ${pct}%`)
+          }
+        },
+      })
+
+      const lines = text.split('\n').map(l => l.trim()).filter(Boolean)
+
+      // ── Amount: find ₱, PHP, TOTAL, AMOUNT patterns ────────────────────
+      let extractedAmount = ''
+      const amountPatterns = [
+        /(?:total|amount|grand\s*total|subtotal|total\s*due)[\s:=₱PHP]*([\d,]+(?:\.\d{1,2})?)/i,
+        /₱\s*([\d,]+(?:\.\d{1,2})?)/i,
+        /PHP\s*([\d,]+(?:\.\d{1,2})?)/i,
+        /([\d,]{3,}(?:\.\d{1,2})?)\s*(?:php|pesos?)/i,
+      ]
+      for (const pat of amountPatterns) {
+        const m = text.match(pat)
+        if (m) { extractedAmount = m[1].replace(/,/g, ''); break }
+      }
+
+      // ── Date: support MM/DD/YYYY, YYYY-MM-DD, DD-MM-YYYY, month names ──
+      let extractedDate = ''
+      const datePatterns = [
+        /(\d{4}[-/]\d{2}[-/]\d{2})/,
+        /(\d{2}[-/]\d{2}[-/]\d{4})/,
+        /(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})/,
+        /(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{1,2},?\s+\d{4}/i,
+        /\d{1,2}\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{4}/i,
+      ]
+      for (const pat of datePatterns) {
+        const m = text.match(pat)
+        if (m) {
+          const parsed = new Date(m[0])
+          if (!isNaN(parsed.getTime())) {
+            extractedDate = parsed.toISOString().slice(0, 10)
+          } else {
+            // Try rearranging DD/MM/YYYY → YYYY-MM-DD
+            const parts = m[0].split(/[-/]/)
+            if (parts.length === 3) {
+              const attempt = parts[2].length === 4
+                ? `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`
+                : m[0]
+              const p2 = new Date(attempt)
+              if (!isNaN(p2.getTime())) extractedDate = p2.toISOString().slice(0, 10)
+            }
+          }
+          if (extractedDate) break
+        }
+      }
+
+      // ── Vendor: first non-empty, non-numeric line (usually store name) ──
+      let extractedVendor = ''
+      const skipPrefixes = /^(date|receipt|invoice|official|no\.|#|total|amount|php|₱|\d)/i
+      for (const line of lines) {
+        if (line.length > 3 && !skipPrefixes.test(line) && /[a-zA-Z]/.test(line)) {
+          extractedVendor = line.replace(/[^\w\s&.,'-]/g, '').trim()
+          if (extractedVendor.length > 2) break
+        }
+      }
+      // Also check for "sold to", "merchant", "cashier", "store" keywords
+      const vendorKeywordMatch = text.match(/(?:merchant|store name|sold to|vendor)[:\s]+([^\n]+)/i)
+      if (vendorKeywordMatch) extractedVendor = vendorKeywordMatch[1].trim()
+
+      // ── Description: line after "purpose", "particulars", "item" ────────
+      let extractedDesc = ''
+      const descKeywordMatch = text.match(/(?:purpose|particulars?|description|items?)[:\s]+([^\n]+)/i)
+      if (descKeywordMatch) {
+        extractedDesc = descKeywordMatch[1].trim()
+      } else {
+        // Fallback: second content line that's not the vendor
+        const candidates = lines.filter(l => l !== extractedVendor && l.length > 5 && /[a-zA-Z]/.test(l))
+        if (candidates[1]) extractedDesc = candidates[1].substring(0, 80)
+      }
+
+      // ── Apply extracted values to form ─────────────────────────────────
+      if (extractedVendor) setRVendor(extractedVendor)
+      if (extractedAmount) setRAmount(extractedAmount)
+      if (extractedDate)   setRDate(extractedDate)
+      if (extractedDesc)   setRDesc(extractedDesc)
+
+      const found: string[] = []
+      if (extractedVendor) found.push(`Vendor: "${extractedVendor}"`)
+      if (extractedAmount) found.push(`Amount: ₱${Number(extractedAmount).toLocaleString()}`)
+      if (extractedDate)   found.push(`Date: ${extractedDate}`)
+      if (extractedDesc)   found.push(`Description: "${extractedDesc}"`)
+
+      if (found.length > 0) {
+        setOcrMsg(`✅ OCR Complete! Extracted — ${found.join(' · ')}. Please review and correct if needed.`)
+      } else {
+        setOcrMsg('⚠️ OCR finished but could not extract data clearly. Please fill the fields manually.')
+      }
+    } catch (err: any) {
+      setOcrMsg(`❌ OCR failed: ${err.message || 'Unknown error'}. Please fill fields manually.`)
+    } finally {
       setScanningOcr(false)
-      setOcrMsg('OCR Scan Complete! Extracted vendor: "SM Supermarket Santa Rosa", Amount: ₱24,500.00')
-    }, 1200)
+    }
   }
 
   const handleSaveProject = async (e: FormEvent) => {
@@ -371,9 +494,10 @@ export default function ProjectDetailModal({
 
     const pId = Number(activeProject.id || (activeProject as any).projectId || (activeProject as any).projectID)
 
+    let createdOrder: any = null
     try {
       if (!isNaN(pId) && pId > 0) {
-        await createPurchaseOrderApi({
+        createdOrder = await createPurchaseOrderApi({
           projectID: pId,
           orderName: rVendor.trim(),
           orderType: 'Physical',
@@ -384,8 +508,22 @@ export default function ProjectDetailModal({
         })
       }
 
+      // Upload image to backend if provided; fall back to data URL if upload fails
+      let imageUrl: string | undefined
+      if (uploadedFile && createdOrder?.orderID) {
+        try {
+          const uploadResult = await uploadReceiptImageApi(createdOrder.orderID, uploadedFile)
+          if (uploadResult.receiptImageURL) {
+            imageUrl = resolveImageUrl(uploadResult.receiptImageURL)
+          }
+        } catch {
+          // Non-fatal — receipt is still saved, just no image on reload
+          console.warn('Receipt image upload failed; image will not persist on reload')
+        }
+      }
+
       const newR: Receipt = {
-        id: `R-${Date.now()}`,
+        id: createdOrder?.orderID || `R-${Date.now()}`,
         projectId: activeProject.id,
         projectTitle: activeProject.title,
         barangay: activeProject.barangay,
@@ -395,6 +533,7 @@ export default function ProjectDetailModal({
         status: 'verified' as const,
         ocrExtracted: !!uploadedFile || !!ocrMsg,
         description: rDesc.trim(),
+        imageUrl,
       } as Receipt
 
       setLocalReceipts(prev => [newR, ...prev])
@@ -837,11 +976,8 @@ export default function ProjectDetailModal({
                               </div>
                             </div>
                             <div style={{ display: 'flex', gap: '0.5rem' }}>
-                              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowCameraModal(true)}>
-                                📷 Open Camera
-                              </button>
                               <button type="button" className="btn btn-gold btn-sm" onClick={handleScanOcr} disabled={scanningOcr}>
-                                {scanningOcr ? 'Scanning OCR…' : '⚡ Auto-Scan with OCR'}
+                                {scanningOcr ? '🔍 Scanning…' : '⚡ Auto-Scan with OCR'}
                               </button>
                             </div>
                           </div>
@@ -867,9 +1003,19 @@ export default function ProjectDetailModal({
                               </div>
                             </label>
                             <div style={{ fontSize: '0.74rem', color: 'var(--muted)', fontWeight: 700 }}>— OR —</div>
-                            <button type="button" className="btn btn-gold btn-sm" onClick={() => setShowCameraModal(true)}>
-                              📷 Open Camera / Snap Receipt Photo
-                            </button>
+                            <label className="btn btn-gold btn-sm" style={{ cursor: 'pointer', margin: 0 }}>
+                              🖼️ Upload an Image
+                              <input
+                                type="file"
+                                accept=".png,.jpg,.jpeg"
+                                style={{ display: 'none' }}
+                                onChange={e => {
+                                  if (e.target.files && e.target.files[0]) {
+                                    setUploadedFile(e.target.files[0])
+                                  }
+                                }}
+                              />
+                            </label>
                           </div>
                         )}
                       </div>
@@ -1061,7 +1207,7 @@ export default function ProjectDetailModal({
       {viewingReceipt && (
         <Portal>
           <div className="modal-overlay" style={{ zIndex: 20000 }} onClick={() => setViewingReceipt(null)}>
-            <div className="modal" style={{ width: 'min(480px, 90vw)', padding: '1.25rem', position: 'relative', zIndex: 20001 }} onClick={e => e.stopPropagation()}>
+            <div className="modal" style={{ width: 'min(560px, 92vw)', padding: '1.25rem', position: 'relative', zIndex: 20001, maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem' }}>
                 <div>
                   <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1rem', color: 'var(--ink)' }}>
@@ -1076,75 +1222,118 @@ export default function ProjectDetailModal({
                 </button>
               </div>
 
-              {/* Authentic Mock Receipt Document Card */}
-              <div style={{
-                background: '#FAF8F5',
-                border: '2px dashed rgba(118,0,49,0.3)',
-                padding: '1.25rem',
-                borderRadius: '6px',
-                fontFamily: 'Courier New, monospace',
-                color: '#111',
-                boxShadow: 'inset 0 0 20px rgba(0,0,0,0.02), 0 8px 24px rgba(0,0,0,0.08)',
-                marginBottom: '1rem',
-                position: 'relative',
-                overflow: 'hidden'
-              }}>
-                {/* Official Stamp */}
+              {/* Uploaded Image — shown when available */}
+              {viewingReceipt.imageUrl ? (
+                <div style={{ marginBottom: '1rem' }}>
+                  <img
+                    src={viewingReceipt.imageUrl}
+                    alt={`Receipt from ${viewingReceipt.vendor}`}
+                    style={{
+                      width: '100%',
+                      borderRadius: '8px',
+                      border: '1.5px solid rgba(118,0,49,0.15)',
+                      boxShadow: '0 4px 18px rgba(0,0,0,0.10)',
+                      display: 'block',
+                      objectFit: 'contain',
+                      maxHeight: '55vh',
+                      background: '#f9f7f4',
+                    }}
+                  />
+                  <div style={{ fontSize: '0.72rem', color: 'var(--muted)', textAlign: 'center', marginTop: '0.4rem' }}>
+                    Uploaded receipt image
+                  </div>
+                </div>
+              ) : (
+                /* Fallback mock receipt card when no image was uploaded */
                 <div style={{
-                  position: 'absolute',
-                  top: '1rem',
-                  right: '1rem',
-                  border: '2px solid #166534',
-                  color: '#166534',
-                  padding: '0.2rem 0.5rem',
-                  fontSize: '0.68rem',
-                  fontWeight: 800,
-                  transform: 'rotate(-8deg)',
-                  letterSpacing: '0.08em',
-                  background: 'rgba(240,253,244,0.85)'
+                  background: '#FAF8F5',
+                  border: '2px dashed rgba(118,0,49,0.3)',
+                  padding: '1.25rem',
+                  borderRadius: '6px',
+                  fontFamily: 'Courier New, monospace',
+                  color: '#111',
+                  boxShadow: 'inset 0 0 20px rgba(0,0,0,0.02), 0 8px 24px rgba(0,0,0,0.08)',
+                  marginBottom: '1rem',
+                  position: 'relative',
+                  overflow: 'hidden'
                 }}>
-                  ✓ AUDITED &amp; VERIFIED
-                </div>
+                  {/* Official Stamp */}
+                  <div style={{
+                    position: 'absolute',
+                    top: '1rem',
+                    right: '1rem',
+                    border: '2px solid #166534',
+                    color: '#166534',
+                    padding: '0.2rem 0.5rem',
+                    fontSize: '0.68rem',
+                    fontWeight: 800,
+                    transform: 'rotate(-8deg)',
+                    letterSpacing: '0.08em',
+                    background: 'rgba(240,253,244,0.85)'
+                  }}>
+                    ✓ AUDITED &amp; VERIFIED
+                  </div>
 
-                <div style={{ textAlign: 'center', borderBottom: '1px dashed #aaa', paddingBottom: '0.75rem', marginBottom: '0.85rem' }}>
-                  <div style={{ fontWeight: 800, fontSize: '0.78rem', textTransform: 'uppercase' }}>Republic of the Philippines · City of Santa Rosa</div>
-                  <div style={{ fontWeight: 900, fontSize: '0.92rem', color: 'var(--maroon)', marginTop: '0.15rem' }}>BARANGAY {activeProject.barangay.toUpperCase()} SANGGUNIANG KABATAAN</div>
-                  <div style={{ fontSize: '0.72rem', color: '#555', marginTop: '0.15rem' }}>OFFICIAL DISBURSEMENT RECEIPT · O.R. #OR-2025-0{Math.abs(viewingReceipt.id.charCodeAt(0)) % 9000 + 1000}</div>
-                </div>
+                  <div style={{ textAlign: 'center', borderBottom: '1px dashed #aaa', paddingBottom: '0.75rem', marginBottom: '0.85rem' }}>
+                    <div style={{ fontWeight: 800, fontSize: '0.78rem', textTransform: 'uppercase' }}>Republic of the Philippines · City of Santa Rosa</div>
+                    <div style={{ fontWeight: 900, fontSize: '0.92rem', color: 'var(--maroon)', marginTop: '0.15rem' }}>BARANGAY {activeProject.barangay.toUpperCase()} SANGGUNIANG KABATAAN</div>
+                    <div style={{ fontSize: '0.72rem', color: '#555', marginTop: '0.15rem' }}>OFFICIAL DISBURSEMENT RECEIPT · O.R. #OR-2025-0{Math.abs(viewingReceipt.id.charCodeAt(0)) % 9000 + 1000}</div>
+                  </div>
 
-                <div style={{ display: 'grid', gap: '0.35rem', fontSize: '0.78rem', marginBottom: '0.85rem' }}>
-                  <div><strong>PAYEE / VENDOR:</strong> {viewingReceipt.vendor}</div>
-                  <div><strong>DATE FILED:</strong> {viewingReceipt.date}</div>
-                  <div><strong>PROJECT:</strong> {viewingReceipt.projectTitle || activeProject.title}</div>
-                  <div><strong>PARTICULARS:</strong> {viewingReceipt.description || 'Disbursement for youth initiative'}</div>
-                </div>
+                  <div style={{ display: 'grid', gap: '0.35rem', fontSize: '0.78rem', marginBottom: '0.85rem' }}>
+                    <div><strong>PAYEE / VENDOR:</strong> {viewingReceipt.vendor}</div>
+                    <div><strong>DATE FILED:</strong> {viewingReceipt.date}</div>
+                    <div><strong>PROJECT:</strong> {viewingReceipt.projectTitle || activeProject.title}</div>
+                    <div><strong>PARTICULARS:</strong> {viewingReceipt.description || 'Disbursement for youth initiative'}</div>
+                  </div>
 
-                <table style={{ width: '100%', fontSize: '0.75rem', borderCollapse: 'collapse', borderTop: '1px dashed #aaa', borderBottom: '1px dashed #aaa', margin: '0.5rem 0 0.85rem' }}>
-                  <thead>
-                    <tr style={{ borderBottom: '1px solid #ddd' }}>
-                      <th style={{ textAlign: 'left', padding: '0.3rem 0' }}>DESCRIPTION</th>
-                      <th style={{ textAlign: 'right', padding: '0.3rem 0' }}>AMOUNT</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td style={{ padding: '0.3rem 0' }}>Procurement &amp; Supplies</td>
-                      <td style={{ textAlign: 'right' }}>₱{(viewingReceipt.amount * 0.7).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                    </tr>
-                    <tr>
-                      <td style={{ padding: '0.3rem 0' }}>Logistics &amp; Services</td>
-                      <td style={{ textAlign: 'right' }}>₱{(viewingReceipt.amount * 0.3).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
-                    </tr>
-                  </tbody>
-                </table>
+                  <table style={{ width: '100%', fontSize: '0.75rem', borderCollapse: 'collapse', borderTop: '1px dashed #aaa', borderBottom: '1px dashed #aaa', margin: '0.5rem 0 0.85rem' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid #ddd' }}>
+                        <th style={{ textAlign: 'left', padding: '0.3rem 0' }}>DESCRIPTION</th>
+                        <th style={{ textAlign: 'right', padding: '0.3rem 0' }}>AMOUNT</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td style={{ padding: '0.3rem 0' }}>Procurement &amp; Supplies</td>
+                        <td style={{ textAlign: 'right' }}>₱{(viewingReceipt.amount * 0.7).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                      </tr>
+                      <tr>
+                        <td style={{ padding: '0.3rem 0' }}>Logistics &amp; Services</td>
+                        <td style={{ textAlign: 'right' }}>₱{(viewingReceipt.amount * 0.3).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                      </tr>
+                    </tbody>
+                  </table>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 900, fontSize: '0.95rem', color: 'var(--maroon)' }}>
-                  <span>TOTAL AMOUNT PAID:</span>
-                  <span>₱{viewingReceipt.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontWeight: 900, fontSize: '0.95rem', color: 'var(--maroon)' }}>
+                    <span>TOTAL AMOUNT PAID:</span>
+                    <span>₱{viewingReceipt.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                  </div>
                 </div>
+              )}
+
+              {/* Receipt metadata summary (always shown) */}
+              <div style={{
+                background: 'rgba(118,0,49,0.04)',
+                border: '1px solid rgba(118,0,49,0.12)',
+                borderRadius: '6px',
+                padding: '0.75rem 1rem',
+                fontSize: '0.78rem',
+                display: 'grid',
+                gap: '0.25rem',
+                marginBottom: '1rem',
+              }}>
+                <div><strong>Vendor / Payee:</strong> {viewingReceipt.vendor}</div>
+                <div><strong>Amount:</strong> ₱{viewingReceipt.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
+                <div><strong>Date:</strong> {viewingReceipt.date}</div>
+                {viewingReceipt.description && <div><strong>Description:</strong> {viewingReceipt.description}</div>}
+                {viewingReceipt.ocrExtracted && (
+                  <div style={{ color: '#166534', fontWeight: 700, marginTop: '0.15rem' }}>✓ OCR Extracted</div>
+                )}
               </div>
 
-              <button className="btn btn-primary btn-sm" style={{ width: '100%', marginTop: '1rem', justifyContent: 'center' }} onClick={() => setViewingReceipt(null)}>
+              <button className="btn btn-primary btn-sm" style={{ width: '100%', justifyContent: 'center' }} onClick={() => setViewingReceipt(null)}>
                 Done Viewing
               </button>
             </div>
