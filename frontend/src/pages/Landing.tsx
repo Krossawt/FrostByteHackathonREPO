@@ -717,7 +717,7 @@ export default function Landing() {
               )}
             </>
           ) : (
-            <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'rgba(255,255,255,0.6)' }}>
+            <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#000' }}>
               No city news published yet.
             </div>
           )}
@@ -762,7 +762,7 @@ export default function Landing() {
               </div>
               <button onClick={() => setLegalModal(null)}
                 style={{ background: 'rgba(118,0,49,0.08)', border: 'none', cursor: 'pointer', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '8px', flexShrink: 0 }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12" /></svg>
               </button>
             </div>
             <div style={{ fontSize: '0.88rem', color: 'var(--muted)', lineHeight: 1.75 }}>

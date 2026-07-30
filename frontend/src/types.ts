@@ -13,6 +13,7 @@ export interface UserAccount {
   skPosition?: SKPosition
   isActive?: boolean
   createdAt?: string
+  photoURL?: string
 }
 
 export interface ReportProject {

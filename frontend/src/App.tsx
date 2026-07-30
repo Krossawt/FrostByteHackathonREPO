@@ -20,6 +20,10 @@ import SKHome from './pages/SKHome'
 import SKProjects from './pages/SKProjects'
 import { BARANGAYS } from './constants'
 import ConfirmDialog from './components/ConfirmDialog'
+import { User as UserIcon } from 'lucide-react'
+import ProfileEditModal from './components/ProfileEditModal'
+import { updateProfileApi, deleteAccountApi } from './services/api'
+import Portal from './components/Portal'
 
 
 const PUBLIC_NAV = [
@@ -106,6 +110,15 @@ function App() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const [navOpen, setNavOpen] = useState(false)
   const isLanding = isLandingPath(location.pathname)
+  const [showProfileModal, setShowProfileModal] = useState(false)
+
+  const [profileFeedback, setProfileFeedback] = useState<{ type: 'success' | 'info'; message: string } | null>(null)
+
+  useEffect(() => {
+    if (!profileFeedback) return
+    const timer = setTimeout(() => setProfileFeedback(null), 3000)
+    return () => clearTimeout(timer)
+  }, [profileFeedback])
 
   useEffect(() => {
     const onMove = (e: MouseEvent) => setCursor({ x: e.clientX / window.innerWidth, y: e.clientY / window.innerHeight })
@@ -169,6 +182,25 @@ function App() {
     return result
   }
 
+  const handleProfileSave = async (updates: { name: string; barangay: string; photoURL: string }) => {
+    const updated = await updateProfileApi(updates)
+    setUser(prev => prev ? { ...prev, ...updated } : prev)
+    setProfileFeedback({ type: 'success', message: 'Profile updated successfully' })
+  }
+
+  const handleDiscardProfileEdit = () => {
+    setShowProfileModal(false)
+    setProfileFeedback({ type: 'info', message: 'Changes discarded' })
+  }
+
+  const handleDeleteAccount = async () => {
+    await deleteAccountApi()
+    logoutService()
+    setUser(null)
+    setShowProfileModal(false)
+    navigate('/', { replace: true })
+  }
+
   const handleLogout = () => { logoutService(); setUser(null); navigate('/', { replace: true }) }
   const confirmLogout = () => setShowLogoutConfirm(true)
 
@@ -230,6 +262,20 @@ function App() {
                 </>
               ) : (
                 <>
+                  {user.role === 'citizen' && (
+                    <button
+                      className="profile-icon-btn"
+                      onClick={() => setShowProfileModal(true)}
+                      aria-label="Edit Profile"
+                      title="Edit Profile"
+                    >
+                      {user.photoURL ? (
+                        <img src={user.photoURL} alt="Profile" />
+                      ) : (
+                        <UserIcon size={17} />
+                      )}
+                    </button>
+                  )}
                   <div className="user-chip">
                     <span className="user-chip-dot" style={{ background: posColor }} />
                     <span>{user.name.split(' ')[0]}</span>
@@ -264,6 +310,22 @@ function App() {
                 </>
               )}
 
+              {/* Profile icon — kept OUTSIDE the hamburger dropdown, always visible on mobile */}
+              {user?.role === 'citizen' && (
+                <button
+                  className="profile-icon-btn"
+                  onClick={() => setShowProfileModal(true)}
+                  aria-label="Edit Profile"
+                  title="Edit Profile"
+                >
+                  {user.photoURL ? (
+                    <img src={user.photoURL} alt="Profile" />
+                  ) : (
+                    <UserIcon size={16} />
+                  )}
+                </button>
+              )}
+
               <button
                 className="landing-menu-toggle"
                 onClick={() => setNavOpen(!navOpen)}
@@ -275,7 +337,7 @@ function App() {
             </div>
           </div>
 
-          {/* Mobile Dropdown — nav links + logout */}
+          {/* Mobile Dropdown — nav links + logout, hidden unless hamburger is open */}
           <div className={`landing-mobile-dropdown mobile-only ${navOpen ? 'open' : ''}`}>
             <div className="landing-mobile-nav-links">
               {nav.map(item => (
@@ -326,6 +388,68 @@ function App() {
           <Route path="*" element={<Navigate to={userHomePath(user)} replace />} />
         </Routes>
       </main>
+
+      {showProfileModal && user && (
+        <ProfileEditModal
+          user={user}
+          onClose={() => setShowProfileModal(false)}
+          onDiscard={handleDiscardProfileEdit}
+          onSave={handleProfileSave}
+          onDeleteAccount={handleDeleteAccount}
+        />
+      )}
+
+      {profileFeedback && (
+        <Portal>
+          <div
+            style={{
+              position: 'fixed',
+              top: 'calc(var(--header-height, 78px) + 1rem)',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 10000,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.6rem',
+              background: profileFeedback.type === 'success' ? 'rgba(22, 101, 52, 0.22)' : 'rgba(118, 0, 49, 0.18)',
+              backdropFilter: 'blur(16px) saturate(1.6)',
+              WebkitBackdropFilter: 'blur(16px) saturate(1.6)',
+              color: profileFeedback.type === 'success' ? '#0d3d20' : '#5c0026',
+              fontFamily: 'var(--font-display)',
+              fontWeight: 700,
+              fontSize: '0.9rem',
+              padding: '0.9rem 1.4rem',
+              borderRadius: '14px',
+              border: '1.5px solid rgba(255, 255, 255, 0.35)',
+              boxShadow: profileFeedback.type === 'success'
+                ? '0 12px 32px rgba(22,101,52,0.25), inset 0 1px 0 rgba(255,255,255,0.4)'
+                : '0 12px 32px rgba(118,0,49,0.18), inset 0 1px 0 rgba(255,255,255,0.4)',
+              maxWidth: '90vw',
+              animation: 'toastPop 220ms ease-out',
+            }}
+          >
+            {profileFeedback.type === 'success' ? (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0 }}>
+                <circle cx="12" cy="12" r="10" />
+                <path d="M8 12l3 3 5-6" />
+              </svg>
+            ) : (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0 }}>
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 8v5" />
+                <path d="M12 16h.01" />
+              </svg>
+            )}
+            <span>{profileFeedback.message}</span>
+          </div>
+          <style>{`
+            @keyframes toastPop {
+              from { opacity: 0; transform: translateX(-50%) translateY(-12px) scale(0.96); }
+              to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+            }
+          `}</style>
+        </Portal>
+      )}
 
       {/* Logout confirmation */}
       <ConfirmDialog

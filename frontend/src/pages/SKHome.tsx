@@ -286,6 +286,14 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
             -webkit-backdrop-filter: blur(16px) saturate(1.6);
             box-shadow: 0 8px 20px rgba(220, 38, 38, 0.18), inset 0 1px 0 rgba(255,255,255,0.3);
           }
+
+          /* Print doesn't make sense as a tap target on tablet/mobile —
+             hide it there and keep Download as the primary export action. */
+          @media (max-width: 1024px) {
+            .report-print-btn {
+              display: none !important;
+            }
+          }
         `}</style>
 
         {/* ── Page Intro ── */}
@@ -603,7 +611,7 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
                 </div>
                 <div className="report-toolbar-actions" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                   <button className="btn btn-sm report-download-btn report-toolbar-btn" onClick={handleDownloadPDF} disabled={isDownloadingPdf} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}>
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
                     {isDownloadingPdf ? 'Generating PDF...' : 'Download (Save as PDF)'}
                   </button>
                   <button className="btn btn-sm report-print-btn report-toolbar-btn" onClick={handlePrintReport} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}>
