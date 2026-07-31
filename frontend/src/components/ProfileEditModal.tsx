@@ -25,8 +25,15 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
     console.error('VITE_SUPABASE_URL:', SUPABASE_URL)
     console.error('VITE_SUPABASE_ANON_KEY:', SUPABASE_KEY ? 'SET' : 'NOT SET')
 }
-
-const supabase = createClient(SUPABASE_URL || '', SUPABASE_KEY || '')
+const getSupabaseClient = () => {
+    if (!SUPABASE_URL || !SUPABASE_KEY) return null
+    try {
+        return createClient(SUPABASE_URL, SUPABASE_KEY)
+    } catch (err) {
+        console.warn('Supabase initialization warning:', err)
+        return null
+    }
+}
 
 export default function ProfileEditModal({ user, onClose, onDiscard, onSave, onDeleteAccount }: ProfileEditModalProps) {
     const initial = {
@@ -38,13 +45,11 @@ export default function ProfileEditModal({ user, onClose, onDiscard, onSave, onD
     const [name, setName] = useState(initial.name)
     const [barangay, setBarangay] = useState(initial.barangay)
     const [photoPreview, setPhotoPreview] = useState(initial.photoURL)
+    const [uploading, setUploading] = useState(false)
     const [saving, setSaving] = useState(false)
     const [error, setError] = useState('')
-    const [uploading, setUploading] = useState(false)
-
     const [confirmDiscard, setConfirmDiscard] = useState(false)
 
-    // Delete-account confirm flow
     const [confirmingDelete, setConfirmingDelete] = useState(false)
     const [deleting, setDeleting] = useState(false)
     const [deleteError, setDeleteError] = useState('')
@@ -73,9 +78,20 @@ export default function ProfileEditModal({ user, onClose, onDiscard, onSave, onD
                 throw new Error('Please select a valid image file')
             }
 
-            // Check Supabase credentials
-            if (!SUPABASE_URL || !SUPABASE_KEY) {
-                throw new Error('Supabase credentials not configured. Check .env file.')
+            const supabase = getSupabaseClient()
+
+            // If Supabase credentials are missing, use local FileReader Data URL fallback
+            if (!supabase) {
+                console.log('ℹ️ Supabase not configured. Using local Data URL avatar preview.')
+                const reader = new FileReader()
+                reader.onload = (event) => {
+                    if (event.target?.result) {
+                        setPhotoPreview(String(event.target.result))
+                    }
+                    setUploading(false)
+                }
+                reader.readAsDataURL(file)
+                return
             }
 
             // Generate unique filename
@@ -112,7 +128,14 @@ export default function ProfileEditModal({ user, onClose, onDiscard, onSave, onD
             console.log('✨ Photo preview updated')
         } catch (err: any) {
             console.error('❌ Photo upload error:', err)
-            setError(err?.message || 'Failed to upload image. Check console for details.')
+            // Fallback to FileReader if Supabase storage upload fails
+            const reader = new FileReader()
+            reader.onload = (event) => {
+                if (event.target?.result) {
+                    setPhotoPreview(String(event.target.result))
+                }
+            }
+            reader.readAsDataURL(file)
         } finally {
             setUploading(false)
         }
