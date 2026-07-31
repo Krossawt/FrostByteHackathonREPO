@@ -43,14 +43,18 @@ function getGrad(cat?: string) { return CATEGORY_GRAD[cat ?? 'default'] ?? CATEG
 // (which may say things like "For Approval" or "Posted") into the four
 // statuses this UI actually renders, instead of just lowercasing blindly.
 const STATUS_LEVELS: Record<string, number> = {
-  'Incoming': 1, 'incoming': 1, 'upcoming': 1,
-  'In Progress': 2, 'in progress': 2, 'ongoing': 2,
-  'Completed': 3, 'completed': 3, 'posted': 3,
+  'Incoming': 1, 'incoming': 1, 'upcoming': 1, 'drafted': 1, 'Drafted': 1,
+  'In Progress': 2, 'in progress': 2, 'Ongoing': 2, 'ongoing': 2, 'active': 2,
+  'Completed': 3, 'completed': 3, 'posted': 3, 'Posted': 3,
 }
 
 function getStatusLevel(st?: string): number {
   if (!st) return 1
-  return STATUS_LEVELS[st] || 1
+  if (STATUS_LEVELS[st]) return STATUS_LEVELS[st]
+  const norm = normalizeProjectStatus({ projectStatus: st })
+  if (norm === 'Completed') return 3
+  if (norm === 'Ongoing') return 2
+  return 1
 }
 
 function mapApiProjectToReportProject(project: any, fallbackBarangay: string): ReportProject {
@@ -673,8 +677,11 @@ export default function SKProjects({ user }: SKProjectsProps) {
                             { key: 'In Progress', label: 'In Progress', level: 2, icon: '⚡' },
                             { key: 'Completed', label: 'Completed', level: 3, icon: '✓' },
                           ].map(st => {
-                            const currentLevel = getStatusLevel(initialSnapshot.status || (formMode as ReportProject)?.projectStatus || (formMode as ReportProject)?.status)
-                            const isCurrent = newStatus === st.key
+                            const rawCurrent = initialSnapshot.status || (formMode as ReportProject)?.projectStatus || (formMode as ReportProject)?.status
+                            const normCurrent = normalizeProjectStatus({ projectStatus: rawCurrent })
+                            const currentLevel = getStatusLevel(normCurrent)
+                            const targetNorm = st.key === 'In Progress' ? 'Ongoing' : st.key
+                            const isCurrent = normalizeProjectStatus({ projectStatus: newStatus }) === targetNorm
                             const isBackward = currentLevel > st.level
                             const isDisabled = isBackward
 

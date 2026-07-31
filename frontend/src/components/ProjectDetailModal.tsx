@@ -45,14 +45,18 @@ interface ProjectDetailModalProps {
 }
 
 const STATUS_LEVELS: Record<string, number> = {
-  'Incoming': 1, 'incoming': 1, 'upcoming': 1,
-  'In Progress': 2, 'in progress': 2, 'ongoing': 2,
-  'Completed': 3, 'completed': 3, 'posted': 3,
+  'Incoming': 1, 'incoming': 1, 'upcoming': 1, 'drafted': 1, 'Drafted': 1,
+  'In Progress': 2, 'in progress': 2, 'Ongoing': 2, 'ongoing': 2, 'active': 2,
+  'Completed': 3, 'completed': 3, 'posted': 3, 'Posted': 3,
 }
 
 function getStatusLevel(st?: string): number {
   if (!st) return 1
-  return STATUS_LEVELS[st] || 1
+  if (STATUS_LEVELS[st]) return STATUS_LEVELS[st]
+  const norm = normalizeProjectStatus({ projectStatus: st })
+  if (norm === 'Completed') return 3
+  if (norm === 'Ongoing') return 2
+  return 1
 }
 
 type ModalTab = 'overview' | 'finance' | 'comments'
@@ -825,8 +829,10 @@ export default function ProjectDetailModal({
                           { key: 'In Progress', label: 'In Progress', level: 2, icon: '⚡' },
                           { key: 'Completed', label: 'Completed', level: 3, icon: '✓' },
                         ].map(st => {
-                          const currentLevel = getStatusLevel(normalizeProjectStatus(activeProject))
-                          const isCurrent = normalizeProjectStatus(activeProject) === st.key
+                          const normCurrent = normalizeProjectStatus(activeProject)
+                          const currentLevel = getStatusLevel(normCurrent)
+                          const targetNorm = st.key === 'In Progress' ? 'Ongoing' : st.key
+                          const isCurrent = normCurrent === targetNorm
                           const isBackward = currentLevel > st.level
                           const isDisabled = isBackward
 
