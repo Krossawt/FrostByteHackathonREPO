@@ -117,28 +117,20 @@ export default function SuperAdminNews() {
     }
   }
 
-  const handleImageChange = async (e: ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = (e: ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0]
       setImageFile(file)
-      try {
-        setUploading(true)
-        const uploaded = await uploadNewsImageApi(file)
-        if (uploaded && uploaded.imageURL) {
-          setImageUrl(uploaded.imageURL)
-        } else {
-          const reader = new FileReader()
-          reader.onload = ev => { if (ev.target?.result) setImageUrl(String(ev.target.result)) }
-          reader.readAsDataURL(file)
+      setUploading(true)
+      const reader = new FileReader()
+      reader.onload = ev => {
+        if (ev.target?.result) {
+          setImageUrl(String(ev.target.result))
         }
-      } catch (err: any) {
-        console.warn('Backend image upload warning:', err)
-        const reader = new FileReader()
-        reader.onload = ev => { if (ev.target?.result) setImageUrl(String(ev.target.result)) }
-        reader.readAsDataURL(file)
-      } finally {
         setUploading(false)
       }
+      reader.onerror = () => setUploading(false)
+      reader.readAsDataURL(file)
     }
   }
 
