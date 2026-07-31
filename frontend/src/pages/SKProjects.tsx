@@ -4,7 +4,7 @@ import ProjectDetailModal from '../components/ProjectDetailModal'
 import ConfirmDialog from '../components/ConfirmDialog'
 import type { ReportProject } from '../types'
 import Portal from '../components/Portal'
-import { fetchProjectsApi, createProjectApi, updateProjectApi, deleteProjectApi } from '../services/api'
+import { fetchProjectsApi, createProjectApi, updateProjectApi, deleteProjectApi, normalizeProjectStatus, isProjectOngoing } from '../services/api'
 
 interface SKProjectsProps { user?: UserAccount | null }
 
@@ -54,15 +54,8 @@ function getStatusLevel(st?: string): number {
 }
 
 function mapApiProjectToReportProject(project: any, fallbackBarangay: string): ReportProject {
-  const rawStatus = String(project?.projectStatus || project?.status || 'In Progress')
-  const normalizedStatus = rawStatus.toLowerCase()
-  const status: ReportProject['status'] = normalizedStatus.includes('completed') || normalizedStatus.includes('posted')
-    ? 'completed'
-    : normalizedStatus.includes('incoming') || normalizedStatus.includes('draft') || normalizedStatus.includes('approval') || normalizedStatus.includes('finance')
-      ? 'upcoming'
-      : normalizedStatus.includes('cancel')
-        ? 'cancelled'
-        : 'ongoing'
+  const normStatus = normalizeProjectStatus(project)
+  const status: ReportProject['status'] = normStatus === 'Completed' ? 'completed' : normStatus === 'Incoming' ? 'upcoming' : 'ongoing'
 
   const proposedBudget = Number(project?.projectBudget ?? project?.proposedBudget ?? 0)
   const spent = Number(project?.projectBreakdown ?? project?.spent ?? 0)
@@ -195,7 +188,7 @@ export default function SKProjects({ user }: SKProjectsProps) {
   }
 
   const openEditForm = (p: ReportProject) => {
-    const currentSt = p.projectStatus || (p.status === 'completed' ? 'Completed' : p.status === 'upcoming' ? 'Incoming' : 'In Progress')
+    const currentSt = normalizeProjectStatus(p)
     setNewTitle(p.title)
     setNewCat(p.category || 'Education')
     setNewDesc(p.description)

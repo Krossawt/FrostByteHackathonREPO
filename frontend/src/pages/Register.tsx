@@ -4,6 +4,7 @@ import { Menu, X } from 'lucide-react'
 import { BARANGAYS } from '../constants'
 import type { UserAccount } from '../types'
 import NewsTicker from '../components/NewsTicker'
+import PolicyModal from '../components/PolicyModal'
 
 interface RegisterPageProps {
   onRegister: (name: string, email: string, password: string, barangay: string, isStaRosa: boolean, username?: string) => Promise<UserAccount> | UserAccount | void
@@ -25,6 +26,7 @@ export default function RegisterPage({ onRegister }: RegisterPageProps) {
   const [showSuccessModal, setShowSuccessModal] = useState(false)
   const [createdUser, setCreatedUser] = useState<UserAccount | null>(null)
   const [navOpen, setNavOpen] = useState(false)
+  const [policyType, setPolicyType] = useState<'terms' | 'privacy' | null>(null)
 
   const pwStrength = password.length >= 12 ? 'Strong' : password.length >= 8 ? 'Good' : password.length >= 4 ? 'Weak' : ''
   const pwColor = pwStrength === 'Strong' ? '#166534' : pwStrength === 'Good' ? '#b45309' : '#b91c1c'
@@ -317,9 +319,21 @@ export default function RegisterPage({ onRegister }: RegisterPageProps) {
               <input type="checkbox" checked={agreed} onChange={() => setAgreed(a => !a)} style={{ marginTop: '2px', accentColor: 'var(--maroon)', width: '15px', height: '15px', flexShrink: 0 }} />
               <span style={{ fontFamily: 'var(--font-display)', fontSize: '0.83rem', color: 'var(--muted)', lineHeight: 1.55 }}>
                 I agree to the{' '}
-                <a href="#" style={{ color: 'var(--maroon)', fontWeight: 700, textDecoration: 'underline' }}>Terms & Conditions</a>
+                <button
+                  type="button"
+                  onClick={e => { e.preventDefault(); setPolicyType('terms') }}
+                  style={{ background: 'none', border: 'none', padding: 0, color: 'var(--maroon)', fontWeight: 700, textDecoration: 'underline', cursor: 'pointer', font: 'inherit' }}
+                >
+                  Terms & Conditions
+                </button>
                 {' '}and{' '}
-                <a href="#" style={{ color: 'var(--maroon)', fontWeight: 700, textDecoration: 'underline' }}>Privacy Policy</a>
+                <button
+                  type="button"
+                  onClick={e => { e.preventDefault(); setPolicyType('privacy') }}
+                  style={{ background: 'none', border: 'none', padding: 0, color: 'var(--maroon)', fontWeight: 700, textDecoration: 'underline', cursor: 'pointer', font: 'inherit' }}
+                >
+                  Privacy Policy
+                </button>
                 {' '}of eSKala and the City Government of Santa Rosa.
               </span>
             </label>
@@ -406,12 +420,27 @@ export default function RegisterPage({ onRegister }: RegisterPageProps) {
         </div>
       )}
 
+      {/* ── Policy Modal Popup ── */}
+      <PolicyModal isOpen={!!policyType} type={policyType} onClose={() => setPolicyType(null)} />
+
       {/* ── Footer ── */}
       <footer className="landing-footer">
         <div className="landing-footer-version">eSKala v1.0 · City of Santa Rosa, Laguna · CYDO</div>
         <div className="landing-footer-links">
-          <Link to="/about">Terms and Conditions</Link>
-          <Link to="/about">Privacy Policy</Link>
+          <button
+            type="button"
+            onClick={e => { e.preventDefault(); setPolicyType('terms') }}
+            style={{ background: 'none', border: 'none', padding: 0, color: 'inherit', font: 'inherit', cursor: 'pointer' }}
+          >
+            Terms &amp; Conditions
+          </button>
+          <button
+            type="button"
+            onClick={e => { e.preventDefault(); setPolicyType('privacy') }}
+            style={{ background: 'none', border: 'none', padding: 0, color: 'inherit', font: 'inherit', cursor: 'pointer' }}
+          >
+            Privacy Policy
+          </button>
         </div>
       </footer>
     </div>

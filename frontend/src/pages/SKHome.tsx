@@ -4,7 +4,7 @@ import ProjectDetailModal from '../components/ProjectDetailModal'
 import BarangayTransactionsModal from '../components/BarangayTransactionsModal'
 import { DonutChart } from '../components/MiniChart'
 import SingleNewsCarousel from '../components/SingleNewsCarousel'
-import { fetchProjectsApi, fetchBarangayReportApi, fetchNewsApi, fetchSuggestionsApi, voteSuggestionApi, replySuggestionApi } from '../services/api'
+import { fetchProjectsApi, fetchBarangayReportApi, fetchNewsApi, fetchSuggestionsApi, voteSuggestionApi, replySuggestionApi, normalizeProjectStatus } from '../services/api'
 import type { SuggestionItem } from '../services/api'
 import Portal from '../components/Portal'
 import html2canvas from 'html2canvas'
@@ -125,12 +125,8 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
 
         if (Array.isArray(projRes)) {
           setLocalProjects(projRes.map((p: any) => {
-            const rawSt = String(p.projectStatus || p.status || 'ongoing').toLowerCase()
-            const mappedStatus: 'ongoing' | 'upcoming' | 'completed' = rawSt.includes('post') || rawSt.includes('complete')
-              ? 'completed'
-              : rawSt.includes('draft') || rawSt.includes('finance') || rawSt.includes('approval')
-                ? 'upcoming'
-                : 'ongoing'
+            const normSt = normalizeProjectStatus(p)
+            const mappedStatus: 'ongoing' | 'upcoming' | 'completed' = normSt === 'Completed' ? 'completed' : normSt === 'Incoming' ? 'upcoming' : 'ongoing'
 
             return {
               id: String(p.projectID || p.id),
@@ -228,14 +224,28 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
   const [isSubmittingReply, setIsSubmittingReply] = useState(false)
 
   const handleVote = async (id: number) => {
-    if (votedIds.has(id)) return
+    const alreadyVoted = votedIds.has(id)
     try {
       const updated = await voteSuggestionApi(id)
       setLocalComments((prev) => prev.map((c) => c.suggestionID === id ? updated : c))
-      setVotedIds(prev => { const next = new Set(prev); next.add(id); return next })
+      setVotedIds(prev => {
+        const next = new Set(prev)
+        if (alreadyVoted) next.delete(id)
+        else next.add(id)
+        return next
+      })
     } catch {
-      setLocalComments((prev) => prev.map((c) => c.suggestionID === id ? { ...c, votesCount: (c.votesCount || 0) + 1 } : c))
-      setVotedIds(prev => { const next = new Set(prev); next.add(id); return next })
+      setLocalComments((prev) => prev.map((c) => {
+        if (c.suggestionID !== id) return c
+        const delta = alreadyVoted ? -1 : 1
+        return { ...c, votesCount: Math.max(0, (c.votesCount || 0) + delta) }
+      }))
+      setVotedIds(prev => {
+        const next = new Set(prev)
+        if (alreadyVoted) next.delete(id)
+        else next.add(id)
+        return next
+      })
     }
   }
 

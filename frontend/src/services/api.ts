@@ -235,6 +235,22 @@ export async function deleteProjectApi(projectId: number | string): Promise<any>
   })
 }
 
+export function normalizeProjectStatus(p: any): 'Incoming' | 'Ongoing' | 'Completed' {
+  if (!p) return 'Incoming'
+  const raw = String(p.projectStatus || p.status || '').trim().toLowerCase()
+  if (raw === 'completed' || raw === 'posted' || raw === 'done') {
+    return 'Completed'
+  }
+  if (raw === 'ongoing' || raw === 'in progress' || raw === 'in-progress' || raw === 'active') {
+    return 'Ongoing'
+  }
+  return 'Incoming'
+}
+
+export function isProjectOngoing(p: any): boolean {
+  return normalizeProjectStatus(p) === 'Ongoing'
+}
+
 // ─── ANNUAL BUDGET REPORTS (ABYIP) ──────────────────────────────────────────
 
 export async function postApprovedAbyipApi(payload: {
@@ -686,6 +702,19 @@ export async function replySuggestionApi(suggestionId: number, replyText: string
   return request<SuggestionItem>(`/suggestions/${suggestionId}/reply`, {
     method: 'POST',
     body: JSON.stringify({ replyText }),
+  })
+}
+
+export async function updateSuggestionApi(suggestionId: number, suggestionText: string, category?: string): Promise<SuggestionItem> {
+  return request<SuggestionItem>(`/suggestions/${suggestionId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ suggestionText, category }),
+  })
+}
+
+export async function deleteSuggestionApi(suggestionId: number): Promise<{ message: string }> {
+  return request<{ message: string }>(`/suggestions/${suggestionId}`, {
+    method: 'DELETE',
   })
 }
 

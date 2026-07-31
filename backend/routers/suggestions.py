@@ -78,7 +78,7 @@ def create_suggestion(
 
 
 @router.post("/{suggestion_id}/vote", response_model=SuggestionResponse,
-             summary="Upvote a suggestion (Limit 1 per user)")
+             summary="Toggle Upvote/Unvote a suggestion")
 def vote_suggestion(
     suggestion_id: int,
     db: Session = Depends(get_db),
@@ -94,10 +94,12 @@ def vote_suggestion(
     ).first()
 
     if existing_vote:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="You have already upvoted this suggestion."
-        )
+        # User already voted — UNDO / UNCHECK / UNVOTE
+        db.delete(existing_vote)
+        suggestion.votesCount = max(0, (suggestion.votesCount or 0) - 1)
+        db.commit()
+        db.refresh(suggestion)
+        return SuggestionResponse.model_validate(suggestion)
 
     vote = SuggestionVote(
         suggestionID=suggestion_id,
@@ -109,6 +111,52 @@ def vote_suggestion(
     db.refresh(suggestion)
 
     return SuggestionResponse.model_validate(suggestion)
+
+
+@router.patch("/{suggestion_id}", response_model=SuggestionResponse,
+              summary="Edit suggestion (Creator or Super Admin)")
+def update_suggestion(
+    suggestion_id: int,
+    payload: SuggestionCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_authenticated),
+):
+    suggestion = db.query(Suggestion).filter(Suggestion.suggestionID == suggestion_id).first()
+    if not suggestion:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Suggestion not found")
+
+    role_str = str(getattr(current_user.userRole, 'value', current_user.userRole)).lower()
+    if suggestion.authorID != current_user.userID and role_str != 'superadmin':
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only edit your own suggestions.")
+
+    if payload.suggestionText and payload.suggestionText.strip():
+        suggestion.suggestionText = payload.suggestionText.strip()
+    if payload.category:
+        suggestion.category = payload.category
+
+    db.commit()
+    db.refresh(suggestion)
+    return SuggestionResponse.model_validate(suggestion)
+
+
+@router.delete("/{suggestion_id}", summary="Delete suggestion (Creator or Super Admin)")
+def delete_suggestion(
+    suggestion_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_authenticated),
+):
+    suggestion = db.query(Suggestion).filter(Suggestion.suggestionID == suggestion_id).first()
+    if not suggestion:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Suggestion not found")
+
+    role_str = str(getattr(current_user.userRole, 'value', current_user.userRole)).lower()
+    if suggestion.authorID != current_user.userID and role_str != 'superadmin':
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only delete your own suggestions.")
+
+    db.delete(suggestion)
+    db.commit()
+    return {"message": "Suggestion deleted successfully"}
+
 
 
 @router.post("/{suggestion_id}/reply", response_model=SuggestionResponse,

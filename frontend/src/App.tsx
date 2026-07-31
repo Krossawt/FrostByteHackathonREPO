@@ -24,6 +24,7 @@ import { User as UserIcon } from 'lucide-react'
 import ProfileEditModal from './components/ProfileEditModal'
 import { updateProfileApi, deleteAccountApi, resolveImageUrl } from './services/api'
 import Portal from './components/Portal'
+import PolicyModal from './components/PolicyModal'
 
 
 const PUBLIC_NAV = [
@@ -111,8 +112,8 @@ function App() {
   const [navOpen, setNavOpen] = useState(false)
   const isLanding = isLandingPath(location.pathname)
   const [showProfileModal, setShowProfileModal] = useState(false)
-
   const [profileFeedback, setProfileFeedback] = useState<{ type: 'success' | 'info'; message: string } | null>(null)
+  const [policyType, setPolicyType] = useState<'terms' | 'privacy' | null>(null)
 
   useEffect(() => {
     if (!profileFeedback) return
@@ -463,6 +464,8 @@ function App() {
         onCancel={() => setShowLogoutConfirm(false)}
       />
 
+      <PolicyModal isOpen={!!policyType} type={policyType} onClose={() => setPolicyType(null)} />
+
       {!isLanding && (
         <footer className="footer">
           <div className="container">
@@ -495,10 +498,22 @@ function App() {
                 <div>
                   <div className="footer-col-title">Legal</div>
                   <div className="footer-links">
-                    <a href="#">Terms & Conditions</a>
-                    <a href="#">Privacy Policy</a>
-                    <a href="#">RA 10742 Full Text</a>
-                    <a href="#">Full Disclosure Policy</a>
+                    <button
+                      type="button"
+                      onClick={e => { e.preventDefault(); setPolicyType('terms') }}
+                      style={{ background: 'none', border: 'none', padding: 0, color: 'inherit', font: 'inherit', cursor: 'pointer', textAlign: 'left' }}
+                    >
+                      Terms &amp; Conditions
+                    </button>
+                    <button
+                      type="button"
+                      onClick={e => { e.preventDefault(); setPolicyType('privacy') }}
+                      style={{ background: 'none', border: 'none', padding: 0, color: 'inherit', font: 'inherit', cursor: 'pointer', textAlign: 'left' }}
+                    >
+                      Privacy Policy
+                    </button>
+                    <a href="https://www.officialgazette.gov.ph/2016/01/15/republic-act-no-10742/" target="_blank" rel="noreferrer">RA 10742 Full Text</a>
+                    <a href="https://www.dilg.gov.ph" target="_blank" rel="noreferrer">Full Disclosure Policy</a>
                   </div>
                 </div>
               </div>

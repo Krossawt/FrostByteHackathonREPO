@@ -7,7 +7,7 @@ import ProjectDetailModal from '../components/ProjectDetailModal'
 import BarangayTransactionsModal from '../components/BarangayTransactionsModal'
 import NewsTicker from '../components/NewsTicker'
 import type { ReportProject, NewsItem } from '../types'
-import { fetchExecutiveSummaryApi, fetchNewsApi, fetchProjectsApi, fetchSKOfficialsApi } from '../services/api'
+import { fetchExecutiveSummaryApi, fetchNewsApi, fetchProjectsApi, fetchSKOfficialsApi, normalizeProjectStatus } from '../services/api'
 
 
 const NEWS_IMAGES: Record<string, string> = {
@@ -116,7 +116,10 @@ export default function Landing() {
             title: p.projectName || p.title,
             barangay: p.projectLocation,
             category: p.projectCategory || 'Education',
-            status: p.projectStatus ? p.projectStatus.toLowerCase() as any : 'ongoing',
+            status: (() => {
+              const norm = normalizeProjectStatus(p)
+              return norm === 'Completed' ? 'completed' : norm === 'Incoming' ? 'upcoming' : 'ongoing'
+            })(),
             proposedBudget: Number(p.projectBudget || 0),
             spent: Number(p.projectBreakdown || 0),
             progress: p.projectProgress || 0,

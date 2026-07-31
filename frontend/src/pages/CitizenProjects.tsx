@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import type { UserAccount } from '../types'
 import ProjectDetailModal from '../components/ProjectDetailModal'
 import type { ReportProject } from '../types'
-import { fetchProjectsApi } from '../services/api'
+import { fetchProjectsApi, normalizeProjectStatus } from '../services/api'
 
 interface CitizenProjectsProps { user?: UserAccount | null }
 
@@ -61,12 +61,8 @@ export default function CitizenProjects({ user }: CitizenProjectsProps) {
         const res = await fetchProjectsApi({ barangay: userBarangay, public_only: true })
         if (Array.isArray(res)) {
           setLiveProjects(res.map((p: any) => {
-            const rawSt = String(p.projectStatus || p.status || 'ongoing').toLowerCase()
-            const mappedStatus: 'ongoing' | 'upcoming' | 'completed' = rawSt.includes('post') || rawSt.includes('complete')
-              ? 'completed'
-              : rawSt.includes('draft') || rawSt.includes('finance') || rawSt.includes('approval')
-                ? 'upcoming'
-                : 'ongoing'
+            const normSt = normalizeProjectStatus(p)
+            const mappedStatus: 'ongoing' | 'upcoming' | 'completed' = normSt === 'Completed' ? 'completed' : normSt === 'Incoming' ? 'upcoming' : 'ongoing'
 
             return {
               id: String(p.projectID || p.id),

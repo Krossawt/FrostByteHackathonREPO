@@ -10,7 +10,7 @@ import type { ReportProject, Receipt, UserAccount } from '../types'
 import CameraCaptureModal from './CameraCaptureModal'
 import ConfirmDialog from './ConfirmDialog'
 import Portal from './Portal'
-import { fetchCommentsApi, fetchProjectByIdApi, updateProjectApi, postCommentApi, createPurchaseOrderApi, fetchPurchaseOrdersApi, uploadReceiptImageApi, resolveImageUrl } from '../services/api'
+import { fetchCommentsApi, fetchProjectByIdApi, updateProjectApi, postCommentApi, createPurchaseOrderApi, fetchPurchaseOrdersApi, uploadReceiptImageApi, resolveImageUrl, normalizeProjectStatus, isProjectOngoing } from '../services/api'
 
 const CATEGORY_IMAGES: Record<string, string> = {
   'Education': 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=800&q=80',
@@ -59,13 +59,8 @@ type ModalTab = 'overview' | 'finance' | 'comments'
 type Feedback = { type: 'success' | 'info'; message: string }
 
 function mapApiProjectToReportProject(project: any, fallbackBarangay: string): ReportProject {
-  const rawStatus = String(project?.projectStatus || project?.status || 'ongoing')
-  const normalizedStatus = rawStatus.toLowerCase()
-  const status: ReportProject['status'] = normalizedStatus.includes('posted') || normalizedStatus.includes('completed')
-    ? 'completed'
-    : normalizedStatus.includes('approval') || normalizedStatus.includes('finance') || normalizedStatus.includes('draft')
-      ? 'upcoming'
-      : 'ongoing'
+  const normStatus = normalizeProjectStatus(project)
+  const status: ReportProject['status'] = normStatus === 'Completed' ? 'completed' : normStatus === 'Incoming' ? 'upcoming' : 'ongoing'
 
   const proposedBudget = Number(project?.projectBudget ?? project?.proposedBudget ?? 0)
   const spent = Number(project?.projectBreakdown ?? project?.spent ?? 0)
@@ -192,7 +187,7 @@ export default function ProjectDetailModal({
   const [editEnd, setEditEnd] = useState(project?.endDate || '')
   const [editDesc, setEditDesc] = useState(project?.description || '')
   const [editBarangay, setEditBarangay] = useState(project?.barangay || '')
-  const [editStatus, setEditStatus] = useState<string>(project?.projectStatus || 'In Progress')
+  const [editStatus, setEditStatus] = useState<string>(normalizeProjectStatus(project))
   const [pendingStatusConfirm, setPendingStatusConfirm] = useState<string | null>(null)
 
   // Comment form state
@@ -226,7 +221,7 @@ export default function ProjectDetailModal({
     setEditEnd(safeProject.endDate || '')
     setEditDesc(safeProject.description || '')
     setEditBarangay(safeProject.barangay || '')
-    setEditStatus(safeProject.projectStatus || 'In Progress')
+    setEditStatus(normalizeProjectStatus(safeProject))
     setEditSnapshot({
       title: safeProject.title || '',
       category: safeProject.category || 'Education',
@@ -235,7 +230,7 @@ export default function ProjectDetailModal({
       end: safeProject.endDate || '',
       barangay: safeProject.barangay || '',
       desc: safeProject.description || '',
-      status: safeProject.projectStatus || 'In Progress',
+      status: normalizeProjectStatus(safeProject),
     })
     setIsEditing(!!autoEditProject)
     setIsLoadingProject(true)
@@ -254,7 +249,7 @@ export default function ProjectDetailModal({
         setEditEnd(mapped.endDate || '')
         setEditDesc(mapped.description || '')
         setEditBarangay(mapped.barangay || '')
-        setEditStatus(mapped.projectStatus || 'In Progress')
+        setEditStatus(normalizeProjectStatus(mapped))
         setEditSnapshot({
           title: mapped.title || '',
           category: mapped.category || 'Education',
@@ -263,7 +258,7 @@ export default function ProjectDetailModal({
           end: mapped.endDate || '',
           barangay: mapped.barangay || '',
           desc: mapped.description || '',
-          status: mapped.projectStatus || 'In Progress',
+          status: normalizeProjectStatus(mapped),
         })
       } catch (err: any) {
         if (!active) return
@@ -944,7 +939,7 @@ export default function ProjectDetailModal({
                           setEditEnd(activeProject.endDate || '')
                           setEditDesc(activeProject.description || '')
                           setEditBarangay(activeProject.barangay || '')
-                          setEditStatus(activeProject.projectStatus || 'In Progress')
+                          setEditStatus(normalizeProjectStatus(activeProject))
                           setEditSnapshot({
                             title: activeProject.title || '',
                             category: activeProject.category || 'Education',
@@ -953,7 +948,7 @@ export default function ProjectDetailModal({
                             end: activeProject.endDate || '',
                             barangay: activeProject.barangay || '',
                             desc: activeProject.description || '',
-                            status: activeProject.projectStatus || 'In Progress',
+                            status: normalizeProjectStatus(activeProject),
                           })
                           setIsEditing(true)
                         }}
@@ -986,14 +981,14 @@ export default function ProjectDetailModal({
                       </div>
                     </div>
                     {canManageReceipts && (
-                      !['ongoing', 'in progress'].includes(String(activeProject.projectStatus || activeProject.status || '').toLowerCase()) ? (
+                      !isProjectOngoing(activeProject) ? (
                         <button
                           className="btn btn-secondary btn-sm"
                           disabled
                           style={{ opacity: 0.7, cursor: 'not-allowed', background: '#f3f4f6', color: '#6b7280', border: '1px solid #d1d5db' }}
-                          title="Receipt attachment locked — project must be Ongoing / In Progress"
+                          title="Receipt attachment locked — project status is currently Incoming or Completed"
                         >
-                          🔒 Receipts Locked (Only allowed when project is Ongoing)
+                          🔒 Receipts Locked (Status: {normalizeProjectStatus(activeProject)} — Must be Ongoing)
                         </button>
                       ) : (
                         <button className="btn btn-primary btn-sm" onClick={() => setShowReceiptForm(v => !v)}>
@@ -1004,7 +999,7 @@ export default function ProjectDetailModal({
                   </div>
 
                   {/* Add receipt form with Upload & OCR */}
-                  {showReceiptForm && canManageReceipts && ['ongoing', 'in progress'].includes(String(activeProject.projectStatus || activeProject.status || '').toLowerCase()) && (
+                  {showReceiptForm && canManageReceipts && isProjectOngoing(activeProject) && (
                     <form onSubmit={handleAddReceipt} className="receipt-form" style={{ marginBottom: '1.5rem' }}>
                       <div className="page-kicker" style={{ marginBottom: '0.75rem' }}>Attach New Receipt Document</div>
 

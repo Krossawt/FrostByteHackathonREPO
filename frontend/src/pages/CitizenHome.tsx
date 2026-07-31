@@ -4,7 +4,7 @@ import ProjectDetailModal from '../components/ProjectDetailModal'
 import BarangayTransactionsModal from '../components/BarangayTransactionsModal'
 import { DonutChart } from '../components/MiniChart'
 import SingleNewsCarousel from '../components/SingleNewsCarousel'
-import { fetchProjectsApi, fetchBarangayReportApi, fetchNewsApi, fetchSuggestionsApi, postSuggestionApi, voteSuggestionApi } from '../services/api'
+import { fetchProjectsApi, fetchBarangayReportApi, fetchNewsApi, fetchSuggestionsApi, postSuggestionApi, voteSuggestionApi, updateSuggestionApi, deleteSuggestionApi, normalizeProjectStatus } from '../services/api'
 import type { SuggestionItem } from '../services/api'
 import Portal from '../components/Portal'
 import html2canvas from 'html2canvas'
@@ -117,12 +117,8 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
 
         if (Array.isArray(projRes)) {
           setLocalProjects(projRes.map((p: any) => {
-            const rawSt = String(p.projectStatus || p.status || 'ongoing').toLowerCase()
-            const mappedStatus: 'ongoing' | 'upcoming' | 'completed' = rawSt.includes('post') || rawSt.includes('complete')
-              ? 'completed'
-              : rawSt.includes('draft') || rawSt.includes('finance') || rawSt.includes('approval')
-                ? 'upcoming'
-                : 'ongoing'
+            const normSt = normalizeProjectStatus(p)
+            const mappedStatus: 'ongoing' | 'upcoming' | 'completed' = normSt === 'Completed' ? 'completed' : normSt === 'Incoming' ? 'upcoming' : 'ongoing'
 
             return {
               id: String(p.projectID || p.id),
@@ -240,16 +236,63 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
     }
   }
 
+  const [suggestionFilter, setSuggestionFilter] = useState<'all' | 'mine'>('all')
+  const [editingSuggestionId, setEditingSuggestionId] = useState<number | null>(null)
+  const [editText, setEditText] = useState('')
+
   const handleVote = async (id: number) => {
-    if (votedIds.has(id)) return  // prevent double-voting
+    const alreadyVoted = votedIds.has(id)
     try {
       const updated = await voteSuggestionApi(id)
       setLocalComments((prev) => prev.map((c) => c.suggestionID === id ? updated : c))
-      setVotedIds(prev => { const next = new Set(prev); next.add(id); return next })
+      setVotedIds(prev => {
+        const next = new Set(prev)
+        if (alreadyVoted) next.delete(id)
+        else next.add(id)
+        return next
+      })
     } catch {
-      // Optimistic fallback
-      setLocalComments((prev) => prev.map((c) => c.suggestionID === id ? { ...c, votesCount: (c.votesCount || 0) + 1 } : c))
-      setVotedIds(prev => { const next = new Set(prev); next.add(id); return next })
+      // Optimistic fallback toggle
+      setLocalComments((prev) => prev.map((c) => {
+        if (c.suggestionID !== id) return c
+        const delta = alreadyVoted ? -1 : 1
+        return { ...c, votesCount: Math.max(0, (c.votesCount || 0) + delta) }
+      }))
+      setVotedIds(prev => {
+        const next = new Set(prev)
+        if (alreadyVoted) next.delete(id)
+        else next.add(id)
+        return next
+      })
+    }
+  }
+
+  const handleStartEdit = (s: SuggestionItem) => {
+    setEditingSuggestionId(s.suggestionID)
+    setEditText(s.suggestionText)
+  }
+
+  const handleSaveEdit = async (id: number) => {
+    if (!editText.trim()) return
+    try {
+      const updated = await updateSuggestionApi(id, editText.trim())
+      setLocalComments(prev => prev.map(c => c.suggestionID === id ? { ...c, suggestionText: updated.suggestionText } : c))
+      setEditingSuggestionId(null)
+    } catch (err) {
+      console.warn('Failed to update suggestion:', err)
+      setLocalComments(prev => prev.map(c => c.suggestionID === id ? { ...c, suggestionText: editText.trim() } : c))
+      setEditingSuggestionId(null)
+    }
+  }
+
+  const handleDeleteSuggestion = async (id: number) => {
+    if (!window.confirm('Are you sure you want to delete your suggestion?')) return
+    try {
+      await deleteSuggestionApi(id)
+      setLocalComments(prev => prev.filter(c => c.suggestionID !== id))
+    } catch (err) {
+      console.warn('Failed to delete suggestion:', err)
+      setLocalComments(prev => prev.filter(c => c.suggestionID !== id))
     }
   }
 
@@ -502,91 +545,198 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
 
               {/* Feed of Recent Citizen Suggestion Posts */}
               <div style={{ marginTop: '1.8rem', borderTop: '1px solid rgba(118,0,49,0.08)', paddingTop: '1.2rem', display: 'grid', gap: '0.9rem' }}>
-                <div className="page-kicker">Barangay {barangay} Community Posts</div>
-                {localComments.length === 0 ? (
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div className="page-kicker" style={{ margin: 0 }}>Barangay {barangay} Community Posts</div>
+                  
+                  {/* Filter Tab: All vs My Suggestions */}
+                  <div style={{ display: 'flex', gap: '0.4rem', background: 'rgba(118,0,49,0.06)', padding: '3px', borderRadius: '8px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setSuggestionFilter('all')}
+                      style={{
+                        background: suggestionFilter === 'all' ? '#fff' : 'transparent',
+                        color: suggestionFilter === 'all' ? 'var(--maroon)' : 'var(--muted)',
+                        border: 'none',
+                        padding: '0.3rem 0.7rem',
+                        borderRadius: '6px',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        boxShadow: suggestionFilter === 'all' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+                      }}
+                    >
+                      All ({localComments.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSuggestionFilter('mine')}
+                      style={{
+                        background: suggestionFilter === 'mine' ? '#fff' : 'transparent',
+                        color: suggestionFilter === 'mine' ? 'var(--maroon)' : 'var(--muted)',
+                        border: 'none',
+                        padding: '0.3rem 0.7rem',
+                        borderRadius: '6px',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        boxShadow: suggestionFilter === 'mine' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none'
+                      }}
+                    >
+                      👤 My Suggestions ({localComments.filter(c => c.authorName === user?.name || c.authorID === Number(user?.id)).length})
+                    </button>
+                  </div>
+                </div>
+
+                {localComments.filter(c => suggestionFilter === 'all' || c.authorName === user?.name || c.authorID === Number(user?.id)).length === 0 ? (
                   <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--muted)', fontSize: '0.85rem' }}>
-                    No suggestions yet. Be the first to post one above!
+                    {suggestionFilter === 'mine' ? "You haven't posted any suggestions yet." : "No suggestions yet. Be the first to post one above!"}
                   </div>
-                ) : localComments.map((c) => (
-                  <div key={c.suggestionID} className="comment-card" style={{ background: 'rgba(255,255,255,0.95)', border: '1.5px solid rgba(118,0,49,0.1)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
-                        <div style={{ width: '30px', height: '30px', background: 'rgba(118,0,49,0.1)', color: 'var(--maroon)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '0.8rem' }}>
-                          {c.authorName?.charAt(0) ?? 'C'}
-                        </div>
-                        <div>
-                          <span className="comment-author">{c.authorName}</span>
-                          <span style={{ marginLeft: '0.4rem', fontSize: '0.72rem', color: 'var(--muted)', background: 'rgba(118,0,49,0.07)', padding: '0.1rem 0.5rem', borderRadius: '12px', fontFamily: 'var(--font-display)', fontWeight: 600 }}>{c.category}</span>
-                        </div>
-                      </div>
-                      <span className="comment-date">{c.createdAt ? new Date(c.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Today'}</span>
-                    </div>
+                ) : localComments
+                    .filter(c => suggestionFilter === 'all' || c.authorName === user?.name || c.authorID === Number(user?.id))
+                    .map((c) => {
+                  const isAuthor = c.authorName === user?.name || c.authorID === Number(user?.id)
+                  const isEditing = editingSuggestionId === c.suggestionID
 
-                    <p className="comment-text" style={{ margin: '0.6rem 0', fontSize: '0.88rem', color: 'var(--ink)' }}>
-                      {c.suggestionText}
-                    </p>
-
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(118,0,49,0.06)', paddingTop: '0.5rem', marginTop: '0.4rem' }}>
-                      <button
-                        type="button"
-                        onClick={() => handleVote(c.suggestionID)}
-                        className="link-button"
-                        disabled={votedIds.has(c.suggestionID)}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.4rem',
-                          fontSize: '0.76rem',
-                          color: votedIds.has(c.suggestionID) ? 'var(--maroon-dark)' : 'var(--maroon)',
-                          fontWeight: 500,
-                          fontFamily: 'var(--font-display)',
-                          lineHeight: 1,
-                          opacity: votedIds.has(c.suggestionID) ? 0.6 : 1,
-                          transition: 'opacity 0.15s ease',
-                        }}
-                      >
-                        <svg
-                          width="16" height="16" viewBox="0 0 24 24"
-                          fill={votedIds.has(c.suggestionID) ? 'var(--maroon)' : 'none'}
-                          stroke={votedIds.has(c.suggestionID) ? 'var(--maroon-dark)' : 'var(--maroon)'}
-                          strokeWidth="2"
-                          strokeLinejoin="round"
-                          style={{ display: 'block', flexShrink: 0 }}
-                        >
-                          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 21 12 17.77 5.82 21 7 14.14 2 9.27l6.91-1.01L12 2z" />
-                        </svg>
-                        <span style={{ lineHeight: 1 }}>Agree / Helpful ({c.votesCount ?? 0})</span>
-                      </button>
-                      <span style={{ fontSize: '0.72rem', color: 'var(--muted)', fontFamily: 'var(--font-display)' }}>
-                        Barangay {barangay} Feed
-                      </span>
-                    </div>
-
-                    {/* SK Council Responses */}
-                    {c.replies && c.replies.length > 0 && (
-                      <div style={{ marginTop: '0.75rem', paddingTop: '0.6rem', borderTop: '1px dashed rgba(118,0,49,0.12)', display: 'grid', gap: '0.5rem' }}>
-                        <div style={{ fontSize: '0.72rem', fontFamily: 'var(--font-display)', fontWeight: 800, color: 'var(--maroon)', textTransform: 'uppercase' }}>
-                          Official SK Council Responses ({c.replies.length})
-                        </div>
-                        {c.replies.map((r) => (
-                          <div key={r.replyID} style={{ background: 'rgba(118,0,49,0.04)', borderLeft: '3px solid var(--maroon)', padding: '0.6rem 0.85rem', borderRadius: '0 6px 6px 0' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
-                              <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '0.8rem', color: 'var(--ink)' }}>
-                                {r.authorName} <span style={{ fontSize: '0.72rem', color: 'var(--maroon)', fontWeight: 600 }}>({r.authorRole})</span>
-                              </span>
-                              <span style={{ fontSize: '0.7rem', color: 'var(--muted)', fontFamily: 'var(--font-display)' }}>
-                                {r.createdAt ? new Date(r.createdAt).toLocaleDateString() : 'Today'}
-                              </span>
-                            </div>
-                            <p style={{ margin: 0, fontSize: '0.83rem', color: 'var(--ink-2)', lineHeight: 1.5 }}>
-                              {r.replyText}
-                            </p>
+                  return (
+                    <div key={c.suggestionID} className="comment-card" style={{ background: 'rgba(255,255,255,0.95)', border: isAuthor ? '1.5px solid rgba(118,0,49,0.3)' : '1.5px solid rgba(118,0,49,0.1)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+                          <div style={{ width: '30px', height: '30px', background: 'rgba(118,0,49,0.1)', color: 'var(--maroon)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '0.8rem' }}>
+                            {c.authorName?.charAt(0) ?? 'C'}
                           </div>
-                        ))}
+                          <div>
+                            <span className="comment-author">{c.authorName}</span>
+                            {isAuthor && <span style={{ marginLeft: '0.3rem', fontSize: '0.7rem', fontWeight: 800, color: 'var(--maroon)', background: 'rgba(118,0,49,0.1)', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>YOU</span>}
+                            <span style={{ marginLeft: '0.4rem', fontSize: '0.72rem', color: 'var(--muted)', background: 'rgba(118,0,49,0.07)', padding: '0.1rem 0.5rem', borderRadius: '12px', fontFamily: 'var(--font-display)', fontWeight: 600 }}>{c.category}</span>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span className="comment-date">{c.createdAt ? new Date(c.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Today'}</span>
+
+                          {/* Creator Actions: Edit & Delete */}
+                          {isAuthor && !isEditing && (
+                            <div style={{ display: 'flex', gap: '0.3rem' }}>
+                              <button
+                                type="button"
+                                onClick={() => handleStartEdit(c)}
+                                title="Edit suggestion"
+                                style={{ background: 'none', border: '1px solid rgba(0,0,0,0.12)', padding: '0.2rem 0.5rem', borderRadius: '6px', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 600, color: '#3b82f6' }}
+                              >
+                                ✏️ Edit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteSuggestion(c.suggestionID)}
+                                title="Delete suggestion"
+                                style={{ background: 'none', border: '1px solid rgba(220,38,38,0.2)', padding: '0.2rem 0.5rem', borderRadius: '6px', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 600, color: '#dc2626' }}
+                              >
+                                🗑️ Delete
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    )}
-                  </div>
-                ))}
+
+                      {isEditing ? (
+                        <div style={{ marginTop: '0.6rem', marginBottom: '0.6rem' }}>
+                          <textarea
+                            className="form-input"
+                            rows={2}
+                            value={editText}
+                            onChange={e => setEditText(e.target.value)}
+                            style={{ fontSize: '0.88rem', marginBottom: '0.4rem' }}
+                          />
+                          <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              onClick={() => setEditingSuggestionId(null)}
+                              style={{ padding: '0.3rem 0.7rem', fontSize: '0.75rem' }}
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-primary btn-sm"
+                              onClick={() => handleSaveEdit(c.suggestionID)}
+                              style={{ padding: '0.3rem 0.9rem', fontSize: '0.75rem' }}
+                            >
+                              Save Changes
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="comment-text" style={{ margin: '0.6rem 0', fontSize: '0.88rem', color: 'var(--ink)' }}>
+                          {c.suggestionText}
+                        </p>
+                      )}
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(118,0,49,0.06)', paddingTop: '0.5rem', marginTop: '0.4rem' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleVote(c.suggestionID)}
+                          className="link-button"
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.4rem',
+                            fontSize: '0.76rem',
+                            color: votedIds.has(c.suggestionID) ? '#15803d' : 'var(--maroon)',
+                            fontWeight: 700,
+                            fontFamily: 'var(--font-display)',
+                            lineHeight: 1,
+                            background: votedIds.has(c.suggestionID) ? 'rgba(22, 101, 52, 0.08)' : 'transparent',
+                            padding: votedIds.has(c.suggestionID) ? '0.25rem 0.6rem' : 0,
+                            borderRadius: votedIds.has(c.suggestionID) ? '6px' : 0,
+                            transition: 'all 0.15s ease',
+                          }}
+                        >
+                          <svg
+                            width="16" height="16" viewBox="0 0 24 24"
+                            fill={votedIds.has(c.suggestionID) ? '#15803d' : 'none'}
+                            stroke={votedIds.has(c.suggestionID) ? '#15803d' : 'var(--maroon)'}
+                            strokeWidth="2"
+                            strokeLinejoin="round"
+                            style={{ display: 'block', flexShrink: 0 }}
+                          >
+                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 21 12 17.77 5.82 21 7 14.14 2 9.27l6.91-1.01L12 2z" />
+                          </svg>
+                          <span style={{ lineHeight: 1 }}>
+                            {votedIds.has(c.suggestionID) ? '✓ Agreed / Helpful' : 'Agree / Helpful'} ({c.votesCount ?? 0})
+                          </span>
+                        </button>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--muted)', fontFamily: 'var(--font-display)' }}>
+                          Barangay {barangay} Feed
+                        </span>
+                      </div>
+
+                      {/* SK Council Responses */}
+                      {c.replies && c.replies.length > 0 && (
+                        <div style={{ marginTop: '0.75rem', paddingTop: '0.6rem', borderTop: '1px dashed rgba(118,0,49,0.12)', display: 'grid', gap: '0.5rem' }}>
+                          <div style={{ fontSize: '0.72rem', fontFamily: 'var(--font-display)', fontWeight: 800, color: 'var(--maroon)', textTransform: 'uppercase' }}>
+                            Official SK Council Responses ({c.replies.length})
+                          </div>
+                          {c.replies.map((r) => (
+                            <div key={r.replyID} style={{ background: 'rgba(118,0,49,0.04)', borderLeft: '3px solid var(--maroon)', padding: '0.6rem 0.85rem', borderRadius: '0 6px 6px 0' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
+                                <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '0.8rem', color: 'var(--ink)' }}>
+                                  {r.authorName} <span style={{ fontSize: '0.72rem', color: 'var(--maroon)', fontWeight: 600 }}>({r.authorRole})</span>
+                                </span>
+                                <span style={{ fontSize: '0.7rem', color: 'var(--muted)', fontFamily: 'var(--font-display)' }}>
+                                  {r.createdAt ? new Date(r.createdAt).toLocaleDateString() : 'Today'}
+                                </span>
+                              </div>
+                              <p style={{ margin: 0, fontSize: '0.83rem', color: 'var(--ink-2)', lineHeight: 1.5 }}>
+                                {r.replyText}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             </div>
 

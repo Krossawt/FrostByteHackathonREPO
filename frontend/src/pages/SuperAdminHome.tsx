@@ -4,7 +4,7 @@ import ProjectDetailModal from '../components/ProjectDetailModal'
 import ConfirmDialog from '../components/ConfirmDialog'
 import type { ReportProject } from '../types'
 import Portal from '../components/Portal'
-import { fetchProjectsApi, fetchExecutiveSummaryApi, fetchAuditLogsApi, fetchNewsApi, postApprovedAbyipApi, createNewsletterApi } from '../services/api'
+import { fetchProjectsApi, fetchExecutiveSummaryApi, fetchAuditLogsApi, fetchNewsApi, postApprovedAbyipApi, createNewsletterApi, normalizeProjectStatus } from '../services/api'
 import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
 
@@ -35,18 +35,9 @@ function getCover(cat?: string) {
 }
 
 // Normalizes raw API project data into the ReportProject shape used by the UI.
-// Raw API statuses like "Posted", "Drafted", "For Finance Update" are mapped
-// to the four values the UI renders: ongoing | upcoming | completed | cancelled.
 function mapApiProjectToReportProject(project: any): ReportProject {
-  const rawStatus = String(project?.projectStatus || project?.status || 'In Progress')
-  const normalizedStatus = rawStatus.toLowerCase()
-  const status: ReportProject['status'] = normalizedStatus.includes('completed') || normalizedStatus.includes('posted')
-    ? 'completed'
-    : normalizedStatus.includes('incoming') || normalizedStatus.includes('draft') || normalizedStatus.includes('approval') || normalizedStatus.includes('finance')
-      ? 'upcoming'
-      : normalizedStatus.includes('cancel')
-        ? 'cancelled'
-        : 'ongoing'
+  const normStatus = normalizeProjectStatus(project)
+  const status: ReportProject['status'] = normStatus === 'Completed' ? 'completed' : normStatus === 'Incoming' ? 'upcoming' : 'ongoing'
 
   const proposedBudget = Number(project?.projectBudget ?? project?.proposedBudget ?? 0)
   const spent = Number(project?.projectBreakdown ?? project?.spent ?? 0)

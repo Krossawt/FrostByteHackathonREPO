@@ -159,7 +159,7 @@ export default function ProfileEditModal({ user, onClose, onDiscard, onSave, onD
                 className="modal-overlay"
                 onClick={e => { if (e.target === e.currentTarget) requestClose() }}
             >
-                <div className="modal" style={{ width: 'min(520px, 95vw)', padding: 0, overflow: 'hidden', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.4)', boxShadow: '0 24px 60px rgba(0,0,0,0.35)' }}>
+                <div className="modal" style={{ width: 'min(520px, 95vw)', maxHeight: '92vh', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.4)', boxShadow: '0 24px 60px rgba(0,0,0,0.35)' }}>
                     
                     {/* Top Decorative Banner */}
                     <div style={{
@@ -251,7 +251,7 @@ export default function ProfileEditModal({ user, onClose, onDiscard, onSave, onD
                         {uploading && <span style={{ fontSize: '0.75rem', color: 'var(--maroon)', fontWeight: 600 }}>Uploading profile photo...</span>}
                     </div>
 
-                    <form onSubmit={handleSubmit} style={{ padding: '0 1.5rem 1.5rem' }}>
+                    <form onSubmit={handleSubmit} style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto', padding: '0 1.5rem 1.5rem' }}>
                         {error && <div className="alert-error" style={{ marginBottom: '1rem', borderRadius: '12px' }}>{error}</div>}
 
                         <div style={{ background: '#fdfafd', padding: '1.25rem', borderRadius: '16px', border: '1px solid rgba(118, 0, 49, 0.1)', marginBottom: '1.25rem' }}>
