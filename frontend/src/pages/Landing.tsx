@@ -336,13 +336,6 @@ export default function Landing() {
               <Link to="/login" className="btn-landing-login" style={{ padding: '0.8rem 2rem', fontSize: '0.9rem' }}>
                 ACCESS PORTAL
               </Link>
-              <button
-                className="btn btn-secondary btn-sm"
-                onClick={() => setPickerOpen(true)}
-                style={{ padding: '0.8rem 1.4rem', fontSize: '0.88rem' }}
-              >
-                SELECT BARANGAY ↓
-              </button>
             </div>
           </div>
 

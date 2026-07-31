@@ -33,11 +33,12 @@ export default function SuperAdminAccounts({ selectedBarangay }: SuperAdminAccou
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [newIsStaRosa, setNewIsStaRosa] = useState(true)
+  const [newPhotoURL, setNewPhotoURL] = useState('')
   const [formError, setFormError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const [initialSnapshot, setInitialSnapshot] = useState({
-    name: '', email: '', brgy: 'Balibago', position: 'Chairperson', isStaRosa: true, password: 'Sk2026!',
+    name: '', email: '', brgy: 'Balibago', position: 'Chairperson', isStaRosa: true, password: 'Sk2026!', photo: '',
   })
 
   useEffect(() => {
@@ -112,8 +113,9 @@ export default function SuperAdminAccounts({ selectedBarangay }: SuperAdminAccou
     setConfirmPassword('Sk2026!')
     setShowPassword(false)
     setShowConfirmPassword(false)
+    setNewPhotoURL('')
     setFormError('')
-    setInitialSnapshot({ name: '', email: '', brgy: 'Balibago', position: 'Chairperson', isStaRosa: true, password: 'Sk2026!' })
+    setInitialSnapshot({ name: '', email: '', brgy: 'Balibago', position: 'Chairperson', isStaRosa: true, password: 'Sk2026!', photo: '' })
     setFormMode('new')
   }
 
@@ -127,10 +129,11 @@ export default function SuperAdminAccounts({ selectedBarangay }: SuperAdminAccou
     setShowPassword(false)
     setShowConfirmPassword(false)
     setNewIsStaRosa(u.isStaRosa ?? true)
+    setNewPhotoURL(u.photoURL || '')
     setFormError('')
     setInitialSnapshot({
       name: u.name, email: u.email, brgy: u.barangay || 'Balibago',
-      position: u.skPosition || 'Chairperson', isStaRosa: u.isStaRosa ?? true, password: '',
+      position: u.skPosition || 'Chairperson', isStaRosa: u.isStaRosa ?? true, password: '', photo: u.photoURL || '',
     })
     setFormMode(u)
   }
@@ -180,12 +183,14 @@ export default function SuperAdminAccounts({ selectedBarangay }: SuperAdminAccou
           skPosition: newPosition as any,
           isStaRosa: true,
           isActive: true,
+          photoURL: newPhotoURL || undefined,
         }
 
         setUsers(prev => [newAcc, ...prev])
         setFormMode(null)
         setNewFullName('')
         setNewEmail('')
+        setNewPhotoURL('')
         setFormError('')
         setFeedback({ type: 'success', message: 'Account created successfully' })
       } catch (err: any) {
@@ -215,7 +220,7 @@ export default function SuperAdminAccounts({ selectedBarangay }: SuperAdminAccou
 
         setUsers(prev => prev.map(u => {
           if (u.id !== editingId) return u
-          const base = { ...u, name: res.userName || newFullName.trim(), email: res.userEmail || newEmail.trim() }
+          const base = { ...u, name: res.userName || newFullName.trim(), email: res.userEmail || newEmail.trim(), photoURL: newPhotoURL || u.photoURL }
           if (role === 'sk') return { ...base, barangay: newBrgy, skPosition: newPosition as any }
           if (role === 'citizen') return { ...base, barangay: newBrgy, isStaRosa: newIsStaRosa }
           return base
@@ -455,6 +460,51 @@ export default function SuperAdminAccounts({ selectedBarangay }: SuperAdminAccou
                 }}>
                   <div className="modal-body">
                     {formError && <div className="notice error">{formError}</div>}
+
+                    {/* Official Profile Picture Upload */}
+                    <div className="field-group" style={{ marginBottom: '1.25rem', textAlign: 'center' }}>
+                      <label className="field-label" style={{ marginBottom: '0.4rem', display: 'block', fontWeight: 700 }}>Official Profile Picture</label>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.6rem' }}>
+                        {newPhotoURL ? (
+                          <img
+                            src={resolveImageUrl(newPhotoURL)}
+                            alt="Official SK Avatar"
+                            style={{ width: '68px', height: '68px', borderRadius: '50%', objectFit: 'cover', border: '3px solid var(--maroon)', boxShadow: '0 4px 12px rgba(118,0,49,0.2)' }}
+                            onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+                          />
+                        ) : (
+                          <div style={{ width: '68px', height: '68px', borderRadius: '50%', background: 'linear-gradient(135deg, var(--maroon), #4a001f)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: '1.4rem' }}>
+                            📷
+                          </div>
+                        )}
+                        <div style={{ display: 'flex', gap: '0.5rem', width: '100%', maxWidth: '360px' }}>
+                          <label className="btn btn-secondary btn-sm" style={{ flex: 1, cursor: 'pointer', textAlign: 'center', justifyContent: 'center', fontWeight: 700 }}>
+                            🖼️ Upload Photo
+                            <input
+                              type="file"
+                              accept="image/*"
+                              style={{ display: 'none' }}
+                              onChange={e => {
+                                const f = e.target.files?.[0]
+                                if (f) {
+                                  const r = new FileReader()
+                                  r.onload = ev => { if (ev.target?.result) setNewPhotoURL(String(ev.target.result)) }
+                                  r.readAsDataURL(f)
+                                }
+                              }}
+                            />
+                          </label>
+                          <input
+                            className="input"
+                            type="text"
+                            placeholder="Or paste Image URL..."
+                            value={newPhotoURL}
+                            onChange={e => setNewPhotoURL(e.target.value)}
+                            style={{ flex: 2, fontSize: '0.78rem' }}
+                          />
+                        </div>
+                      </div>
+                    </div>
 
                     <div className="field-group">
                       <label className="field-label">Full Name *</label>

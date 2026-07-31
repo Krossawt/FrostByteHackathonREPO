@@ -262,18 +262,20 @@ function App() {
                 </>
               ) : (
                 <>
-                  <button
-                    className="profile-icon-btn"
-                    onClick={() => setShowProfileModal(true)}
-                    aria-label="Edit Profile"
-                    title="Edit Profile"
-                  >
-                    {user.photoURL ? (
-                      <img src={resolveImageUrl(user.photoURL)} alt="Profile" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
-                    ) : (
-                      <UserIcon size={17} />
-                    )}
-                  </button>
+                  {user.role === 'citizen' && (
+                    <button
+                      className="profile-icon-btn"
+                      onClick={() => setShowProfileModal(true)}
+                      aria-label="Edit Profile"
+                      title="Edit Profile"
+                    >
+                      {user.photoURL ? (
+                        <img src={resolveImageUrl(user.photoURL)} alt="Profile" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                      ) : (
+                        <UserIcon size={17} />
+                      )}
+                    </button>
+                  )}
                   <div className="user-chip">
                     <span className="user-chip-dot" style={{ background: posColor }} />
                     <span>{user.name.split(' ')[0]}</span>
