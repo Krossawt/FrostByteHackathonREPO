@@ -29,8 +29,16 @@ function readStoredUser(key: string): UserAccount | null {
 }
 
 export function getStoredUser(): UserAccount | null {
-  return readStoredUser(STORAGE_KEY) || readStoredUser(SESSION_KEY)
+  // Retrieve persisted user from local storage first
+  const fromLocal = readStoredUser(STORAGE_KEY)
+  if (fromLocal) return fromLocal
+  // Fallback to session storage (used when rememberMe is false)
+  const fromSession = readStoredUser(SESSION_KEY)
+  return fromSession
 }
+
+
+
 
 function storeUser(user: UserAccount | null, _rememberMe = true) {
   if (!user) {
@@ -54,6 +62,7 @@ export async function loginAsync(emailOrUsername: string, password: string, reme
       name: res.user?.userName || 'User',
       email: res.user?.userEmail || emailOrUsername,
       username: (res.user?.userName || emailOrUsername).toLowerCase().replace(/\s+/g, ''),
+      photoURL: res.user?.userProfilePicture || undefined,
       role: mappedRole as any,
       barangay: res.user?.userLocation !== 'Santa Rosa City' ? res.user?.userLocation : undefined,
       skPosition: res.user?.userRole?.includes('Chairperson') ? 'Chairperson' : res.user?.userRole?.includes('Secretary') ? 'Secretary' : res.user?.userRole?.includes('Treasurer') ? 'Treasurer' : undefined,

@@ -1,8 +1,10 @@
+/// <reference types="vite/client" />
 import { useState, FormEvent } from 'react'
 import Portal from './Portal'
 import ConfirmDialog from './ConfirmDialog'
 import type { UserAccount } from '../types'
 import { BARANGAYS } from '../constants'
+import { createClient } from '@supabase/supabase-js'
 
 interface ProfileEditModalProps {
     user: UserAccount
@@ -11,6 +13,20 @@ interface ProfileEditModalProps {
     onSave: (updates: { name: string; barangay: string; photoURL: string }) => Promise<void>
     onDeleteAccount: () => Promise<void>
 }
+
+// Initialize Supabase client
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+console.log('Supabase Config:', { SUPABASE_URL, SUPABASE_KEY: SUPABASE_KEY ? 'SET' : 'MISSING' })
+
+if (!SUPABASE_URL || !SUPABASE_KEY) {
+    console.error('❌ MISSING SUPABASE CREDENTIALS - Check your .env file')
+    console.error('VITE_SUPABASE_URL:', SUPABASE_URL)
+    console.error('VITE_SUPABASE_ANON_KEY:', SUPABASE_KEY ? 'SET' : 'NOT SET')
+}
+
+const supabase = createClient(SUPABASE_URL || '', SUPABASE_KEY || '')
 
 export default function ProfileEditModal({ user, onClose, onDiscard, onSave, onDeleteAccount }: ProfileEditModalProps) {
     const initial = {
@@ -24,6 +40,7 @@ export default function ProfileEditModal({ user, onClose, onDiscard, onSave, onD
     const [photoPreview, setPhotoPreview] = useState(initial.photoURL)
     const [saving, setSaving] = useState(false)
     const [error, setError] = useState('')
+    const [uploading, setUploading] = useState(false)
 
     const [confirmDiscard, setConfirmDiscard] = useState(false)
 
@@ -35,12 +52,70 @@ export default function ProfileEditModal({ user, onClose, onDiscard, onSave, onD
     // THIS is what controls the Save Changes button + instruction message
     const isDirty = name !== initial.name || barangay !== initial.barangay || photoPreview !== initial.photoURL
 
-    const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (!file) return
-        const reader = new FileReader()
-        reader.onload = () => setPhotoPreview(reader.result as string)
-        reader.readAsDataURL(file)
+
+        setUploading(true)
+        setError('')
+
+        try {
+            console.log('📸 Starting image upload...', { fileName: file.name, size: file.size })
+
+            // Validate file size (max 5MB)
+            const maxSize = 5 * 1024 * 1024
+            if (file.size > maxSize) {
+                throw new Error('Image size must be less than 5MB')
+            }
+
+            // Validate file type
+            if (!file.type.startsWith('image/')) {
+                throw new Error('Please select a valid image file')
+            }
+
+            // Check Supabase credentials
+            if (!SUPABASE_URL || !SUPABASE_KEY) {
+                throw new Error('Supabase credentials not configured. Check .env file.')
+            }
+
+            // Generate unique filename
+            const userId = user.id || 'unknown'
+            const timestamp = Date.now()
+            const fileName = `${userId}_${timestamp}_${file.name}`
+
+            console.log('📤 Uploading to Supabase...', { fileName })
+
+            // Upload to Supabase Storage
+            const { data, error: uploadError } = await supabase.storage
+                .from('profile-pictures')
+                .upload(fileName, file, {
+                    cacheControl: '3600',
+                    upsert: false,
+                })
+
+            if (uploadError) {
+                console.error('❌ Upload error:', uploadError)
+                throw new Error(uploadError.message || 'Upload failed')
+            }
+
+            console.log('✅ Upload successful:', data)
+
+            // Get public URL
+            const { data: { publicUrl } } = supabase.storage
+                .from('profile-pictures')
+                .getPublicUrl(fileName)
+
+            console.log('🖼️ Public URL:', publicUrl)
+
+            // Show preview immediately
+            setPhotoPreview(publicUrl)
+            console.log('✨ Photo preview updated')
+        } catch (err: any) {
+            console.error('❌ Photo upload error:', err)
+            setError(err?.message || 'Failed to upload image. Check console for details.')
+        } finally {
+            setUploading(false)
+        }
     }
 
     const handleSubmit = async (e: FormEvent) => {
@@ -124,17 +199,23 @@ export default function ProfileEditModal({ user, onClose, onDiscard, onSave, onD
                                 <label
                                     htmlFor="profile-photo-input"
                                     className="btn btn-secondary btn-sm"
-                                    style={{ cursor: 'pointer' }}
+                                    style={{ cursor: uploading ? 'not-allowed' : 'pointer', opacity: uploading ? 0.6 : 1 }}
                                 >
-                                    Change Photo
+                                    {uploading ? 'Uploading...' : 'Change Photo'}
                                 </label>
                                 <input
                                     id="profile-photo-input"
                                     type="file"
                                     accept="image/*"
                                     onChange={handlePhotoChange}
+                                    disabled={uploading}
                                     style={{ display: 'none' }}
                                 />
+                                {uploading && (
+                                    <span style={{ fontSize: '0.75rem', color: '#666' }}>
+                                        Uploading...
+                                    </span>
+                                )}
                             </div>
 
                             <div className="form-group">
@@ -177,12 +258,12 @@ export default function ProfileEditModal({ user, onClose, onDiscard, onSave, onD
                                         Edit a field to enable saving
                                     </span>
                                 )}
-                                <button type="button" className="btn btn-secondary btn-sm" onClick={requestClose} disabled={saving}>
+                                <button type="button" className="btn btn-secondary btn-sm" onClick={requestClose} disabled={saving || uploading}>
                                     Cancel
                                 </button>
                                 {/* Save Changes button — only shows when dirty */}
                                 {isDirty && (
-                                    <button type="submit" className="btn btn-save btn-sm" disabled={saving}>
+                                    <button type="submit" className="btn btn-save btn-sm" disabled={saving || uploading}>
                                         {saving ? 'Saving...' : 'Save Changes'}
                                     </button>
                                 )}
@@ -196,6 +277,7 @@ export default function ProfileEditModal({ user, onClose, onDiscard, onSave, onD
                                         className="btn btn-danger btn-sm"
                                         style={{ width: '100%' }}
                                         onClick={() => setConfirmingDelete(true)}
+                                        disabled={saving || uploading}
                                     >
                                         Delete Account
                                     </button>
