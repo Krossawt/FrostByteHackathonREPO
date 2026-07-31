@@ -22,7 +22,7 @@ import { BARANGAYS } from './constants'
 import ConfirmDialog from './components/ConfirmDialog'
 import { User as UserIcon } from 'lucide-react'
 import ProfileEditModal from './components/ProfileEditModal'
-import { updateProfileApi, deleteAccountApi } from './services/api'
+import { updateProfileApi, deleteAccountApi, resolveImageUrl } from './services/api'
 import Portal from './components/Portal'
 
 
@@ -262,20 +262,18 @@ function App() {
                 </>
               ) : (
                 <>
-                  {user.role === 'citizen' && (
-                    <button
-                      className="profile-icon-btn"
-                      onClick={() => setShowProfileModal(true)}
-                      aria-label="Edit Profile"
-                      title="Edit Profile"
-                    >
-                      {user.photoURL ? (
-                        <img src={user.photoURL} alt="Profile" />
-                      ) : (
-                        <UserIcon size={17} />
-                      )}
-                    </button>
-                  )}
+                  <button
+                    className="profile-icon-btn"
+                    onClick={() => setShowProfileModal(true)}
+                    aria-label="Edit Profile"
+                    title="Edit Profile"
+                  >
+                    {user.photoURL ? (
+                      <img src={resolveImageUrl(user.photoURL)} alt="Profile" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                    ) : (
+                      <UserIcon size={17} />
+                    )}
+                  </button>
                   <div className="user-chip">
                     <span className="user-chip-dot" style={{ background: posColor }} />
                     <span>{user.name.split(' ')[0]}</span>
@@ -311,7 +309,7 @@ function App() {
               )}
 
               {/* Profile icon — kept OUTSIDE the hamburger dropdown, always visible on mobile */}
-              {user?.role === 'citizen' && (
+              {user && (
                 <button
                   className="profile-icon-btn"
                   onClick={() => setShowProfileModal(true)}
@@ -319,7 +317,7 @@ function App() {
                   title="Edit Profile"
                 >
                   {user.photoURL ? (
-                    <img src={user.photoURL} alt="Profile" />
+                    <img src={resolveImageUrl(user.photoURL)} alt="Profile" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
                   ) : (
                     <UserIcon size={16} />
                   )}

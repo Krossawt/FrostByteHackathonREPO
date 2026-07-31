@@ -18,12 +18,8 @@ interface ProfileEditModalProps {
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-console.log('Supabase Config:', { SUPABASE_URL, SUPABASE_KEY: SUPABASE_KEY ? 'SET' : 'MISSING' })
-
 if (!SUPABASE_URL || !SUPABASE_KEY) {
-    console.error('❌ MISSING SUPABASE CREDENTIALS - Check your .env file')
-    console.error('VITE_SUPABASE_URL:', SUPABASE_URL)
-    console.error('VITE_SUPABASE_ANON_KEY:', SUPABASE_KEY ? 'SET' : 'NOT SET')
+    console.log('ℹ️ Note: Supabase storage unconfigured. Local FileReader avatar preview active.')
 }
 const getSupabaseClient = () => {
     if (!SUPABASE_URL || !SUPABASE_KEY) return null
