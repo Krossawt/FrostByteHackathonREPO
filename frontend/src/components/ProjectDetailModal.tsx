@@ -978,17 +978,22 @@ export default function ProjectDetailModal({
                       <div className="page-kicker">Financial Records</div>
                       <div style={{ fontSize: '1.05rem', fontFamily: 'var(--font-display)', fontWeight: 800, color: 'var(--maroon)', marginTop: '0.15rem' }}>
                         Total Disbursed: ₱{localReceipts.reduce((s, r) => s + r.amount, 0).toLocaleString()}
+                        {activeProject.proposedBudget > 0 && localReceipts.reduce((s, r) => s + r.amount, 0) > activeProject.proposedBudget && (
+                          <span style={{ marginLeft: '0.6rem', fontSize: '0.78rem', background: '#fee2e2', color: '#991b1b', border: '1px solid #f87171', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 800 }}>
+                            ⚠️ OVER BUDGET (+₱{(localReceipts.reduce((s, r) => s + r.amount, 0) - activeProject.proposedBudget).toLocaleString()})
+                          </span>
+                        )}
                       </div>
                     </div>
                     {canManageReceipts && (
-                      getStatusLevel(activeProject.projectStatus || activeProject.status) === 3 ? (
+                      !['ongoing', 'in progress'].includes(String(activeProject.projectStatus || activeProject.status || '').toLowerCase()) ? (
                         <button
                           className="btn btn-secondary btn-sm"
                           disabled
-                          style={{ opacity: 0.65, cursor: 'not-allowed' }}
-                          title="Receipt attachment locked — project is completed"
+                          style={{ opacity: 0.7, cursor: 'not-allowed', background: '#f3f4f6', color: '#6b7280', border: '1px solid #d1d5db' }}
+                          title="Receipt attachment locked — project must be Ongoing / In Progress"
                         >
-                          🔒 Receipts Locked (Project Completed)
+                          🔒 Receipts Locked (Only allowed when project is Ongoing)
                         </button>
                       ) : (
                         <button className="btn btn-primary btn-sm" onClick={() => setShowReceiptForm(v => !v)}>
@@ -999,12 +1004,35 @@ export default function ProjectDetailModal({
                   </div>
 
                   {/* Add receipt form with Upload & OCR */}
-                  {showReceiptForm && canManageReceipts && (
+                  {showReceiptForm && canManageReceipts && ['ongoing', 'in progress'].includes(String(activeProject.projectStatus || activeProject.status || '').toLowerCase()) && (
                     <form onSubmit={handleAddReceipt} className="receipt-form" style={{ marginBottom: '1.5rem' }}>
                       <div className="page-kicker" style={{ marginBottom: '0.75rem' }}>Attach New Receipt Document</div>
 
                       {rError && <div className="alert-error">{rError}</div>}
                       {ocrMsg && <div className="alert-info" style={{ marginBottom: '0.75rem' }}>{ocrMsg}</div>}
+
+                      {/* Over-Budget Real-Time Warning Banner */}
+                      {(() => {
+                        const currentSpent = localReceipts.reduce((s, r) => s + r.amount, 0)
+                        const budget = activeProject.proposedBudget || 0
+                        const typedVal = Number(rAmount || 0)
+                        const projectedSpent = currentSpent + typedVal
+                        if (budget > 0 && typedVal > 0 && projectedSpent > budget) {
+                          return (
+                            <div style={{ background: '#fef2f2', border: '1.5px solid #ef4444', color: '#991b1b', padding: '0.75rem 1rem', borderRadius: '8px', marginBottom: '0.85rem', fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.84rem' }}>
+                              ⚠️ OVER BUDGET WARNING: Adding this ₱{typedVal.toLocaleString()} receipt will bring total spending to ₱{projectedSpent.toLocaleString()}, which exceeds the proposed budget of ₱{budget.toLocaleString()} by ₱{(projectedSpent - budget).toLocaleString()}!
+                            </div>
+                          )
+                        }
+                        if (budget > 0 && typedVal > 0 && projectedSpent >= budget * 0.9) {
+                          return (
+                            <div style={{ background: '#fffbeb', border: '1.5px solid #f59e0b', color: '#92400e', padding: '0.75rem 1rem', borderRadius: '8px', marginBottom: '0.85rem', fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.84rem' }}>
+                              ⚠️ CAUTION: Total project spending will reach ₱{projectedSpent.toLocaleString()} ({Math.round((projectedSpent / budget) * 100)}% of proposed budget). Nearing budget limit.
+                            </div>
+                          )
+                        }
+                        return null
+                      })()}
 
                       {/* Upload Zone & OCR Trigger */}
                       <div style={{ marginBottom: '1rem', border: '1.5px dashed var(--maroon)', padding: '1rem', textAlign: 'center', background: 'rgba(118,0,49,0.02)', borderRadius: '8px' }}>

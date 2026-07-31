@@ -3,7 +3,7 @@ import { BARANGAYS } from '../constants'
 import type { Role, UserAccount } from '../types'
 import ConfirmDialog from '../components/ConfirmDialog'
 import Portal from '../components/Portal'
-import { fetchUserAccountsApi, createUserAccountApi, toggleUserStatusApi, updateUserAccountApi } from '../services/api'
+import { fetchUserAccountsApi, createUserAccountApi, toggleUserStatusApi, updateUserAccountApi, resolveImageUrl } from '../services/api'
 
 const ROLE_OPTIONS: (Role | 'all')[] = ['all', 'superadmin', 'sk', 'citizen']
 
@@ -359,28 +359,40 @@ export default function SuperAdminAccounts({ selectedBarangay }: SuperAdminAccou
         {filtered.length > 0 ? (
           <div className="card-grid card-grid-3">
             {filtered.map(u => (
-              <div key={u.id} className="card">
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.85rem', marginBottom: '0.75rem' }}>
-                  <div style={{
-                    width: '44px', height: '44px', flexShrink: 0,
-                    background: `${roleColor[u.role]}18`,
-                    border: `2px solid ${roleColor[u.role]}28`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1rem', color: roleColor[u.role],
-                  }}>
-                    {u.name.split(' ').filter(w => w.length > 1 && !/^(Jr|Sr)$/i.test(w)).slice(0, 2).map(w => w[0]).join('').toUpperCase()}
-                  </div>
+              <div key={u.id} className="card" style={{ transition: 'all 0.2s ease', border: '1px solid rgba(118,0,49,0.12)', boxShadow: '0 4px 14px rgba(0,0,0,0.03)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', marginBottom: '0.75rem' }}>
+                  {u.photoURL ? (
+                    <img
+                      src={resolveImageUrl(u.photoURL)}
+                      alt={u.name}
+                      style={{
+                        width: '46px', height: '46px', borderRadius: '50%', objectFit: 'cover',
+                        border: `2px solid ${roleColor[u.role]}`, flexShrink: 0,
+                      }}
+                      onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+                    />
+                  ) : (
+                    <div style={{
+                      width: '46px', height: '46px', borderRadius: '50%', flexShrink: 0,
+                      background: `linear-gradient(135deg, ${roleColor[u.role]}, #4a001f)`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1rem', color: '#fff',
+                      boxShadow: '0 3px 8px rgba(0,0,0,0.12)',
+                    }}>
+                      {u.name.split(' ').filter(w => w.length > 1 && !/^(Jr|Sr)$/i.test(w)).slice(0, 2).map(w => w[0]).join('').toUpperCase()}
+                    </div>
+                  )}
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.92rem', color: 'var(--ink)', marginBottom: '0.15rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.name}</div>
-                    <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                      <span className={`badge ${roleBadge[u.role]}`}>{u.role === 'superadmin' ? 'Super Admin' : u.role === 'sk' ? 'SK Officer' : 'Citizen'}</span>
-                      {u.skPosition && <span className={`badge badge-${u.skPosition.toLowerCase()}`}>{u.skPosition}</span>}
-                      <span className={`badge ${u.isActive ? 'badge-active' : 'badge-inactive'}`}>{u.isActive ? 'Active' : 'Inactive'}</span>
+                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '0.94rem', color: 'var(--ink)', marginBottom: '0.15rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.name}</div>
+                    <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                      <span className={`badge ${roleBadge[u.role]}`} style={{ fontWeight: 700 }}>{u.role === 'superadmin' ? 'Super Admin' : u.role === 'sk' ? 'SK Officer' : 'Citizen'}</span>
+                      {u.skPosition && <span className={`badge badge-${u.skPosition.toLowerCase()}`} style={{ fontWeight: 700 }}>{u.skPosition}</span>}
+                      <span className={`badge ${u.isActive ? 'badge-active' : 'badge-inactive'}`} style={{ fontWeight: 700 }}>{u.isActive ? 'Active' : 'Inactive'}</span>
                     </div>
                   </div>
                 </div>
-                <div style={{ display: 'grid', gap: '0.28rem', fontSize: '0.8rem', color: 'var(--muted)', fontFamily: 'var(--font-display)', marginBottom: '0.75rem' }}>
-                  {u.username && <div>@{u.username}</div>}
+                <div style={{ display: 'grid', gap: '0.3rem', fontSize: '0.8rem', color: 'var(--muted)', fontFamily: 'var(--font-display)', marginBottom: '0.75rem' }}>
+                  {u.username && <div style={{ fontWeight: 600 }}>@{u.username}</div>}
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></svg>
                     {u.email}
@@ -391,8 +403,8 @@ export default function SuperAdminAccounts({ selectedBarangay }: SuperAdminAccou
                   </div>}
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem', borderTop: '1px solid rgba(118,0,49,0.08)', paddingTop: '0.65rem' }}>
-                  <button className="btn btn-secondary btn-sm" style={{ flex: 1 }} onClick={() => openEditForm(u)}>Edit</button>
-                  <button className={`btn btn-sm ${u.isActive ? 'btn-danger' : 'btn-secondary'}`} style={{ flex: 1 }}
+                  <button className="btn btn-secondary btn-sm" style={{ flex: 1, fontWeight: 700 }} onClick={() => openEditForm(u)}>✏️ Edit Account</button>
+                  <button className={`btn btn-sm ${u.isActive ? 'btn-danger' : 'btn-secondary'}`} style={{ flex: 1, fontWeight: 700 }}
                     onClick={() => setSuspendTarget(u)}>
                     {u.isActive ? 'Suspend' : 'Reactivate'}
                   </button>

@@ -395,8 +395,13 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
                         }}
                       />
                       <div className="v-card-img-overlay" />
-                      <div className="v-card-badge-pin">
+                      <div className="v-card-badge-pin" style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', alignItems: 'center' }}>
                         <span className={`badge badge-${p.status}`}>{p.status}</span>
+                        {p.proposedBudget > 0 && p.spent > p.proposedBudget && (
+                          <span className="badge" style={{ background: '#760031', color: '#fef08a', fontWeight: 800, border: '1px solid #fef08a' }}>
+                            ⚠️ OVER BUDGET (+₱{(p.spent - p.proposedBudget).toLocaleString()})
+                          </span>
+                        )}
                       </div>
                     </div>
 
@@ -408,12 +413,12 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
                       <div style={{ marginTop: '0.4rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.2rem' }}>
                           <span style={{ fontSize: '0.72rem', color: 'var(--muted)', fontFamily: 'var(--font-display)', fontWeight: 600 }}>Budget Used</span>
-                          <span style={{ fontSize: '0.72rem', fontFamily: 'var(--font-display)', fontWeight: 800, color: 'var(--maroon)' }}>
+                          <span style={{ fontSize: '0.72rem', fontFamily: 'var(--font-display)', fontWeight: 800, color: p.proposedBudget > 0 && p.spent > p.proposedBudget ? '#dc2626' : 'var(--maroon)' }}>
                             {p.proposedBudget > 0 ? Math.round((p.spent / p.proposedBudget) * 100) : 0}%
                           </span>
                         </div>
                         <div className="progress-bar">
-                          <div className="progress-fill" style={{ width: `${Math.min(100, p.proposedBudget > 0 ? (p.spent / p.proposedBudget) * 100 : 0)}%` }} />
+                          <div className="progress-fill" style={{ width: `${Math.min(100, p.proposedBudget > 0 ? (p.spent / p.proposedBudget) * 100 : 0)}%`, background: p.proposedBudget > 0 && p.spent > p.proposedBudget ? '#dc2626' : undefined }} />
                         </div>
                       </div>
 
