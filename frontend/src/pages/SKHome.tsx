@@ -1,10 +1,11 @@
-import { useState, useEffect, FormEvent } from 'react'
+import { useState, useEffect } from 'react'
 import type { UserAccount, ReportProject } from '../types'
 import ProjectDetailModal from '../components/ProjectDetailModal'
 import BarangayTransactionsModal from '../components/BarangayTransactionsModal'
 import { DonutChart } from '../components/MiniChart'
 import SingleNewsCarousel from '../components/SingleNewsCarousel'
-import { fetchProjectsApi, fetchBarangayReportApi, fetchNewsApi, postCommentApi } from '../services/api'
+import { fetchProjectsApi, fetchBarangayReportApi, fetchNewsApi, fetchSuggestionsApi, voteSuggestionApi } from '../services/api'
+import type { SuggestionItem } from '../services/api'
 import Portal from '../components/Portal'
 import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
@@ -41,22 +42,18 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
   const [summary, setSummary] = useState({ spent: 0, annualBudget: 0, remaining: 0 })
   const [localProjects, setLocalProjects] = useState<ReportProject[]>([])
   const [news, setNews] = useState<any[]>([])
-  const [localComments, setLocalComments] = useState<any[]>([])
-  const [votedIds, setVotedIds] = useState<Set<string>>(new Set())
+  const [localComments, setLocalComments] = useState<SuggestionItem[]>([])
+  const [votedIds, setVotedIds] = useState<Set<number>>(new Set())
 
   useEffect(() => {
     async function loadCitizenData() {
       try {
-        const [projRes, repRes, newsRes] = await Promise.all([
+        const [projRes, repRes, newsRes, suggRes] = await Promise.all([
           fetchProjectsApi({ barangay }).catch(() => []),
           fetchBarangayReportApi(barangay).catch(() => null),
           fetchNewsApi().catch(() => []),
+          fetchSuggestionsApi(barangay).catch(() => []),
         ])
-
-        console.log("newsRes =", newsRes)
-        console.log("projRes:", projRes)
-        console.log("repRes:", repRes)
-        console.log("newsRes:", newsRes)
 
         const rawNews = Array.isArray(newsRes)
           ? newsRes
@@ -115,8 +112,6 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
           ]
         }
 
-        console.log("mappedNews:", mappedNews)
-
         setNews(mappedNews)
 
         if (Array.isArray(projRes)) {
@@ -153,6 +148,11 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
             remaining: Number(repRes.remaining || 0),
           })
         }
+
+        // Load citizen suggestions for this barangay
+        if (Array.isArray(suggRes)) {
+          setLocalComments(suggRes)
+        }
       } catch (err) {
         console.warn('API load warning:', err)
       }
@@ -160,9 +160,8 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
     loadCitizenData()
   }, [barangay])
 
-  const [comment, setComment] = useState('')
-  const [suggestionCat, setSuggestionCat] = useState('Sports Facilities')
-  const [submitted, setSubmitted] = useState(false)
+
+
   const [selectedProject, setSelectedProject] = useState<ReportProject | null>(null)
   const [showTxnModal, setShowTxnModal] = useState(false)
   const [showReportModal, setShowReportModal] = useState(false)
@@ -215,55 +214,16 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
   const remain = summary.remaining
   const usagePct = budget > 0 ? Math.min(Math.round((spent / budget) * 100), 100) : 0
 
-  const [isSubmittingComment, setIsSubmittingComment] = useState(false)
-
-  const handleComment = async (e: FormEvent) => {
-    e.preventDefault()
-    if (!comment.trim()) return
-    const targetProject = localProjects.length > 0 ? localProjects[0] : null
-    const targetProjectId = targetProject ? Number(targetProject.id) : 1
-    setIsSubmittingComment(true)
-
+  const handleVote = async (id: number) => {
+    if (votedIds.has(id)) return
     try {
-      if (!isNaN(targetProjectId) && targetProjectId > 0) {
-        await postCommentApi({
-          commentFor: targetProjectId,
-          commentDetails: `[${suggestionCat}] ${comment.trim()}`,
-          commentType: 'suggestion',
-        })
-      }
-      const newC = {
-        id: `C-${Date.now()}`,
-        barangay,
-        author: user?.name?.split(' ')[0] ?? 'Citizen',
-        text: `[${suggestionCat}] ${comment.trim()}`,
-        date: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
-        type: 'suggestion' as const,
-        votes: 1,
-      }
-      setLocalComments((prev: any[]) => [newC, ...prev])
-      setSubmitted(true)
-      setComment('')
-      setTimeout(() => setSubmitted(false), 4000)
-    } catch (err: any) {
-      console.warn('API error posting suggestion:', err)
-    } finally {
-      setIsSubmittingComment(false)
+      const updated = await voteSuggestionApi(id)
+      setLocalComments((prev) => prev.map((c) => c.suggestionID === id ? updated : c))
+      setVotedIds(prev => { const next = new Set(prev); next.add(id); return next })
+    } catch {
+      setLocalComments((prev) => prev.map((c) => c.suggestionID === id ? { ...c, votesCount: (c.votesCount || 0) + 1 } : c))
+      setVotedIds(prev => { const next = new Set(prev); next.add(id); return next })
     }
-  }
-
-  const handleVote = (id: string) => {
-    setLocalComments((prev: any[]) => prev.map((c: any) => {
-      if (c.id !== id) return c
-      const alreadyVoted = votedIds.has(id)
-      return { ...c, votes: (c.votes ?? 0) + (alreadyVoted ? -1 : 1) }
-    }))
-    setVotedIds(prev => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
   }
 
   return (
@@ -449,117 +409,84 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
               </div>
             )}
 
-            {/* ── Facebook-Style SK Community Suggestion Post Box & Feed ── */}
+            {/* ── Citizen Suggestions Feed (Read-Only for SK Officials) ── */}
             <div style={{ background: '#fff', border: '1.5px solid rgba(118,0,49,0.14)', boxShadow: '0 8px 24px rgba(118,0,49,0.06)', padding: '1.5rem' }}>
-              <div style={{ display: 'flex', gap: '0.85rem', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid rgba(118,0,49,0.08)', paddingBottom: '0.85rem' }}>
-                <div style={{ width: '42px', height: '42px', background: 'var(--maroon)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '0.95rem', flexShrink: 0 }}>
-                  {user?.name?.charAt(0) ?? 'C'}
+              <div style={{ display: 'flex', gap: '0.85rem', alignItems: 'flex-start', marginBottom: '1.2rem', borderBottom: '1px solid rgba(118,0,49,0.08)', paddingBottom: '0.85rem' }}>
+                <div style={{ width: '42px', height: '42px', background: 'rgba(118,0,49,0.1)', color: 'var(--maroon)', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', fontSize: '1.2rem', flexShrink: 0 }}>
+                  💡
                 </div>
                 <div>
                   <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '0.96rem', color: 'var(--ink)' }}>
-                    What should Sangguniang Kabataan of Barangay {barangay} do, fix, or create next?
+                    Citizen Suggestions — Barangay {barangay}
                   </div>
-                  <div style={{ fontSize: '0.78rem', color: 'var(--muted)' }}>
-                    Post a public suggestion directly to your SK Council feed
+                  <div style={{ fontSize: '0.78rem', color: 'var(--muted)', marginTop: '0.2rem' }}>
+                    These are public suggestions submitted directly by citizens of Barangay {barangay}. Review and upvote to show which concerns need priority attention.
                   </div>
                 </div>
               </div>
 
-              {submitted ? (
-                <div className="alert-success" style={{ marginBottom: '1rem' }}>
-                  Suggestion posted to the Barangay {barangay} SK feed! Thank you for participating.
-                </div>
-              ) : (
-                <form onSubmit={handleComment} style={{ display: 'grid', gap: '0.85rem' }}>
-                  <textarea
-                    className="form-input"
-                    rows={3}
-                    value={comment}
-                    onChange={e => setComment(e.target.value)}
-                    placeholder={`What's on your mind regarding Barangay ${barangay} SK? (e.g. "Fix basketball court lighting", "More youth workshops")`}
-                    style={{ resize: 'vertical', fontFamily: 'var(--font-body)', fontSize: '0.88rem' }}
-                    required
-                  />
-
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <label style={{ fontSize: '0.78rem', fontFamily: 'var(--font-display)', fontWeight: 700, color: 'var(--muted)' }}>Topic:</label>
-                      <select
-                        className="form-input"
-                        style={{ width: 'auto', padding: '0.35rem 0.75rem', fontSize: '0.8rem' }}
-                        value={suggestionCat}
-                        onChange={e => setSuggestionCat(e.target.value)}
-                      >
-                        <option value="Sports Facilities">Sports Facilities</option>
-                        <option value="Scholarships &amp; Education">Scholarships &amp; Education</option>
-                        <option value="Digital Hub &amp; Wi-Fi">Digital Hub &amp; Wi-Fi</option>
-                        <option value="Street Lighting &amp; Safety">Street Lighting &amp; Safety</option>
-                        <option value="Youth Events &amp; Culture">Youth Events &amp; Culture</option>
-                        <option value="General Suggestion">General Suggestion</option>
-                      </select>
-                    </div>
-
-                    <button type="submit" className="btn btn-primary" style={{ padding: '0.55rem 1.4rem' }}>
-                      Post Suggestion &rarr;
-                    </button>
+              {/* Feed of Citizen Suggestions */}
+              <div style={{ display: 'grid', gap: '0.9rem' }}>
+                <div className="page-kicker">Barangay {barangay} Citizen Feed ({localComments.length} suggestion{localComments.length !== 1 ? 's' : ''})</div>
+                {localComments.length === 0 ? (
+                  <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)', fontSize: '0.85rem', background: 'rgba(118,0,49,0.03)', borderRadius: '8px' }}>
+                    <div style={{ fontSize: '1.5rem', marginBottom: '0.5rem' }}>🗳️</div>
+                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, marginBottom: '0.3rem' }}>No citizen suggestions yet</div>
+                    <div>Citizens of Barangay {barangay} can post their suggestions and ideas on their dashboard. They'll appear here for your review.</div>
                   </div>
-                </form>
-              )}
-
-              {/* Feed of Recent Citizen Suggestion Posts */}
-              <div style={{ marginTop: '1.8rem', borderTop: '1px solid rgba(118,0,49,0.08)', paddingTop: '1.2rem', display: 'grid', gap: '0.9rem' }}>
-                <div className="page-kicker">Barangay {barangay} Community Posts</div>
-                {localComments.map((c: any) => (
-                  <div key={c.id} className="comment-card" style={{ background: 'rgba(255,255,255,0.95)', border: '1.5px solid rgba(118,0,49,0.1)' }}>
+                ) : localComments.map((c) => (
+                  <div key={c.suggestionID} className="comment-card" style={{ background: 'rgba(255,255,255,0.95)', border: '1.5px solid rgba(118,0,49,0.1)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
                         <div style={{ width: '30px', height: '30px', background: 'rgba(118,0,49,0.1)', color: 'var(--maroon)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '0.8rem' }}>
-                          {c.author.charAt(0)}
+                          {c.authorName?.charAt(0) ?? 'C'}
                         </div>
-                        <span className="comment-author">{c.author}</span>
+                        <div>
+                          <span className="comment-author">{c.authorName}</span>
+                          <span style={{ marginLeft: '0.4rem', fontSize: '0.72rem', color: 'var(--muted)', background: 'rgba(118,0,49,0.07)', padding: '0.1rem 0.5rem', borderRadius: '12px', fontFamily: 'var(--font-display)', fontWeight: 600 }}>{c.category}</span>
+                        </div>
                       </div>
-                      <span className="comment-date">{c.date}</span>
+                      <span className="comment-date">{c.createdAt ? new Date(c.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Today'}</span>
                     </div>
 
                     <p className="comment-text" style={{ margin: '0.6rem 0', fontSize: '0.88rem', color: 'var(--ink)' }}>
-                      {c.text}
+                      {c.suggestionText}
                     </p>
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(118,0,49,0.06)', paddingTop: '0.5rem', marginTop: '0.4rem' }}>
                       <button
                         type="button"
-                        onClick={() => handleVote(c.id)}
+                        onClick={() => handleVote(c.suggestionID)}
                         className="link-button"
+                        disabled={votedIds.has(c.suggestionID)}
+                        title={votedIds.has(c.suggestionID) ? 'Already acknowledged' : 'Acknowledge as important'}
                         style={{
                           display: 'flex',
                           alignItems: 'center',
                           gap: '0.4rem',
                           fontSize: '0.76rem',
-                          color: 'var(--maroon)',
+                          color: votedIds.has(c.suggestionID) ? 'var(--maroon-dark)' : 'var(--maroon)',
                           fontWeight: 500,
                           fontFamily: 'var(--font-display)',
                           lineHeight: 1,
+                          opacity: votedIds.has(c.suggestionID) ? 0.6 : 1,
                           transition: 'opacity 0.15s ease',
                         }}
-                        onMouseEnter={e => { e.currentTarget.style.opacity = '0.7' }}
-                        onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
                       >
                         <svg
                           width="16" height="16" viewBox="0 0 24 24"
-                          fill={votedIds.has(c.id) ? 'var(--maroon)' : 'none'}
-                          stroke={votedIds.has(c.id) ? 'var(--maroon-dark)' : 'var(--maroon)'}
+                          fill={votedIds.has(c.suggestionID) ? 'var(--maroon)' : 'none'}
+                          stroke={votedIds.has(c.suggestionID) ? 'var(--maroon-dark)' : 'var(--maroon)'}
                           strokeWidth="2"
                           strokeLinejoin="round"
-                          style={{ display: 'block', flexShrink: 0, transition: 'transform 0.15s ease' }}
-                          onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.15)' }}
-                          onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}
+                          style={{ display: 'block', flexShrink: 0 }}
                         >
                           <path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 21 12 17.77 5.82 21 7 14.14 2 9.27l6.91-1.01L12 2z" />
                         </svg>
-                        <span style={{ lineHeight: 1 }}>Agree / Helpful ({c.votes ?? 0})</span>
+                        <span style={{ lineHeight: 1 }}>Acknowledge ({c.votesCount ?? 0})</span>
                       </button>
                       <span style={{ fontSize: '0.72rem', color: 'var(--muted)', fontFamily: 'var(--font-display)' }}>
-                        Barangay {barangay} Feed
+                        Barangay {barangay} · Citizen Submission
                       </span>
                     </div>
                   </div>

@@ -4,7 +4,8 @@ import ProjectDetailModal from '../components/ProjectDetailModal'
 import BarangayTransactionsModal from '../components/BarangayTransactionsModal'
 import { DonutChart } from '../components/MiniChart'
 import SingleNewsCarousel from '../components/SingleNewsCarousel'
-import { fetchProjectsApi, fetchBarangayReportApi, fetchNewsApi, postCommentApi } from '../services/api'
+import { fetchProjectsApi, fetchBarangayReportApi, fetchNewsApi, fetchSuggestionsApi, postSuggestionApi, voteSuggestionApi } from '../services/api'
+import type { SuggestionItem } from '../services/api'
 import Portal from '../components/Portal'
 import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
@@ -41,17 +42,18 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
   const [summary, setSummary] = useState({ spent: 0, annualBudget: 0, remaining: 0 })
   const [localProjects, setLocalProjects] = useState<ReportProject[]>([])
   const [news, setNews] = useState<any[]>([])
-  const [localComments, setLocalComments] = useState<any[]>([])
-  const [votedIds, setVotedIds] = useState<Set<string>>(new Set())
+  const [localComments, setLocalComments] = useState<SuggestionItem[]>([])
+  const [votedIds, setVotedIds] = useState<Set<number>>(new Set())
 
   useEffect(() => {
     async function loadCitizenData() {
       try {
-        const [projRes, repRes, newsRes] = await Promise.all([
+        const [projRes, repRes, newsRes, suggRes] = await Promise.all([
           // Citizens only see publicly Posted projects from their barangay
           fetchProjectsApi({ barangay, public_only: true }).catch(() => []),
           fetchBarangayReportApi(barangay).catch(() => null),
           fetchNewsApi().catch(() => []),
+          fetchSuggestionsApi(barangay).catch(() => []),
         ])
 
         const rawNews = Array.isArray(newsRes)
@@ -147,12 +149,18 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
             remaining: Number(repRes.remaining || 0),
           })
         }
+
+        // Load suggestions from backend
+        if (Array.isArray(suggRes) && suggRes.length > 0) {
+          setLocalComments(suggRes)
+        }
       } catch (err) {
         console.warn('API load warning:', err)
       }
     }
     loadCitizenData()
   }, [barangay])
+
 
   const [comment, setComment] = useState('')
   const [suggestionCat, setSuggestionCat] = useState('Sports Facilities')
@@ -214,28 +222,14 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
   const handleComment = async (e: FormEvent) => {
     e.preventDefault()
     if (!comment.trim()) return
-    const targetProject = localProjects.length > 0 ? localProjects[0] : null
-    const targetProjectId = targetProject ? Number(targetProject.id) : 1
     setIsSubmittingComment(true)
 
     try {
-      if (!isNaN(targetProjectId) && targetProjectId > 0) {
-        await postCommentApi({
-          commentFor: targetProjectId,
-          commentDetails: `[${suggestionCat}] ${comment.trim()}`,
-          commentType: 'suggestion',
-        })
-      }
-      const newC = {
-        id: `C-${Date.now()}`,
-        barangay,
-        author: user?.name?.split(' ')[0] ?? 'Citizen',
-        text: `[${suggestionCat}] ${comment.trim()}`,
-        date: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
-        type: 'suggestion' as const,
-        votes: 1,
-      }
-      setLocalComments((prev: any[]) => [newC, ...prev])
+      const created = await postSuggestionApi({
+        category: suggestionCat,
+        suggestionText: comment.trim(),
+      })
+      setLocalComments((prev) => [created, ...prev])
       setSubmitted(true)
       setComment('')
       setTimeout(() => setSubmitted(false), 4000)
@@ -246,18 +240,17 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
     }
   }
 
-  const handleVote = (id: string) => {
-    setLocalComments((prev: any[]) => prev.map((c: any) => {
-      if (c.id !== id) return c
-      const alreadyVoted = votedIds.has(id)
-      return { ...c, votes: (c.votes ?? 0) + (alreadyVoted ? -1 : 1) }
-    }))
-    setVotedIds(prev => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
+  const handleVote = async (id: number) => {
+    if (votedIds.has(id)) return  // prevent double-voting
+    try {
+      const updated = await voteSuggestionApi(id)
+      setLocalComments((prev) => prev.map((c) => c.suggestionID === id ? updated : c))
+      setVotedIds(prev => { const next = new Set(prev); next.add(id); return next })
+    } catch {
+      // Optimistic fallback
+      setLocalComments((prev) => prev.map((c) => c.suggestionID === id ? { ...c, votesCount: (c.votesCount || 0) + 1 } : c))
+      setVotedIds(prev => { const next = new Set(prev); next.add(id); return next })
+    }
   }
 
   console.log("news state:", news)
@@ -505,54 +498,59 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
               {/* Feed of Recent Citizen Suggestion Posts */}
               <div style={{ marginTop: '1.8rem', borderTop: '1px solid rgba(118,0,49,0.08)', paddingTop: '1.2rem', display: 'grid', gap: '0.9rem' }}>
                 <div className="page-kicker">Barangay {barangay} Community Posts</div>
-                {localComments.map((c: any) => (
-                  <div key={c.id} className="comment-card" style={{ background: 'rgba(255,255,255,0.95)', border: '1.5px solid rgba(118,0,49,0.1)' }}>
+                {localComments.length === 0 ? (
+                  <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--muted)', fontSize: '0.85rem' }}>
+                    No suggestions yet. Be the first to post one above!
+                  </div>
+                ) : localComments.map((c) => (
+                  <div key={c.suggestionID} className="comment-card" style={{ background: 'rgba(255,255,255,0.95)', border: '1.5px solid rgba(118,0,49,0.1)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
                         <div style={{ width: '30px', height: '30px', background: 'rgba(118,0,49,0.1)', color: 'var(--maroon)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '0.8rem' }}>
-                          {c.author.charAt(0)}
+                          {c.authorName?.charAt(0) ?? 'C'}
                         </div>
-                        <span className="comment-author">{c.author}</span>
+                        <div>
+                          <span className="comment-author">{c.authorName}</span>
+                          <span style={{ marginLeft: '0.4rem', fontSize: '0.72rem', color: 'var(--muted)', background: 'rgba(118,0,49,0.07)', padding: '0.1rem 0.5rem', borderRadius: '12px', fontFamily: 'var(--font-display)', fontWeight: 600 }}>{c.category}</span>
+                        </div>
                       </div>
-                      <span className="comment-date">{c.date}</span>
+                      <span className="comment-date">{c.createdAt ? new Date(c.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Today'}</span>
                     </div>
 
                     <p className="comment-text" style={{ margin: '0.6rem 0', fontSize: '0.88rem', color: 'var(--ink)' }}>
-                      {c.text}
+                      {c.suggestionText}
                     </p>
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(118,0,49,0.06)', paddingTop: '0.5rem', marginTop: '0.4rem' }}>
                       <button
                         type="button"
-                        onClick={() => handleVote(c.id)}
+                        onClick={() => handleVote(c.suggestionID)}
                         className="link-button"
+                        disabled={votedIds.has(c.suggestionID)}
                         style={{
                           display: 'flex',
                           alignItems: 'center',
                           gap: '0.4rem',
                           fontSize: '0.76rem',
-                          color: 'var(--maroon)',
+                          color: votedIds.has(c.suggestionID) ? 'var(--maroon-dark)' : 'var(--maroon)',
                           fontWeight: 500,
                           fontFamily: 'var(--font-display)',
                           lineHeight: 1,
+                          opacity: votedIds.has(c.suggestionID) ? 0.6 : 1,
                           transition: 'opacity 0.15s ease',
                         }}
-                        onMouseEnter={e => { e.currentTarget.style.opacity = '0.7' }}
-                        onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
                       >
                         <svg
                           width="16" height="16" viewBox="0 0 24 24"
-                          fill={votedIds.has(c.id) ? 'var(--maroon)' : 'none'}
-                          stroke={votedIds.has(c.id) ? 'var(--maroon-dark)' : 'var(--maroon)'}
+                          fill={votedIds.has(c.suggestionID) ? 'var(--maroon)' : 'none'}
+                          stroke={votedIds.has(c.suggestionID) ? 'var(--maroon-dark)' : 'var(--maroon)'}
                           strokeWidth="2"
                           strokeLinejoin="round"
-                          style={{ display: 'block', flexShrink: 0, transition: 'transform 0.15s ease' }}
-                          onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.15)' }}
-                          onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)' }}
+                          style={{ display: 'block', flexShrink: 0 }}
                         >
                           <path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 21 12 17.77 5.82 21 7 14.14 2 9.27l6.91-1.01L12 2z" />
                         </svg>
-                        <span style={{ lineHeight: 1 }}>Agree / Helpful ({c.votes ?? 0})</span>
+                        <span style={{ lineHeight: 1 }}>Agree / Helpful ({c.votesCount ?? 0})</span>
                       </button>
                       <span style={{ fontSize: '0.72rem', color: 'var(--muted)', fontFamily: 'var(--font-display)' }}>
                         Barangay {barangay} Feed

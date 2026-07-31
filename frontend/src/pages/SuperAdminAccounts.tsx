@@ -29,6 +29,9 @@ export default function SuperAdminAccounts({ selectedBarangay }: SuperAdminAccou
   const [newBrgy, setNewBrgy] = useState('Balibago')
   const [newPosition, setNewPosition] = useState('Chairperson')
   const [newPassword, setNewPassword] = useState('Sk2026!')
+  const [confirmPassword, setConfirmPassword] = useState('Sk2026!')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [newIsStaRosa, setNewIsStaRosa] = useState(true)
   const [formError, setFormError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -92,10 +95,15 @@ export default function SuperAdminAccounts({ selectedBarangay }: SuperAdminAccou
   const roleBadge: Record<string, string> = { superadmin: 'badge-superadmin', sk: 'badge-sk', citizen: 'badge-citizen' }
   const roleColor: Record<string, string> = { superadmin: '#760031', sk: '#b45309', citizen: '#7a6200' }
 
-  const openAddForm = () => {
-    setNewFullName(''); setNewEmail(''); setNewBrgy('Balibago')
-    setNewPosition('Chairperson'); setNewPassword('Sk2026!')
-    setNewIsStaRosa(true)
+  const openNewForm = () => {
+    setNewFullName('')
+    setNewEmail('')
+    setNewBrgy('Balibago')
+    setNewPosition('Chairperson')
+    setNewPassword('Sk2026!')
+    setConfirmPassword('Sk2026!')
+    setShowPassword(false)
+    setShowConfirmPassword(false)
     setFormError('')
     setInitialSnapshot({ name: '', email: '', brgy: 'Balibago', position: 'Chairperson', isStaRosa: true, password: 'Sk2026!' })
     setFormMode('new')
@@ -107,6 +115,9 @@ export default function SuperAdminAccounts({ selectedBarangay }: SuperAdminAccou
     setNewBrgy(u.barangay || 'Balibago')
     setNewPosition(u.skPosition || 'Chairperson')
     setNewPassword('')
+    setConfirmPassword('')
+    setShowPassword(false)
+    setShowConfirmPassword(false)
     setNewIsStaRosa(u.isStaRosa ?? true)
     setFormError('')
     setInitialSnapshot({
@@ -284,7 +295,7 @@ export default function SuperAdminAccounts({ selectedBarangay }: SuperAdminAccou
                 Manage all Super Admin, SK Officer, and Citizen accounts across Santa Rosa City's 18 barangays.
               </p>
             </div>
-            <button className="btn btn-primary" style={{ alignSelf: 'flex-start', marginTop: '0.4rem' }} onClick={openAddForm}>
+            <button className="btn btn-primary" style={{ alignSelf: 'flex-start', marginTop: '0.4rem' }} onClick={openNewForm}>
               + Create SK Account
             </button>
           </div>
@@ -415,6 +426,10 @@ export default function SuperAdminAccounts({ selectedBarangay }: SuperAdminAccou
                     setFormError('Please enter a temporary password.')
                     return
                   }
+                  if (newPassword && newPassword !== confirmPassword) {
+                    setFormError('Passwords do not match. Please enter the same password in both fields.')
+                    return
+                  }
                   setFormError('')
                   executeSave()
                 }}>
@@ -429,14 +444,88 @@ export default function SuperAdminAccounts({ selectedBarangay }: SuperAdminAccou
                       <label className="field-label">Email Address *</label>
                       <input className="input" type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} placeholder="msantos.balibago@sk.gov.ph" required />
                     </div>
+
+                    {/* New Password field with eye toggle */}
                     <div className="field-group">
                       <label className="field-label">
                         {formMode === 'new' ? 'Temporary Password *' : 'New Password (optional)'}
                       </label>
-                      <input className="input" type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)}
-                        placeholder={formMode === 'new' ? '' : 'Leave blank to keep current password'}
-                        required={formMode === 'new'} />
+                      <div style={{ position: 'relative' }}>
+                        <input
+                          className="input"
+                          type={showPassword ? 'text' : 'password'}
+                          value={newPassword}
+                          onChange={e => setNewPassword(e.target.value)}
+                          placeholder={formMode === 'new' ? '' : 'Leave blank to keep current password'}
+                          required={formMode === 'new'}
+                          style={{ paddingRight: '2.5rem' }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(v => !v)}
+                          style={{
+                            position: 'absolute', right: '0.65rem', top: '50%', transform: 'translateY(-50%)',
+                            background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0.2rem'
+                          }}
+                          title={showPassword ? 'Hide Password' : 'Show Password'}
+                        >
+                          {showPassword ? (
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                              <line x1="1" y1="1" x2="23" y2="23" />
+                            </svg>
+                          ) : (
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                              <circle cx="12" cy="12" r="3" />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
                     </div>
+
+                    {/* Confirm Password field with eye toggle */}
+                    {(formMode === 'new' || newPassword) && (
+                      <div className="field-group">
+                        <label className="field-label">
+                          {formMode === 'new' ? 'Confirm Temporary Password *' : 'Confirm New Password *'}
+                        </label>
+                        <div style={{ position: 'relative' }}>
+                          <input
+                            className="input"
+                            type={showConfirmPassword ? 'text' : 'password'}
+                            value={confirmPassword}
+                            onChange={e => setConfirmPassword(e.target.value)}
+                            placeholder={formMode === 'new' ? 'Re-enter temporary password' : 'Re-enter new password'}
+                            required={formMode === 'new' || !!newPassword}
+                            style={{ paddingRight: '2.5rem' }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowConfirmPassword(v => !v)}
+                            style={{
+                              position: 'absolute', right: '0.65rem', top: '50%', transform: 'translateY(-50%)',
+                              background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0.2rem'
+                            }}
+                            title={showConfirmPassword ? 'Hide Password' : 'Show Password'}
+                          >
+                            {showConfirmPassword ? (
+                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                                <line x1="1" y1="1" x2="23" y2="23" />
+                              </svg>
+                            ) : (
+                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                <circle cx="12" cy="12" r="3" />
+                              </svg>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    )}
 
                     {(formMode === 'new' || editingRole === 'sk') && (
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>

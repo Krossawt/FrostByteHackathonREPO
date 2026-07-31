@@ -12,7 +12,7 @@ from database import engine, Base
 import models  # noqa: F401 — ensures all models are registered before create_all
 
 # ─── Routers ──────────────────────────────────────────────────────────────────
-from routers import auth, users, projects, purchase_orders, comments, newsletter, budget_reports, audit_logs, reports
+from routers import auth, users, projects, purchase_orders, comments, newsletter, budget_reports, audit_logs, reports, suggestions
 
 load_dotenv()
 
@@ -161,6 +161,7 @@ app.include_router(newsletter.router)
 app.include_router(budget_reports.router)
 app.include_router(audit_logs.router)
 app.include_router(reports.router)
+app.include_router(suggestions.router)
 
 
 # ─── Health Check ─────────────────────────────────────────────────────────────

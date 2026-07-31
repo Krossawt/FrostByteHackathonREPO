@@ -239,3 +239,25 @@ class AuditLog(Base):
 
     # Relationships
     actor               = relationship("User", back_populates="audit_logs")
+
+
+# ─── TABLE: SUGGESTIONS ───────────────────────────────────────────────────────
+
+class Suggestion(Base):
+    """
+    Standalone citizen suggestions — independent of any project.
+    Citizens post these; SK officials read and view them for their barangay.
+    """
+    __tablename__ = "suggestions"
+
+    suggestionID        = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    barangay            = Column(String(100), nullable=False, index=True)   # Barangay this suggestion is for
+    authorID            = Column(Integer, ForeignKey("users.userID", ondelete="CASCADE"), nullable=False)
+    authorName          = Column(String(150), nullable=False)               # Display name at time of posting
+    category            = Column(String(100), nullable=False, default="General Suggestion")
+    suggestionText      = Column(Text, nullable=False)
+    votesCount          = Column(Integer, default=0)
+    createdAt           = Column(DateTime, default=func.now(), index=True)
+
+    # Relationships
+    author              = relationship("User")

@@ -385,3 +385,29 @@ class CityConsolidatedReport(BaseModel):
     upcomingProjects: int
     skOfficialsCount: int
     barangays: List[BarangaySummary]
+
+
+# ─── SUGGESTIONS ──────────────────────────────────────────────────────────────
+
+class SuggestionCreate(BaseModel):
+    category: str = Field("General Suggestion", max_length=100)
+    suggestionText: str = Field(..., min_length=1, max_length=2000)
+
+    @field_validator("category", "suggestionText", mode="before")
+    @classmethod
+    def clean_suggestion_fields(cls, v: Optional[str]) -> Optional[str]:
+        return sanitize_str(v)
+
+
+class SuggestionResponse(BaseModel):
+    suggestionID: int
+    barangay: str
+    authorID: int
+    authorName: str
+    category: str
+    suggestionText: str
+    votesCount: int
+    createdAt: datetime
+
+    model_config = {"from_attributes": True}
+

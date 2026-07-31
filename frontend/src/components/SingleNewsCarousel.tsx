@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import type { NewsItem } from '../types'
+import { resolveImageUrl } from '../services/api'
 
 const NEWS_IMAGES: Record<string, string> = {
   'N-01': 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=700&q=80',
@@ -17,12 +18,12 @@ interface SingleNewsCarouselProps {
   autoPlayInterval?: number
 }
 
+
 const resolveImage = (item?: NewsItem) => {
   if (!item) return 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=700&q=80'
   const raw = item.image || (item as any).imageURL || (item as any).image_url
   if (raw) {
-    if (raw.startsWith('http')) return raw
-    return `https://frostbytehackathonrepo.onrender.com${raw}`
+    return resolveImageUrl(raw)
   }
   return NEWS_IMAGES[item.id] ?? 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=700&q=80'
 }

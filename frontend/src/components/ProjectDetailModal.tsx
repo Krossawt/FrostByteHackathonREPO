@@ -4,6 +4,7 @@
  * Tabs: Overview | Finance & Receipts | Citizen Comments
  */
 import { useState, useEffect, FormEvent } from 'react'
+// @ts-ignore
 import Tesseract from 'tesseract.js'
 import type { ReportProject, Receipt, UserAccount } from '../types'
 import CameraCaptureModal from './CameraCaptureModal'
@@ -308,7 +309,7 @@ export default function ProjectDetailModal({
     try {
       setOcrMsg('📄 Reading receipt image with Tesseract OCR…')
       const { data: { text } } = await Tesseract.recognize(uploadedFile, 'eng', {
-        logger: (m) => {
+        logger: (m: any) => {
           if (m.status === 'recognizing text') {
             const pct = Math.round((m.progress ?? 0) * 100)
             setOcrMsg(`📄 Scanning receipt… ${pct}%`)
@@ -316,7 +317,7 @@ export default function ProjectDetailModal({
         },
       })
 
-      const lines = text.split('\n').map(l => l.trim()).filter(Boolean)
+      const lines = text.split('\n').map((l: string) => l.trim()).filter(Boolean)
 
       // ── Amount: find ₱, PHP, TOTAL, AMOUNT patterns ────────────────────
       let extractedAmount = ''
@@ -381,7 +382,7 @@ export default function ProjectDetailModal({
         extractedDesc = descKeywordMatch[1].trim()
       } else {
         // Fallback: second content line that's not the vendor
-        const candidates = lines.filter(l => l !== extractedVendor && l.length > 5 && /[a-zA-Z]/.test(l))
+        const candidates = lines.filter((l: string) => l !== extractedVendor && l.length > 5 && /[a-zA-Z]/.test(l))
         if (candidates[1]) extractedDesc = candidates[1].substring(0, 80)
       }
 
@@ -1125,24 +1126,14 @@ export default function ProjectDetailModal({
                   {/* Add comment form (logged-in citizens) */}
                   {user?.role === 'citizen' && (
                     <form onSubmit={handleAddComment} style={{ marginBottom: '1.2rem', background: 'var(--maroon-faint)', borderRadius: 12, padding: '1rem 1.2rem' }}>
-                      <div className="page-kicker" style={{ marginBottom: '0.65rem' }}>Share Your Feedback</div>
-                      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.65rem' }}>
-                        {(['comment', 'suggestion'] as const).map(t => (
-                          <button key={t} type="button"
-                            className={`filter-tab${cType === t ? ' active' : ''}`}
-                            style={{ fontSize: '0.78rem' }}
-                            onClick={() => setCType(t)}>
-                            {t === 'comment' ? 'Comment' : 'Suggestion'}
-                          </button>
-                        ))}
-                      </div>
+                      <div className="page-kicker" style={{ marginBottom: '0.65rem' }}>Share Your Thoughts</div>
                       {cError && <div className="alert-error" style={{ marginBottom: '0.5rem' }}>{cError}</div>}
                       <textarea
                         className="form-input"
                         rows={3}
                         value={cText}
                         onChange={e => setCText(e.target.value)}
-                        placeholder={cType === 'comment' ? 'Share your thoughts on this project…' : 'What would you suggest to improve this?'}
+                        placeholder="Share your thoughts on this project…"
                         style={{ resize: 'vertical', fontFamily: 'var(--font-body)' }}
                       />
                       <button type="submit" className="btn btn-primary btn-sm" style={{ marginTop: '0.65rem' }} disabled={isSubmittingComment}>

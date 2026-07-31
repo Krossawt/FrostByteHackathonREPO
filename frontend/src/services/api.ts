@@ -522,13 +522,15 @@ export async function fetchNewsApi(): Promise<NewsItem[]> {
 
     return rawList.map((n: any) => {
       const rawImg = n.imageURL || n.image_url || n.image || ''
+      const resolvedImg = rawImg ? resolveImageUrl(rawImg) : undefined
       return {
         id: String(n.newsletterID || n.id || `news-${Math.random()}`),
         title: n.title || 'City News Update',
         category: n.category || 'City News',
         summary: n.summary || n.fullContent || n.details || '',
         date: n.publishedAt ? new Date(n.publishedAt).toLocaleDateString() : 'Today',
-        image: rawImg ? resolveImageUrl(rawImg) : undefined,
+        image: resolvedImg,
+        imageURL: resolvedImg,
       }
     })
   } catch (err) {
@@ -628,3 +630,44 @@ export async function deleteAccountApi(): Promise<{ message: string }> {
 
   return result
 }
+
+// ─── STANDALONE SUGGESTIONS ──────────────────────────────────────────────────
+
+export interface SuggestionItem {
+  suggestionID: number
+  barangay: string
+  authorID: number
+  authorName: string
+  category: string
+  suggestionText: string
+  votesCount: number
+  createdAt: string
+}
+
+export async function fetchSuggestionsApi(barangay?: string): Promise<SuggestionItem[]> {
+  try {
+    const params = barangay ? `?barangay=${encodeURIComponent(barangay)}` : ''
+    const res = await request<SuggestionItem[]>(`/suggestions${params}`)
+    return Array.isArray(res) ? res : []
+  } catch (err) {
+    console.warn('fetchSuggestionsApi error:', err)
+    return []
+  }
+}
+
+export async function postSuggestionApi(payload: {
+  category: string
+  suggestionText: string
+}): Promise<SuggestionItem> {
+  return request<SuggestionItem>('/suggestions', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function voteSuggestionApi(suggestionId: number): Promise<SuggestionItem> {
+  return request<SuggestionItem>(`/suggestions/${suggestionId}/vote`, {
+    method: 'POST',
+  })
+}
+
