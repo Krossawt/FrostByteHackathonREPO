@@ -2,7 +2,7 @@ import { useState, useEffect, FormEvent, ChangeEvent } from 'react'
 import type { NewsItem } from '../types'
 import ConfirmDialog from '../components/ConfirmDialog'
 import Portal from '../components/Portal'
-import { fetchNewsApi, createNewsletterApi, updateNewsletterApi, deleteNewsletterApi, uploadNewsImageApi } from '../services/api'
+import { fetchNewsApi, createNewsletterApi, updateNewsletterApi, deleteNewsletterApi, uploadNewsImageApi, resolveImageUrl } from '../services/api'
 
 const CATEGORIES = ['Transparency', 'Youth Programs', 'SK Update', 'Health', 'Education', 'Environment', 'Sports', 'City News', 'Emergency']
 
@@ -41,12 +41,13 @@ export default function SuperAdminNews() {
       const res = await fetchNewsApi()
       if (Array.isArray(res)) {
         setArticles(res.map((n: any) => ({
-          id: String(n.newsletterID || n.id),
+          id: String(n.id || n.newsletterID || `news-${Math.random()}`),
           title: n.title,
           category: n.category || 'City News',
           summary: n.summary || n.fullContent || '',
-          date: n.publishedAt ? new Date(n.publishedAt).toLocaleDateString() : 'Today',
-          image: n.imageURL || undefined,
+          date: n.date || (n.publishedAt ? new Date(n.publishedAt).toLocaleDateString() : 'Today'),
+          image: n.image || n.imageURL || undefined,
+          imageURL: n.image || n.imageURL || undefined,
         })))
       }
     } catch (err) {
@@ -123,9 +124,18 @@ export default function SuperAdminNews() {
       try {
         setUploading(true)
         const uploaded = await uploadNewsImageApi(file)
-        setImageUrl(uploaded.imageURL)
+        if (uploaded && uploaded.imageURL) {
+          setImageUrl(uploaded.imageURL)
+        } else {
+          const reader = new FileReader()
+          reader.onload = ev => { if (ev.target?.result) setImageUrl(String(ev.target.result)) }
+          reader.readAsDataURL(file)
+        }
       } catch (err: any) {
-        setFormError(`Image upload failed: ${err.message}`)
+        console.warn('Backend image upload warning:', err)
+        const reader = new FileReader()
+        reader.onload = ev => { if (ev.target?.result) setImageUrl(String(ev.target.result)) }
+        reader.readAsDataURL(file)
       } finally {
         setUploading(false)
       }
@@ -306,16 +316,30 @@ export default function SuperAdminNews() {
         {filtered.length > 0 ? (
           <div className="card-grid card-grid-3">
             {filtered.map(article => (
-              <div key={article.id} className="news-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+              <div key={article.id} className="news-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: 0, overflow: 'hidden' }}>
                 <div>
-                  <span className="news-cat">{article.category}</span>
-                  <div className="news-title">{article.title}</div>
-                  <span className="news-date">{article.date}</span>
-                  {article.summary && <p className="news-summary" style={{ marginTop: '0.5rem' }}>{article.summary}</p>}
+                  <div style={{ width: '100%', height: '165px', position: 'relative', overflow: 'hidden', background: '#111' }}>
+                    <img
+                      src={resolveImageUrl(article.image || article.imageURL) || 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=700&q=80'}
+                      alt={article.title}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      onError={e => {
+                        (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=700&q=80'
+                      }}
+                    />
+                    <div style={{ position: 'absolute', top: '0.65rem', left: '0.65rem' }}>
+                      <span className="news-cat" style={{ margin: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>{article.category}</span>
+                    </div>
+                  </div>
+                  <div style={{ padding: '1rem 1.1rem 0' }}>
+                    <div className="news-title" style={{ fontSize: '1rem', fontWeight: 800 }}>{article.title}</div>
+                    <span className="news-date">{article.date}</span>
+                    {article.summary && <p className="news-summary" style={{ marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--ink-2)' }}>{article.summary}</p>}
+                  </div>
                 </div>
-                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.85rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(118,0,49,0.08)' }}>
-                  <button className="btn btn-secondary btn-sm" style={{ flex: 1 }} onClick={() => openModal(article)}>Edit</button>
-                  <button className="btn btn-danger btn-sm" onClick={() => setDeleteTarget(article)}>Delete</button>
+                <div style={{ display: 'flex', gap: '0.5rem', padding: '0.85rem 1.1rem 1rem', borderTop: '1px solid rgba(118,0,49,0.08)' }}>
+                  <button className="btn btn-secondary btn-sm" style={{ flex: 1, fontWeight: 700 }} onClick={() => openModal(article)}>✏️ Edit Article</button>
+                  <button className="btn btn-danger btn-sm" style={{ fontWeight: 700 }} onClick={() => setDeleteTarget(article)}>Delete</button>
                 </div>
               </div>
             ))}
@@ -365,13 +389,41 @@ export default function SuperAdminNews() {
 
                     <div className="form-group">
                       <label className="form-label">Article Banner Image</label>
-                      <input className="form-input" type="file" accept="image/*" onChange={handleImageChange} />
-                      {uploading && <div style={{ fontSize: '0.78rem', color: 'var(--maroon)', marginTop: '0.25rem' }}>Uploading image to backend storage…</div>}
-                      {imageUrl && (
-                        <div style={{ marginTop: '0.4rem', fontSize: '0.78rem', color: '#166534' }}>
-                          Uploaded image: <a href={imageUrl.startsWith('http') ? imageUrl : `https://frostbytehackathonrepo.onrender.com${imageUrl}`} target="_blank" rel="noreferrer" style={{ textDecoration: 'underline' }}>{imageUrl}</a>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                        {imageUrl && (
+                          <div style={{ width: '100%', height: '140px', borderRadius: '8px', overflow: 'hidden', border: '1.5px solid rgba(118,0,49,0.2)', position: 'relative' }}>
+                            <img
+                              src={resolveImageUrl(imageUrl)}
+                              alt="Banner Preview"
+                              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                              onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => { setImageUrl(''); setImageFile(null) }}
+                              style={{ position: 'absolute', top: '0.4rem', right: '0.4rem', background: 'rgba(0,0,0,0.7)', color: '#fff', border: 'none', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', fontWeight: 800 }}
+                              title="Remove Image"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        )}
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <label className="btn btn-secondary btn-sm" style={{ flex: 1, cursor: 'pointer', textAlign: 'center', justifyContent: 'center', fontWeight: 700 }}>
+                            🖼️ Select Image File
+                            <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImageChange} />
+                          </label>
+                          <input
+                            className="form-input"
+                            type="text"
+                            placeholder="Or paste image URL..."
+                            value={imageUrl}
+                            onChange={e => setImageUrl(e.target.value)}
+                            style={{ flex: 1.5, fontSize: '0.8rem' }}
+                          />
                         </div>
-                      )}
+                        {uploading && <div style={{ fontSize: '0.78rem', color: 'var(--maroon)' }}>Processing image...</div>}
+                      </div>
                     </div>
 
                     <div className="form-group">

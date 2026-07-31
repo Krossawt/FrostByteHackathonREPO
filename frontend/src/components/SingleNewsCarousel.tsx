@@ -108,7 +108,7 @@ export default function SingleNewsCarousel({ items = [], autoPlayInterval = 4000
             className="single-news-img"
             onError={e => {
               const el = e.target as HTMLImageElement
-              el.style.display = 'none'
+              el.src = 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=700&q=80'
             }}
           />
           <div className="single-news-img-overlay" />

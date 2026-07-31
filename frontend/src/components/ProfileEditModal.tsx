@@ -39,7 +39,7 @@ export default function ProfileEditModal({ user, onClose, onDiscard, onSave, onD
     }
 
     const [name, setName] = useState(initial.name)
-    const [barangay, setBarangay] = useState(initial.barangay)
+    const barangay = initial.barangay
     const [photoPreview, setPhotoPreview] = useState(initial.photoURL)
     const [uploading, setUploading] = useState(false)
     const [saving, setSaving] = useState(false)
@@ -50,8 +50,8 @@ export default function ProfileEditModal({ user, onClose, onDiscard, onSave, onD
     const [deleting, setDeleting] = useState(false)
     const [deleteError, setDeleteError] = useState('')
 
-    // THIS is what controls the Save Changes button + instruction message
-    const isDirty = name !== initial.name || barangay !== initial.barangay || photoPreview !== initial.photoURL
+    // Save enabled ONLY when name or photoPreview changes from initial
+    const isDirty = name.trim() !== initial.name || photoPreview !== initial.photoURL
 
     const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
@@ -61,24 +61,17 @@ export default function ProfileEditModal({ user, onClose, onDiscard, onSave, onD
         setError('')
 
         try {
-            console.log('📸 Starting image upload...', { fileName: file.name, size: file.size })
-
-            // Validate file size (max 5MB)
             const maxSize = 5 * 1024 * 1024
             if (file.size > maxSize) {
                 throw new Error('Image size must be less than 5MB')
             }
-
-            // Validate file type
             if (!file.type.startsWith('image/')) {
                 throw new Error('Please select a valid image file')
             }
 
             const supabase = getSupabaseClient()
 
-            // If Supabase credentials are missing, use local FileReader Data URL fallback
             if (!supabase) {
-                console.log('ℹ️ Supabase not configured. Using local Data URL avatar preview.')
                 const reader = new FileReader()
                 reader.onload = (event) => {
                     if (event.target?.result) {
@@ -90,14 +83,10 @@ export default function ProfileEditModal({ user, onClose, onDiscard, onSave, onD
                 return
             }
 
-            // Generate unique filename
             const userId = user.id || 'unknown'
             const timestamp = Date.now()
             const fileName = `${userId}_${timestamp}_${file.name}`
 
-            console.log('📤 Uploading to Supabase...', { fileName })
-
-            // Upload to Supabase Storage
             const { data, error: uploadError } = await supabase.storage
                 .from('profile-pictures')
                 .upload(fileName, file, {
@@ -106,25 +95,15 @@ export default function ProfileEditModal({ user, onClose, onDiscard, onSave, onD
                 })
 
             if (uploadError) {
-                console.error('❌ Upload error:', uploadError)
                 throw new Error(uploadError.message || 'Upload failed')
             }
 
-            console.log('✅ Upload successful:', data)
-
-            // Get public URL
             const { data: { publicUrl } } = supabase.storage
                 .from('profile-pictures')
                 .getPublicUrl(fileName)
 
-            console.log('🖼️ Public URL:', publicUrl)
-
-            // Show preview immediately
             setPhotoPreview(publicUrl)
-            console.log('✨ Photo preview updated')
         } catch (err: any) {
-            console.error('❌ Photo upload error:', err)
-            // Fallback to FileReader if Supabase storage upload fails
             const reader = new FileReader()
             reader.onload = (event) => {
                 if (event.target?.result) {
@@ -141,11 +120,7 @@ export default function ProfileEditModal({ user, onClose, onDiscard, onSave, onD
         e.preventDefault()
         setError('')
         if (!name.trim()) {
-            setError('Name cannot be empty.')
-            return
-        }
-        if (!barangay) {
-            setError('Please select a barangay.')
+            setError('Full Name cannot be empty.')
             return
         }
         setSaving(true)
@@ -159,12 +134,11 @@ export default function ProfileEditModal({ user, onClose, onDiscard, onSave, onD
         }
     }
 
-    // THIS is what decides: pop "Discard Changes" only if the form was edited
     const requestClose = () => {
         if (isDirty) {
             setConfirmDiscard(true)
         } else {
-            onClose() // no changes made — close freely, no popup
+            onClose()
         }
     }
 
@@ -185,86 +159,173 @@ export default function ProfileEditModal({ user, onClose, onDiscard, onSave, onD
                 className="modal-overlay"
                 onClick={e => { if (e.target === e.currentTarget) requestClose() }}
             >
-                <div className="modal" style={{ width: 'min(480px, 100%)' }}>
-                    <div className="modal-header">
-                        <span className="modal-title">Edit Your Profile</span>
-                        <button className="modal-close" onClick={requestClose} aria-label="Close">✕</button>
+                <div className="modal" style={{ width: 'min(520px, 95vw)', padding: 0, overflow: 'hidden', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.4)', boxShadow: '0 24px 60px rgba(0,0,0,0.35)' }}>
+                    
+                    {/* Top Decorative Banner */}
+                    <div style={{
+                        background: 'linear-gradient(135deg, #760031 0%, #4a001f 60%, #1a000b 100%)',
+                        padding: '1.75rem 1.5rem 2.75rem',
+                        position: 'relative',
+                        color: '#fff',
+                        textAlign: 'center'
+                    }}>
+                        <button
+                            className="modal-close"
+                            onClick={requestClose}
+                            aria-label="Close"
+                            style={{
+                                position: 'absolute', top: '1rem', right: '1rem',
+                                background: 'rgba(255,255,255,0.15)', color: '#fff',
+                                border: 'none', borderRadius: '50%', width: '32px', height: '32px',
+                                cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                backdropFilter: 'blur(8px)'
+                            }}
+                        >
+                            ✕
+                        </button>
+                        <div style={{ fontSize: '0.75rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: '#FEEC41', fontWeight: 800, marginBottom: '0.2rem' }}>
+                            CITIZEN ACCOUNT MANAGEMENT
+                        </div>
+                        <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: '1.4rem', margin: 0, color: '#fff' }}>
+                            My Profile Settings
+                        </h2>
                     </div>
 
-                    <form onSubmit={handleSubmit}>
-                        <div className="modal-body">
-                            {error && <div className="alert-error">{error}</div>}
-
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
-                                {photoPreview ? (
-                                    <img
-                                        src={photoPreview}
-                                        alt="Profile"
-                                        style={{
-                                            width: 96, height: 96, borderRadius: '50%', objectFit: 'cover',
-                                            border: '3px solid #fff', boxShadow: '0 6px 20px rgba(118,0,49,0.18)',
-                                        }}
-                                    />
-                                ) : (
-                                    <div style={{
-                                        width: 96, height: 96, borderRadius: '50%',
-                                        background: 'linear-gradient(135deg, var(--maroon), var(--maroon-mid))',
-                                        color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                        fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '2rem',
-                                    }}>
-                                        {name.charAt(0).toUpperCase() || 'C'}
-                                    </div>
-                                )}
-                                <label
-                                    htmlFor="profile-photo-input"
-                                    className="btn btn-secondary btn-sm"
-                                    style={{ cursor: uploading ? 'not-allowed' : 'pointer', opacity: uploading ? 0.6 : 1 }}
-                                >
-                                    {uploading ? 'Uploading...' : 'Change Photo'}
-                                </label>
-                                <input
-                                    id="profile-photo-input"
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={handlePhotoChange}
-                                    disabled={uploading}
-                                    style={{ display: 'none' }}
+                    {/* Avatar Header overlap */}
+                    <div style={{ marginTop: '-42px', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0 1.5rem 1.5rem' }}>
+                        <div style={{ position: 'relative', marginBottom: '0.5rem' }}>
+                            {photoPreview ? (
+                                <img
+                                    src={photoPreview}
+                                    alt="Profile"
+                                    style={{
+                                        width: 88, height: 88, borderRadius: '50%', objectFit: 'cover',
+                                        border: '4px solid #fff', boxShadow: '0 10px 24px rgba(118,0,49,0.25)',
+                                        background: '#fff'
+                                    }}
                                 />
-                                {uploading && (
-                                    <span style={{ fontSize: '0.75rem', color: '#666' }}>
-                                        Uploading...
-                                    </span>
-                                )}
-                            </div>
+                            ) : (
+                                <div style={{
+                                    width: 88, height: 88, borderRadius: '50%',
+                                    background: 'linear-gradient(135deg, var(--maroon), #4a001f)',
+                                    color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: '2.2rem',
+                                    border: '4px solid #fff', boxShadow: '0 10px 24px rgba(118,0,49,0.25)',
+                                }}>
+                                    {name.charAt(0).toUpperCase() || 'C'}
+                                </div>
+                            )}
 
-                            <div className="form-group">
-                                <label className="form-label">Full Name</label>
+                            <label
+                                htmlFor="profile-photo-input"
+                                style={{
+                                    position: 'absolute', bottom: '2px', right: '2px',
+                                    background: '#760031', color: '#fff', border: '2px solid #fff',
+                                    borderRadius: '50%', width: '30px', height: '30px',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    cursor: uploading ? 'not-allowed' : 'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.3)',
+                                    fontSize: '0.85rem'
+                                }}
+                                title="Change Profile Picture"
+                            >
+                                📷
+                            </label>
+                            <input
+                                id="profile-photo-input"
+                                type="file"
+                                accept="image/*"
+                                onChange={handlePhotoChange}
+                                disabled={uploading}
+                                style={{ display: 'none' }}
+                            />
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.2rem' }}>
+                            <span style={{ fontSize: '0.78rem', fontWeight: 800, background: 'rgba(22, 101, 52, 0.12)', color: '#166534', padding: '0.25rem 0.65rem', borderRadius: '9999px', border: '1px solid rgba(22, 101, 52, 0.2)' }}>
+                                🛡️ Verified Citizen Account
+                            </span>
+                            <span style={{ fontSize: '0.78rem', fontWeight: 700, background: 'rgba(118, 0, 49, 0.08)', color: 'var(--maroon)', padding: '0.25rem 0.65rem', borderRadius: '9999px' }}>
+                                📍 Barangay {barangay || 'Santa Rosa'}
+                            </span>
+                        </div>
+                        {uploading && <span style={{ fontSize: '0.75rem', color: 'var(--maroon)', fontWeight: 600 }}>Uploading profile photo...</span>}
+                    </div>
+
+                    <form onSubmit={handleSubmit} style={{ padding: '0 1.5rem 1.5rem' }}>
+                        {error && <div className="alert-error" style={{ marginBottom: '1rem', borderRadius: '12px' }}>{error}</div>}
+
+                        <div style={{ background: '#fdfafd', padding: '1.25rem', borderRadius: '16px', border: '1px solid rgba(118, 0, 49, 0.1)', marginBottom: '1.25rem' }}>
+                            <div className="form-group" style={{ marginBottom: '1rem' }}>
+                                <label className="form-label" style={{ fontWeight: 800, color: 'var(--maroon)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                    ✏️ Full Name (Editable)
+                                </label>
                                 <input
                                     className="form-input"
                                     value={name}
                                     onChange={e => setName(e.target.value)}
-                                    placeholder="Your full name"
+                                    placeholder="Enter your full name"
                                     required
+                                    style={{ fontWeight: 600, fontSize: '0.95rem', background: '#fff', border: '1.5px solid rgba(118,0,49,0.2)', padding: '0.65rem 0.85rem' }}
                                 />
                             </div>
 
-                            <div className="form-group">
-                                <label className="form-label">Barangay</label>
-                                <select
-                                    className="form-input"
-                                    value={barangay}
-                                    onChange={e => setBarangay(e.target.value)}
-                                    required
-                                >
-                                    <option value="" disabled>Select barangay</option>
-                                    {BARANGAYS.map(b => <option key={b} value={b}>{b}</option>)}
-                                </select>
+                            <div className="form-group" style={{ marginBottom: 0 }}>
+                                <label className="form-label" style={{ fontWeight: 800, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                    🔒 Registered Barangay (Fixed)
+                                </label>
+                                <div style={{ position: 'relative' }}>
+                                    <input
+                                        className="form-input"
+                                        value={barangay || 'Santa Rosa City Resident'}
+                                        disabled
+                                        readOnly
+                                        style={{
+                                            background: 'rgba(0, 0, 0, 0.04)',
+                                            color: '#555',
+                                            fontWeight: 700,
+                                            cursor: 'not-allowed',
+                                            border: '1px solid rgba(0,0,0,0.12)',
+                                            paddingRight: '2.5rem'
+                                        }}
+                                    />
+                                    <span style={{ position: 'absolute', right: '0.8rem', top: '50%', transform: 'translateY(-50%)', fontSize: '0.9rem' }} title="Barangay is locked by residency verification">
+                                        🔒
+                                    </span>
+                                </div>
+                                <span style={{ fontSize: '0.74rem', color: 'var(--muted)', marginTop: '0.35rem', display: 'block', fontStyle: 'italic' }}>
+                                    ℹ️ Barangay residence is verified upon registration and cannot be changed online. Contact CYDO Admin for official relocation.
+                                </span>
                             </div>
                         </div>
 
-                        <div className="modal-footer" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '0.75rem' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.5rem' }}>
-                                {/* Instruction message — only shows when NOT dirty */}
+                        {/* Additional Account Metadata Card */}
+                        <div style={{ background: '#f8fafc', padding: '1rem 1.2rem', borderRadius: '14px', border: '1px solid #e2e8f0', marginBottom: '1.25rem' }}>
+                            <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.6rem' }}>
+                                Account Information & Compliance
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem', fontSize: '0.8rem' }}>
+                                <div>
+                                    <span style={{ color: '#64748b', display: 'block', fontSize: '0.72rem' }}>Role Status</span>
+                                    <strong style={{ color: '#0f172a' }}>Youth Resident Voter</strong>
+                                </div>
+                                <div>
+                                    <span style={{ color: '#64748b', display: 'block', fontSize: '0.72rem' }}>Municipality</span>
+                                    <strong style={{ color: '#0f172a' }}>Santa Rosa, Laguna</strong>
+                                </div>
+                                <div>
+                                    <span style={{ color: '#64748b', display: 'block', fontSize: '0.72rem' }}>RA 10742 Status</span>
+                                    <strong style={{ color: '#166534' }}>Active Beneficiary</strong>
+                                </div>
+                                <div>
+                                    <span style={{ color: '#64748b', display: 'block', fontSize: '0.72rem' }}>Account ID</span>
+                                    <strong style={{ color: '#0f172a' }}>#{user.id.slice(0, 8)}</strong>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.6rem' }}>
                                 {!isDirty && (
                                     <span style={{
                                         fontSize: '0.78rem',
@@ -272,57 +333,56 @@ export default function ProfileEditModal({ user, onClose, onDiscard, onSave, onD
                                         fontFamily: 'var(--font-display)',
                                         fontWeight: 600,
                                         marginRight: 'auto',
-                                        lineHeight: 1,
                                     }}>
-                                        Edit a field to enable saving
+                                        Edit full name or photo to save changes
                                     </span>
                                 )}
-                                <button type="button" className="btn btn-secondary btn-sm" onClick={requestClose} disabled={saving || uploading}>
+                                <button type="button" className="btn btn-secondary btn-sm" onClick={requestClose} disabled={saving || uploading} style={{ fontWeight: 700, padding: '0.6rem 1.2rem' }}>
                                     Cancel
                                 </button>
-                                {/* Save Changes button — only shows when dirty */}
                                 {isDirty && (
-                                    <button type="submit" className="btn btn-save btn-sm" disabled={saving || uploading}>
-                                        {saving ? 'Saving...' : 'Save Changes'}
+                                    <button type="submit" className="btn btn-primary btn-sm" disabled={saving || uploading} style={{ fontWeight: 800, padding: '0.6rem 1.5rem', background: 'linear-gradient(135deg, var(--maroon), #4a001f)' }}>
+                                        {saving ? 'Saving...' : 'Save Profile Changes'}
                                     </button>
                                 )}
                             </div>
 
-                            <div style={{ borderTop: '1px solid #eee', paddingTop: '0.75rem' }}>
+                            {/* Danger Zone */}
+                            <div style={{ borderTop: '1px solid rgba(0,0,0,0.08)', paddingTop: '0.85rem' }}>
                                 {deleteError && <div className="alert-error" style={{ marginBottom: '0.5rem' }}>{deleteError}</div>}
                                 {!confirmingDelete ? (
                                     <button
                                         type="button"
-                                        className="btn btn-danger btn-sm"
-                                        style={{ width: '100%' }}
+                                        className="btn btn-secondary btn-sm"
+                                        style={{ width: '100%', color: '#dc2626', borderColor: 'rgba(220,38,38,0.3)', background: 'rgba(220,38,38,0.04)', fontWeight: 700 }}
                                         onClick={() => setConfirmingDelete(true)}
                                         disabled={saving || uploading}
                                     >
-                                        Delete Account
+                                        🗑️ Delete Account
                                     </button>
                                 ) : (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                        <span style={{ fontSize: '0.85rem', color: '#760031' }}>
-                                            This will permanently delete your account. Are you sure?
+                                    <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', padding: '0.85rem', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                                        <span style={{ fontSize: '0.82rem', color: '#991b1b', fontWeight: 700 }}>
+                                            ⚠️ Permanent Action: Are you sure you want to delete your citizen account?
                                         </span>
                                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                                             <button
                                                 type="button"
                                                 className="btn btn-secondary btn-sm"
-                                                style={{ flex: 1 }}
+                                                style={{ flex: 1, fontWeight: 700 }}
                                                 onClick={() => setConfirmingDelete(false)}
                                                 disabled={deleting}
                                             >
-                                                Cancel
+                                                Keep Account
                                             </button>
                                             <button
                                                 type="button"
                                                 className="btn btn-danger btn-sm"
-                                                style={{ flex: 1 }}
+                                                style={{ flex: 1, fontWeight: 800, background: '#dc2626' }}
                                                 onClick={handleDeleteAccount}
                                                 disabled={deleting}
                                             >
-                                                {deleting ? 'Deleting...' : 'Yes, Delete'}
+                                                {deleting ? 'Deleting...' : 'Yes, Delete Account'}
                                             </button>
                                         </div>
                                     </div>
@@ -333,11 +393,11 @@ export default function ProfileEditModal({ user, onClose, onDiscard, onSave, onD
                 </div>
             </div>
 
-            {/* Discard Changes confirm — only opens when isDirty was true at requestClose() */}
+            {/* Discard Changes confirm */}
             <ConfirmDialog
                 isOpen={confirmDiscard}
-                title="Discard Changes"
-                message="Any unsaved changes will be lost. Are you sure you want to close this form?"
+                title="Discard Profile Changes"
+                message="Any unsaved profile edits will be lost. Are you sure you want to close?"
                 confirmLabel="Discard"
                 cancelLabel="Keep Editing"
                 variant="danger"

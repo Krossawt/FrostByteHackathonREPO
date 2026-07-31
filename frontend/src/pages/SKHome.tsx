@@ -81,7 +81,7 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
             category: n.category || 'City News',
             summary: n.summary || n.fullContent || '',
             date: n.publishedAt ? new Date(n.publishedAt).toLocaleDateString() : 'Today',
-            image: n.imageURL || undefined,
+            image: n.image || n.imageURL || undefined,
           }))
         } else if (Array.isArray(projRes) && projRes.length > 0) {
           mappedNews = projRes.map((p: any) => ({
