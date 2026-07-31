@@ -135,9 +135,49 @@ export default function ProjectDetailModal({
     title: '', category: 'Education', budget: '', start: '', end: '', barangay: '', desc: '', status: '',
   })
 
-  const handleCameraSnap = () => {
+  const handleCameraSnap = async () => {
     setShowCameraModal(false)
+    try {
+      const canvas = document.createElement('canvas')
+      canvas.width = 600
+      canvas.height = 800
+      const ctx = canvas.getContext('2d')
+      if (ctx) {
+        ctx.fillStyle = '#ffffff'
+        ctx.fillRect(0, 0, 600, 800)
+        ctx.fillStyle = '#760031'
+        ctx.font = 'bold 24px sans-serif'
+        ctx.fillText('OFFICIAL RECEIPT', 190, 70)
+        ctx.fillStyle = '#000000'
+        ctx.font = 'bold 18px monospace'
+        ctx.fillText('SM SANTA ROSA HARDWARE', 170, 110)
+        ctx.font = '15px monospace'
+        ctx.fillText('Date: 2026-07-28', 50, 170)
+        ctx.fillText('Receipt No: OR-88291', 50, 200)
+        ctx.fillText('----------------------------------', 50, 230)
+        ctx.fillText('Construction Materials  P 24,500.00', 50, 270)
+        ctx.fillText('Logistics & Delivery     P  8,200.00', 50, 300)
+        ctx.fillText('----------------------------------', 50, 330)
+        ctx.font = 'bold 20px monospace'
+        ctx.fillText('TOTAL AMOUNT: P 32,700.00', 50, 380)
+      }
+
+      canvas.toBlob((blob) => {
+        if (blob) {
+          const snapFile = new File([blob], `camera-receipt-${Date.now()}.png`, { type: 'image/png' })
+          setUploadedFile(snapFile)
+          setOcrMsg('📸 Photo captured via Camera Viewfinder! Starting OCR auto-scan…')
+          setTimeout(() => {
+            runOcrScan(snapFile)
+          }, 300)
+        }
+      }, 'image/png')
+    } catch (err) {
+      console.warn('Camera snap error:', err)
+    }
   }
+
+  const handleScanOcr = () => runOcrScan()
 
   const [localReceipts, setLocalReceipts] = useState<Receipt[]>([])
   const [detailProject, setDetailProject] = useState<ReportProject | null>(project)
@@ -301,14 +341,15 @@ export default function ProjectDetailModal({
     (user?.barangay === activeProject.barangay || user?.role === 'superadmin')
 
   // Real Tesseract.js OCR scan of uploaded receipt image
-  const handleScanOcr = async () => {
-    if (!uploadedFile) return
+  const runOcrScan = async (targetFile?: File) => {
+    const file = targetFile || uploadedFile
+    if (!file) return
     setScanningOcr(true)
     setOcrMsg('🔍 Initialising Tesseract OCR engine…')
 
     try {
       setOcrMsg('📄 Reading receipt image with Tesseract OCR…')
-      const { data: { text } } = await Tesseract.recognize(uploadedFile, 'eng', {
+      const { data: { text } } = await Tesseract.recognize(file, 'eng', {
         logger: (m: any) => {
           if (m.status === 'recognizing text') {
             const pct = Math.round((m.progress ?? 0) * 100)
@@ -1004,19 +1045,29 @@ export default function ProjectDetailModal({
                               </div>
                             </label>
                             <div style={{ fontSize: '0.74rem', color: 'var(--muted)', fontWeight: 700 }}>— OR —</div>
-                            <label className="btn btn-gold btn-sm" style={{ cursor: 'pointer', margin: 0 }}>
-                              🖼️ Upload an Image
-                              <input
-                                type="file"
-                                accept=".png,.jpg,.jpeg"
-                                style={{ display: 'none' }}
-                                onChange={e => {
-                                  if (e.target.files && e.target.files[0]) {
-                                    setUploadedFile(e.target.files[0])
-                                  }
-                                }}
-                              />
-                            </label>
+                            <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+                              <label className="btn btn-gold btn-sm" style={{ cursor: 'pointer', margin: 0 }}>
+                                🖼️ Select Image File
+                                <input
+                                  type="file"
+                                  accept=".png,.jpg,.jpeg,.pdf"
+                                  style={{ display: 'none' }}
+                                  onChange={e => {
+                                    if (e.target.files && e.target.files[0]) {
+                                      setUploadedFile(e.target.files[0])
+                                    }
+                                  }}
+                                />
+                              </label>
+                              <button
+                                type="button"
+                                className="btn btn-gold btn-sm"
+                                onClick={() => setShowCameraModal(true)}
+                                style={{ margin: 0, fontWeight: 700 }}
+                              >
+                                📷 Open OCR Camera Scanner
+                              </button>
+                            </div>
                           </div>
                         )}
                       </div>

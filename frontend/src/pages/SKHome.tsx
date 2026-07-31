@@ -36,6 +36,15 @@ const CATEGORY_GRAD: Record<string, string> = {
 }
 const getCover = (cat?: string) => CATEGORY_IMAGES[cat ?? 'Other'] ?? CATEGORY_IMAGES['Other']
 const getGrad = (cat?: string) => CATEGORY_GRAD[cat ?? 'default'] ?? CATEGORY_GRAD['default']
+const STATUS_LEVELS: Record<string, number> = {
+  'Incoming': 1, 'incoming': 1, 'upcoming': 1,
+  'In Progress': 2, 'in progress': 2, 'ongoing': 2,
+  'Completed': 3, 'completed': 3, 'posted': 3,
+}
+function getStatusLevel(st?: string): number {
+  if (!st) return 1
+  return STATUS_LEVELS[st] || 1
+}
 
 export default function CitizenHome({ user }: CitizenHomeProps) {
   const barangay = user?.barangay || 'Balibago'
@@ -410,11 +419,23 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
                       <div className="v-card-footer" style={{ paddingTop: '0.65rem' }}>
                         <div>
                           <div className="v-card-budget" style={{ fontSize: '0.95rem' }}>₱{(p.proposedBudget / 1000).toFixed(0)}K</div>
-                          <div className="v-card-budget-label">Proposed Budget</div>
+                          <div className="v-card-budget-label">Budget</div>
                         </div>
-                        <div style={{ fontSize: '0.76rem', color: 'var(--maroon)', fontFamily: 'var(--font-display)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-                          Inspect
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 18l6-6-6-6" /></svg>
+                        <div className="v-card-actions" style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }} onClick={e => e.stopPropagation()}>
+                          {getStatusLevel(p.projectStatus || p.status) === 3 ? (
+                            <button className="btn btn-secondary btn-sm" disabled style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem', opacity: 0.65, cursor: 'not-allowed' }} title="Receipt attachment locked — project is completed">
+                              🔒 Receipts Locked
+                            </button>
+                          ) : (
+                            <button className="btn btn-gold btn-sm" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }}
+                              onClick={() => setSelectedProject(p)}>
+                              Attach Receipt
+                            </button>
+                          )}
+                          <button className="btn btn-secondary btn-sm" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }}
+                            onClick={() => setSelectedProject(p)}>
+                            Details
+                          </button>
                         </div>
                       </div>
                     </div>
