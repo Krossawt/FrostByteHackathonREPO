@@ -556,6 +556,30 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
                         Barangay {barangay} Feed
                       </span>
                     </div>
+
+                    {/* SK Council Responses */}
+                    {c.replies && c.replies.length > 0 && (
+                      <div style={{ marginTop: '0.75rem', paddingTop: '0.6rem', borderTop: '1px dashed rgba(118,0,49,0.12)', display: 'grid', gap: '0.5rem' }}>
+                        <div style={{ fontSize: '0.72rem', fontFamily: 'var(--font-display)', fontWeight: 800, color: 'var(--maroon)', textTransform: 'uppercase' }}>
+                          Official SK Council Responses ({c.replies.length})
+                        </div>
+                        {c.replies.map((r) => (
+                          <div key={r.replyID} style={{ background: 'rgba(118,0,49,0.04)', borderLeft: '3px solid var(--maroon)', padding: '0.6rem 0.85rem', borderRadius: '0 6px 6px 0' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
+                              <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '0.8rem', color: 'var(--ink)' }}>
+                                {r.authorName} <span style={{ fontSize: '0.72rem', color: 'var(--maroon)', fontWeight: 600 }}>({r.authorRole})</span>
+                              </span>
+                              <span style={{ fontSize: '0.7rem', color: 'var(--muted)', fontFamily: 'var(--font-display)' }}>
+                                {r.createdAt ? new Date(r.createdAt).toLocaleDateString() : 'Today'}
+                              </span>
+                            </div>
+                            <p style={{ margin: 0, fontSize: '0.83rem', color: 'var(--ink-2)', lineHeight: 1.5 }}>
+                              {r.replyText}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

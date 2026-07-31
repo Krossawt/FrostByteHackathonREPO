@@ -389,6 +389,27 @@ class CityConsolidatedReport(BaseModel):
 
 # ─── SUGGESTIONS ──────────────────────────────────────────────────────────────
 
+class SuggestionReplyCreate(BaseModel):
+    replyText: str = Field(..., min_length=1, max_length=2000)
+
+    @field_validator("replyText", mode="before")
+    @classmethod
+    def clean_reply_fields(cls, v: Optional[str]) -> Optional[str]:
+        return sanitize_str(v)
+
+
+class SuggestionReplyResponse(BaseModel):
+    replyID: int
+    suggestionID: int
+    authorID: int
+    authorName: str
+    authorRole: str
+    replyText: str
+    createdAt: datetime
+
+    model_config = {"from_attributes": True}
+
+
 class SuggestionCreate(BaseModel):
     category: str = Field("General Suggestion", max_length=100)
     suggestionText: str = Field(..., min_length=1, max_length=2000)
@@ -408,6 +429,8 @@ class SuggestionResponse(BaseModel):
     suggestionText: str
     votesCount: int
     createdAt: datetime
+    replies: List[SuggestionReplyResponse] = []
 
     model_config = {"from_attributes": True}
+
 

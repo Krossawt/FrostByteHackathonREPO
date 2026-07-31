@@ -16,7 +16,7 @@ interface SuperAdminAccountsProps {
 export default function SuperAdminAccounts({ selectedBarangay }: SuperAdminAccountsProps) {
   const [users, setUsers] = useState<UserAccount[]>([])
   const [filterRole, setFilterRole] = useState<Role | 'all'>('all')
-  const [filterBrgy, setFilterBrgy] = useState('All')
+  const [filterBrgy, setFilterBrgy] = useState(selectedBarangay || 'All')
   const [search, setSearch] = useState('')
   const [formMode, setFormMode] = useState<'new' | UserAccount | null>(null)
   const [suspendTarget, setSuspendTarget] = useState<UserAccount | null>(null)
@@ -41,6 +41,12 @@ export default function SuperAdminAccounts({ selectedBarangay }: SuperAdminAccou
   })
 
   useEffect(() => {
+    if (selectedBarangay) {
+      setFilterBrgy(selectedBarangay)
+    }
+  }, [selectedBarangay])
+
+  useEffect(() => {
     async function loadAccounts() {
       try {
         const res = await fetchUserAccountsApi()
@@ -54,7 +60,7 @@ export default function SuperAdminAccounts({ selectedBarangay }: SuperAdminAccou
               email: u.userEmail,
               username: u.userName.toLowerCase().replace(/\s+/g, ''),
               role,
-              barangay: u.userLocation !== 'Santa Rosa City' ? u.userLocation : undefined,
+              barangay: u.userLocation || 'Santa Rosa City',
               skPosition: u.userRole.includes('Chairperson') ? 'Chairperson' : u.userRole.includes('Secretary') ? 'Secretary' : u.userRole.includes('Treasurer') ? 'Treasurer' : 'Kagawad',
               isStaRosa: u.userIsStaRosa,
               isActive: u.userIsActive,
@@ -75,13 +81,15 @@ export default function SuperAdminAccounts({ selectedBarangay }: SuperAdminAccou
     return () => clearTimeout(timer)
   }, [feedback])
 
-  const activeBrgy = selectedBarangay && selectedBarangay !== '' ? selectedBarangay : filterBrgy
-
   const filtered = users.filter(u => {
     const matchRole = filterRole === 'all' || u.role === filterRole
-    const matchBrgy = activeBrgy === 'All' || u.barangay === activeBrgy
-    const q = search.toLowerCase()
-    const matchQ = !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || (u.username?.toLowerCase() ?? '').includes(q)
+    const userBrgy = u.barangay || 'Santa Rosa City'
+    const targetBrgy = filterBrgy
+    const matchBrgy = targetBrgy === 'All' || targetBrgy === 'all' ||
+      userBrgy.toLowerCase().includes(targetBrgy.toLowerCase()) ||
+      targetBrgy.toLowerCase().includes(userBrgy.toLowerCase())
+    const q = search.toLowerCase().trim()
+    const matchQ = !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || (u.username?.toLowerCase() ?? '').includes(q) || (u.barangay?.toLowerCase() ?? '').includes(q)
     return matchRole && matchBrgy && matchQ
   })
 

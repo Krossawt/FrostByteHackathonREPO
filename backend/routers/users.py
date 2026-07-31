@@ -30,7 +30,7 @@ def list_accounts(
     is_active: Optional[bool] = Query(None, description="Filter by active status"),
     search: Optional[str] = Query(None, description="Search by name or email"),
     skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=200),
+    limit: int = Query(300, ge=1, le=1000),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_authenticated),
 ):

@@ -4,7 +4,7 @@ import ProjectDetailModal from '../components/ProjectDetailModal'
 import BarangayTransactionsModal from '../components/BarangayTransactionsModal'
 import { DonutChart } from '../components/MiniChart'
 import SingleNewsCarousel from '../components/SingleNewsCarousel'
-import { fetchProjectsApi, fetchBarangayReportApi, fetchNewsApi, fetchSuggestionsApi, voteSuggestionApi } from '../services/api'
+import { fetchProjectsApi, fetchBarangayReportApi, fetchNewsApi, fetchSuggestionsApi, voteSuggestionApi, replySuggestionApi } from '../services/api'
 import type { SuggestionItem } from '../services/api'
 import Portal from '../components/Portal'
 import html2canvas from 'html2canvas'
@@ -214,6 +214,10 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
   const remain = summary.remaining
   const usagePct = budget > 0 ? Math.min(Math.round((spent / budget) * 100), 100) : 0
 
+  const [activeReplyId, setActiveReplyId] = useState<number | null>(null)
+  const [replyInputText, setReplyInputText] = useState('')
+  const [isSubmittingReply, setIsSubmittingReply] = useState(false)
+
   const handleVote = async (id: number) => {
     if (votedIds.has(id)) return
     try {
@@ -223,6 +227,21 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
     } catch {
       setLocalComments((prev) => prev.map((c) => c.suggestionID === id ? { ...c, votesCount: (c.votesCount || 0) + 1 } : c))
       setVotedIds(prev => { const next = new Set(prev); next.add(id); return next })
+    }
+  }
+
+  const handleSendReply = async (suggestionId: number) => {
+    if (!replyInputText.trim()) return
+    setIsSubmittingReply(true)
+    try {
+      const updated = await replySuggestionApi(suggestionId, replyInputText.trim())
+      setLocalComments((prev) => prev.map((c) => c.suggestionID === suggestionId ? updated : c))
+      setReplyInputText('')
+      setActiveReplyId(null)
+    } catch (err: any) {
+      console.warn('API error sending reply:', err)
+    } finally {
+      setIsSubmittingReply(false)
     }
   }
 
@@ -454,41 +473,121 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
                     </p>
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(118,0,49,0.06)', paddingTop: '0.5rem', marginTop: '0.4rem' }}>
-                      <button
-                        type="button"
-                        onClick={() => handleVote(c.suggestionID)}
-                        className="link-button"
-                        disabled={votedIds.has(c.suggestionID)}
-                        title={votedIds.has(c.suggestionID) ? 'Already acknowledged' : 'Acknowledge as important'}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.4rem',
-                          fontSize: '0.76rem',
-                          color: votedIds.has(c.suggestionID) ? 'var(--maroon-dark)' : 'var(--maroon)',
-                          fontWeight: 500,
-                          fontFamily: 'var(--font-display)',
-                          lineHeight: 1,
-                          opacity: votedIds.has(c.suggestionID) ? 0.6 : 1,
-                          transition: 'opacity 0.15s ease',
-                        }}
-                      >
-                        <svg
-                          width="16" height="16" viewBox="0 0 24 24"
-                          fill={votedIds.has(c.suggestionID) ? 'var(--maroon)' : 'none'}
-                          stroke={votedIds.has(c.suggestionID) ? 'var(--maroon-dark)' : 'var(--maroon)'}
-                          strokeWidth="2"
-                          strokeLinejoin="round"
-                          style={{ display: 'block', flexShrink: 0 }}
+                      <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleVote(c.suggestionID)}
+                          className="link-button"
+                          disabled={votedIds.has(c.suggestionID)}
+                          title={votedIds.has(c.suggestionID) ? 'Already acknowledged' : 'Acknowledge as important'}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.4rem',
+                            fontSize: '0.76rem',
+                            color: votedIds.has(c.suggestionID) ? 'var(--maroon-dark)' : 'var(--maroon)',
+                            fontWeight: 500,
+                            fontFamily: 'var(--font-display)',
+                            lineHeight: 1,
+                            opacity: votedIds.has(c.suggestionID) ? 0.6 : 1,
+                            transition: 'opacity 0.15s ease',
+                          }}
                         >
-                          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 21 12 17.77 5.82 21 7 14.14 2 9.27l6.91-1.01L12 2z" />
-                        </svg>
-                        <span style={{ lineHeight: 1 }}>Acknowledge ({c.votesCount ?? 0})</span>
-                      </button>
+                          <svg
+                            width="16" height="16" viewBox="0 0 24 24"
+                            fill={votedIds.has(c.suggestionID) ? 'var(--maroon)' : 'none'}
+                            stroke={votedIds.has(c.suggestionID) ? 'var(--maroon-dark)' : 'var(--maroon)'}
+                            strokeWidth="2"
+                            strokeLinejoin="round"
+                            style={{ display: 'block', flexShrink: 0 }}
+                          >
+                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 21 12 17.77 5.82 21 7 14.14 2 9.27l6.91-1.01L12 2z" />
+                          </svg>
+                          <span style={{ lineHeight: 1 }}>Acknowledge ({c.votesCount ?? 0})</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="link-button"
+                          onClick={() => {
+                            setActiveReplyId(activeReplyId === c.suggestionID ? null : c.suggestionID)
+                            setReplyInputText('')
+                          }}
+                          style={{
+                            fontSize: '0.76rem',
+                            color: 'var(--maroon)',
+                            fontWeight: 700,
+                            fontFamily: 'var(--font-display)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.3rem',
+                          }}
+                        >
+                          💬 Reply ({c.replies?.length ?? 0})
+                        </button>
+                      </div>
+
                       <span style={{ fontSize: '0.72rem', color: 'var(--muted)', fontFamily: 'var(--font-display)' }}>
                         Barangay {barangay} · Citizen Submission
                       </span>
                     </div>
+
+                    {/* Official SK Replies List */}
+                    {c.replies && c.replies.length > 0 && (
+                      <div style={{ marginTop: '0.75rem', paddingTop: '0.6rem', borderTop: '1px dashed rgba(118,0,49,0.12)', display: 'grid', gap: '0.5rem' }}>
+                        <div style={{ fontSize: '0.72rem', fontFamily: 'var(--font-display)', fontWeight: 800, color: 'var(--maroon)', textTransform: 'uppercase' }}>
+                          Official SK Council Responses ({c.replies.length})
+                        </div>
+                        {c.replies.map((r) => (
+                          <div key={r.replyID} style={{ background: 'rgba(118,0,49,0.04)', borderLeft: '3px solid var(--maroon)', padding: '0.6rem 0.85rem', borderRadius: '0 6px 6px 0' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
+                              <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '0.8rem', color: 'var(--ink)' }}>
+                                {r.authorName} <span style={{ fontSize: '0.72rem', color: 'var(--maroon)', fontWeight: 600 }}>({r.authorRole})</span>
+                              </span>
+                              <span style={{ fontSize: '0.7rem', color: 'var(--muted)', fontFamily: 'var(--font-display)' }}>
+                                {r.createdAt ? new Date(r.createdAt).toLocaleDateString() : 'Today'}
+                              </span>
+                            </div>
+                            <p style={{ margin: 0, fontSize: '0.83rem', color: 'var(--ink-2)', lineHeight: 1.5 }}>
+                              {r.replyText}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Inline Reply Form for SK Official */}
+                    {activeReplyId === c.suggestionID && (
+                      <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(118,0,49,0.1)', background: 'rgba(118,0,49,0.02)', padding: '0.75rem', borderRadius: '6px' }}>
+                        <div style={{ fontSize: '0.78rem', fontFamily: 'var(--font-display)', fontWeight: 800, color: 'var(--maroon)', marginBottom: '0.4rem' }}>
+                          Post Official SK Council Response
+                        </div>
+                        <textarea
+                          className="form-input"
+                          rows={2}
+                          value={replyInputText}
+                          onChange={e => setReplyInputText(e.target.value)}
+                          placeholder="Type official response to this suggestion…"
+                          style={{ resize: 'vertical', fontSize: '0.84rem' }}
+                        />
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => setActiveReplyId(null)}
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-primary btn-sm"
+                            disabled={isSubmittingReply || !replyInputText.trim()}
+                            onClick={() => handleSendReply(c.suggestionID)}
+                          >
+                            {isSubmittingReply ? 'Posting…' : 'Submit Response'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

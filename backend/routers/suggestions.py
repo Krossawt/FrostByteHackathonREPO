@@ -1,19 +1,20 @@
 """
 eSKala — Standalone Suggestions Router
 Suggestions are independent of any project — citizens post them to their barangay feed,
-and SK officials can read them.
+SK officials and community members can read, reply, and upvote them once.
 
-GET  /api/v1/suggestions?barangay=X  — List suggestions for a barangay (authenticated)
-POST /api/v1/suggestions              — Post a new suggestion (Citizens only)
-POST /api/v1/suggestions/{id}/vote   — Upvote a suggestion (any authenticated)
+GET  /api/v1/suggestions?barangay=X       — List suggestions for a barangay
+POST /api/v1/suggestions                   — Post a new suggestion (Citizens only)
+POST /api/v1/suggestions/{id}/vote        — Upvote a suggestion (Limit 1 per user)
+POST /api/v1/suggestions/{id}/reply       — Reply to a suggestion (SK officials & users)
 """
 
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from database import get_db
-from models import User, Suggestion, UserRole
-from schemas import SuggestionCreate, SuggestionResponse
+from models import User, Suggestion, SuggestionReply, SuggestionVote, UserRole
+from schemas import SuggestionCreate, SuggestionResponse, SuggestionReplyCreate, SuggestionReplyResponse
 from auth import require_authenticated, log_action
 
 router = APIRouter(prefix="/api/v1/suggestions", tags=["Suggestions"])
@@ -34,7 +35,7 @@ def list_suggestions(
     current_user: User = Depends(require_authenticated),
 ):
     query = db.query(Suggestion)
-    if barangay:
+    if barangay and barangay.strip() and barangay.strip().lower() not in {"all", "santa rosa city"}:
         query = query.filter(Suggestion.barangay == barangay)
     items = query.order_by(Suggestion.createdAt.desc()).offset(skip).limit(limit).all()
     return [SuggestionResponse.model_validate(s) for s in items]
@@ -77,7 +78,7 @@ def create_suggestion(
 
 
 @router.post("/{suggestion_id}/vote", response_model=SuggestionResponse,
-             summary="Upvote a suggestion (any authenticated user)")
+             summary="Upvote a suggestion (Limit 1 per user)")
 def vote_suggestion(
     suggestion_id: int,
     db: Session = Depends(get_db),
@@ -87,8 +88,60 @@ def vote_suggestion(
     if not suggestion:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Suggestion not found")
 
+    existing_vote = db.query(SuggestionVote).filter(
+        SuggestionVote.suggestionID == suggestion_id,
+        SuggestionVote.userID == current_user.userID
+    ).first()
+
+    if existing_vote:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You have already upvoted this suggestion."
+        )
+
+    vote = SuggestionVote(
+        suggestionID=suggestion_id,
+        userID=current_user.userID,
+    )
+    db.add(vote)
     suggestion.votesCount = (suggestion.votesCount or 0) + 1
     db.commit()
     db.refresh(suggestion)
+
+    return SuggestionResponse.model_validate(suggestion)
+
+
+@router.post("/{suggestion_id}/reply", response_model=SuggestionResponse,
+             summary="Reply to a suggestion (SK Officials & Community members)")
+def reply_suggestion(
+    suggestion_id: int,
+    payload: SuggestionReplyCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_authenticated),
+):
+    suggestion = db.query(Suggestion).filter(Suggestion.suggestionID == suggestion_id).first()
+    if not suggestion:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Suggestion not found")
+
+    role_val = str(getattr(current_user.userRole, 'value', current_user.userRole))
+
+    reply = SuggestionReply(
+        suggestionID=suggestion_id,
+        authorID=current_user.userID,
+        authorName=current_user.userName,
+        authorRole=role_val,
+        replyText=payload.replyText,
+    )
+    db.add(reply)
+    db.commit()
+    db.refresh(suggestion)
+
+    log_action(
+        db, current_user,
+        "Suggestion Replied",
+        "suggestions",
+        str(suggestion_id),
+        f"{current_user.userName} ({role_val}) replied to suggestion #{suggestion_id}: '{payload.replyText[:50]}'",
+    )
 
     return SuggestionResponse.model_validate(suggestion)

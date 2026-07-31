@@ -261,3 +261,34 @@ class Suggestion(Base):
 
     # Relationships
     author              = relationship("User")
+    replies             = relationship("SuggestionReply", back_populates="suggestion", cascade="all, delete-orphan", order_by="SuggestionReply.createdAt.asc()")
+
+
+# ─── TABLE: SUGGESTION REPLIES ─────────────────────────────────────────────
+
+class SuggestionReply(Base):
+    __tablename__ = "suggestion_replies"
+
+    replyID             = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    suggestionID        = Column(Integer, ForeignKey("suggestions.suggestionID", ondelete="CASCADE"), nullable=False, index=True)
+    authorID            = Column(Integer, ForeignKey("users.userID", ondelete="CASCADE"), nullable=False)
+    authorName          = Column(String(150), nullable=False)
+    authorRole          = Column(String(100), nullable=False)
+    replyText           = Column(Text, nullable=False)
+    createdAt           = Column(DateTime, default=func.now())
+
+    # Relationships
+    suggestion          = relationship("Suggestion", back_populates="replies")
+    author              = relationship("User")
+
+
+# ─── TABLE: SUGGESTION VOTES ───────────────────────────────────────────────
+
+class SuggestionVote(Base):
+    __tablename__ = "suggestion_votes"
+
+    voteID              = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    suggestionID        = Column(Integer, ForeignKey("suggestions.suggestionID", ondelete="CASCADE"), nullable=False, index=True)
+    userID              = Column(Integer, ForeignKey("users.userID", ondelete="CASCADE"), nullable=False, index=True)
+    createdAt           = Column(DateTime, default=func.now())
+

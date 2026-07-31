@@ -289,7 +289,7 @@ export async function fetchBarangayReportApi(barangayName: string): Promise<any>
 // ─── USER ACCOUNTS (SUPER ADMIN) ────────────────────────────────────────────
 
 export async function fetchUserAccountsApi(): Promise<any[]> {
-  return request<any[]>('/admin/accounts')
+  return request<any[]>('/admin/accounts?limit=300')
 }
 
 export async function createUserAccountApi(payload: {
@@ -633,6 +633,16 @@ export async function deleteAccountApi(): Promise<{ message: string }> {
 
 // ─── STANDALONE SUGGESTIONS ──────────────────────────────────────────────────
 
+export interface SuggestionReplyItem {
+  replyID: number
+  suggestionID: number
+  authorID: number
+  authorName: string
+  authorRole: string
+  replyText: string
+  createdAt: string
+}
+
 export interface SuggestionItem {
   suggestionID: number
   barangay: string
@@ -642,6 +652,7 @@ export interface SuggestionItem {
   suggestionText: string
   votesCount: number
   createdAt: string
+  replies?: SuggestionReplyItem[]
 }
 
 export async function fetchSuggestionsApi(barangay?: string): Promise<SuggestionItem[]> {
@@ -670,4 +681,12 @@ export async function voteSuggestionApi(suggestionId: number): Promise<Suggestio
     method: 'POST',
   })
 }
+
+export async function replySuggestionApi(suggestionId: number, replyText: string): Promise<SuggestionItem> {
+  return request<SuggestionItem>(`/suggestions/${suggestionId}/reply`, {
+    method: 'POST',
+    body: JSON.stringify({ replyText }),
+  })
+}
+
 
