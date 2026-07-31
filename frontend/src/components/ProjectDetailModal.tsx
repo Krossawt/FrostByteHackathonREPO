@@ -189,8 +189,6 @@ export default function ProjectDetailModal({
   const [editBarangay, setEditBarangay] = useState(project?.barangay || '')
   const [editStatus, setEditStatus] = useState<string>(normalizeProjectStatus(project))
   const [pendingStatusConfirm, setPendingStatusConfirm] = useState<string | null>(null)
-  const [quickProgress, setQuickProgress] = useState<number>(project?.progress || 0)
-  const [isSavingQuickProgress, setIsSavingQuickProgress] = useState(false)
 
   // Comment form state
   const [cText, setCText] = useState('')
@@ -216,7 +214,6 @@ export default function ProjectDetailModal({
     const safeProject = currentProject
     let active = true
     setDetailProject(safeProject)
-    setQuickProgress(safeProject.progress || 0)
     setEditTitle(safeProject.title || '')
     setEditCategory(safeProject.category || 'Education')
     setEditBudget(String(safeProject.proposedBudget || ''))
@@ -245,7 +242,6 @@ export default function ProjectDetailModal({
         if (!active) return
         const mapped = mapApiProjectToReportProject(res, safeProject.barangay)
         setDetailProject(mapped)
-        setQuickProgress(mapped.progress || 0)
         setEditTitle(mapped.title || '')
         setEditCategory(mapped.category || 'Education')
         setEditBudget(String(mapped.proposedBudget || ''))
@@ -451,25 +447,24 @@ export default function ProjectDetailModal({
     }
   }
 
-  const handleSaveQuickProgress = async (newVal?: number) => {
-    const targetVal = typeof newVal === 'number' ? newVal : quickProgress
-    if (!activeProject?.id) return
-    setIsSavingQuickProgress(true)
+  const handleConfirmStatusChange = async (targetStatus?: string) => {
+    const nextStatus = targetStatus || pendingStatusConfirm
+    if (!nextStatus || !activeProject) return
+    setPendingStatusConfirm(null)
+    setEditStatus(nextStatus)
 
     try {
       const targetId = activeProject.projectId || Number(activeProject.id)
-      const updated = await updateProjectApi(targetId, {
-        projectProgress: targetVal,
+      const res = await updateProjectApi(targetId, {
+        projectStatus: nextStatus,
       })
-      const formatted = mapApiProjectToReportProject(updated, activeProject.barangay)
-      setDetailProject(formatted)
-      setQuickProgress(formatted.progress)
-      if (onProjectUpdated) onProjectUpdated(formatted)
-      setFeedback({ type: 'success', message: `Project progress updated to ${formatted.progress}%!` })
+      const updated = mapApiProjectToReportProject(res, activeProject.barangay)
+      setDetailProject(updated)
+      setEditSnapshot(prev => ({ ...prev, status: normalizeProjectStatus(updated) }))
+      onProjectUpdated?.(updated)
+      setFeedback({ type: 'success', message: `Project status successfully updated to "${nextStatus}"!` })
     } catch (err: any) {
-      setFeedback({ type: 'info', message: err.message || 'Failed to update progress' })
-    } finally {
-      setIsSavingQuickProgress(false)
+      setFeedback({ type: 'info', message: err.message || 'Unable to update project status' })
     }
   }
 
@@ -791,84 +786,7 @@ export default function ProjectDetailModal({
                     </div>
                   </div>
 
-                  {/* ── Direct Progress Updater (Always visible for authorized users when project is selected) ── */}
-                  {canEditProject && (
-                    <div style={{
-                      background: 'linear-gradient(135deg, rgba(118, 0, 49, 0.05) 0%, rgba(180, 83, 9, 0.05) 100%)',
-                      border: '1.5px solid rgba(118, 0, 49, 0.2)',
-                      borderRadius: '12px',
-                      padding: '0.9rem 1.1rem',
-                      margin: '1.2rem 0 1rem 0',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '0.6rem',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
-                    }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                          <span style={{ fontSize: '1rem' }}>⚡</span>
-                          <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '0.88rem', color: 'var(--maroon)' }}>
-                            Project Progress Updater
-                          </span>
-                        </div>
-                        <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1rem', color: 'var(--maroon)' }}>
-                          {quickProgress}% Complete
-                        </span>
-                      </div>
 
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-                        <input
-                          type="range"
-                          min="0"
-                          max="100"
-                          step="5"
-                          value={quickProgress}
-                          onChange={e => setQuickProgress(Number(e.target.value))}
-                          style={{ flex: 1, accentColor: 'var(--maroon)', cursor: 'pointer', height: '8px' }}
-                        />
-                        <button
-                          type="button"
-                          className="btn btn-primary btn-sm"
-                          disabled={isSavingQuickProgress || quickProgress === activeProject.progress}
-                          onClick={() => handleSaveQuickProgress()}
-                          style={{ padding: '0.38rem 0.95rem', fontSize: '0.8rem', fontWeight: 700, borderRadius: '6px' }}
-                        >
-                          {isSavingQuickProgress ? 'Saving…' : 'Save Progress'}
-                        </button>
-                      </div>
-
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
-                        <div style={{ display: 'flex', gap: '0.35rem' }}>
-                          {[0, 25, 50, 75, 100].map(pct => (
-                            <button
-                              key={pct}
-                              type="button"
-                              onClick={() => {
-                                setQuickProgress(pct)
-                                handleSaveQuickProgress(pct)
-                              }}
-                              style={{
-                                padding: '0.22rem 0.6rem',
-                                fontSize: '0.74rem',
-                                borderRadius: '5px',
-                                border: quickProgress === pct ? '1.5px solid var(--maroon)' : '1px solid #d1d5db',
-                                background: quickProgress === pct ? 'var(--maroon)' : '#fff',
-                                color: quickProgress === pct ? '#fff' : '#374151',
-                                cursor: 'pointer',
-                                fontWeight: 700,
-                                transition: 'all 120ms ease',
-                              }}
-                            >
-                              {pct}%
-                            </button>
-                          ))}
-                        </div>
-                        <span style={{ fontSize: '0.72rem', color: 'var(--muted)', fontFamily: 'var(--font-display)' }}>
-                          Drag slider or click preset % to update
-                        </span>
-                      </div>
-                    </div>
-                  )}
 
                   <div style={{ margin: '1.2rem 0' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
@@ -883,6 +801,89 @@ export default function ProjectDetailModal({
                       <span>of ₱{activeProject.proposedBudget.toLocaleString()}</span>
                     </div>
                   </div>
+
+                  {/* ── Status Progression (Directly accessible when project is selected for authorized users) ── */}
+                  {canEditProject && !isEditing && (
+                    <div style={{
+                      margin: '1.25rem 0 1rem 0',
+                      background: 'rgba(118,0,49,0.03)',
+                      padding: '1rem 1.1rem',
+                      borderRadius: '12px',
+                      border: '1.5px solid rgba(118,0,49,0.18)',
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem' }}>
+                        <label className="form-label" style={{ fontWeight: 800, fontSize: '0.88rem', color: 'var(--maroon)', margin: 0 }}>
+                          ⚡ Change Project Status
+                        </label>
+                        <span style={{ fontSize: '0.76rem', fontWeight: 800, color: 'var(--maroon)', fontFamily: 'var(--font-display)', background: '#fff', padding: '0.2rem 0.6rem', borderRadius: '6px', border: '1px solid rgba(118,0,49,0.2)' }}>
+                          Status: {normalizeProjectStatus(activeProject)}
+                        </span>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem' }}>
+                        {[
+                          { key: 'Incoming', label: 'Incoming', level: 1, icon: '📌' },
+                          { key: 'In Progress', label: 'In Progress', level: 2, icon: '⚡' },
+                          { key: 'Completed', label: 'Completed', level: 3, icon: '✓' },
+                        ].map(st => {
+                          const currentLevel = getStatusLevel(normalizeProjectStatus(activeProject))
+                          const isCurrent = normalizeProjectStatus(activeProject) === st.key
+                          const isBackward = currentLevel > st.level
+                          const isDisabled = isBackward
+
+                          return (
+                            <button
+                              key={st.key}
+                              type="button"
+                              disabled={isDisabled}
+                              onClick={() => {
+                                if (!isCurrent && !isDisabled) {
+                                  setPendingStatusConfirm(st.key)
+                                }
+                              }}
+                              style={{
+                                padding: '0.65rem 0.5rem',
+                                fontSize: '0.8rem',
+                                fontFamily: 'var(--font-display)',
+                                fontWeight: 800,
+                                borderRadius: '8px',
+                                border: isCurrent
+                                  ? '2px solid var(--maroon)'
+                                  : isDisabled
+                                  ? '1px dashed #ccc'
+                                  : '1.5px solid rgba(118,0,49,0.25)',
+                                background: isCurrent
+                                  ? 'var(--maroon)'
+                                  : isDisabled
+                                  ? '#f5f5f5'
+                                  : '#fff',
+                                color: isCurrent
+                                  ? '#fff'
+                                  : isDisabled
+                                  ? '#aaa'
+                                  : 'var(--maroon)',
+                                cursor: isDisabled ? 'not-allowed' : 'pointer',
+                                opacity: isDisabled ? 0.55 : 1,
+                                transition: 'all 150ms ease',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                gap: '0.2rem',
+                              }}
+                              title={isDisabled ? 'Status cannot be moved backwards' : isCurrent ? 'Current Status' : `Advance status to ${st.label}`}
+                            >
+                              <span style={{ fontSize: '1rem' }}>{st.icon}</span>
+                              <span>{st.label}</span>
+                              {isCurrent && <span style={{ fontSize: '0.62rem', opacity: 0.9, textTransform: 'uppercase' }}>(Current)</span>}
+                              {isDisabled && <span style={{ fontSize: '0.62rem', textTransform: 'uppercase' }}>(Locked)</span>}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--muted)', marginTop: '0.45rem', fontFamily: 'var(--font-display)' }}>
+                        ⚠️ Project status moves strictly forward (Incoming → In Progress → Completed). Past statuses cannot be reversed.
+                      </div>
+                    </div>
+                  )}
 
                   <div style={{ borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
                     <div className="page-kicker" style={{ marginBottom: '0.5rem' }}>Description</div>
@@ -1556,9 +1557,8 @@ export default function ProjectDetailModal({
         danger={false}
         onConfirm={() => {
           if (pendingStatusConfirm) {
-            setEditStatus(pendingStatusConfirm)
+            handleConfirmStatusChange(pendingStatusConfirm)
           }
-          setPendingStatusConfirm(null)
         }}
         onCancel={() => setPendingStatusConfirm(null)}
       />
