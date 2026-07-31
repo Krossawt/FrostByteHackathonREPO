@@ -3,6 +3,8 @@ eSKala — Auth Router
 POST /api/v1/auth/login
 POST /api/v1/auth/register
 GET  /api/v1/auth/me
+PATCH /api/v1/auth/users/me       (NEW - citizen profile update)
+DELETE /api/v1/auth/users/me       (NEW - citizen account soft-delete)
 POST /api/v1/auth/logout (client-side but endpoint for completeness)
 """
 
@@ -163,6 +165,78 @@ def register(payload: UserRegister, db: Session = Depends(get_db)):
 @router.get("/me", response_model=UserResponse, summary="Get current authenticated user profile")
 def get_me(current_user: User = Depends(get_current_user)):
     return UserResponse.model_validate(current_user)
+
+
+# ─── NEW ENDPOINTS FOR CITIZEN PROFILE MANAGEMENT ───────────────────────────
+
+@router.patch("/users/me", response_model=UserResponse, 
+              summary="Citizen: Update their own profile (name, barangay, photoURL)")
+def update_my_profile(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Allows authenticated citizen to update ONLY their own profile.
+    Permitted fields: name, barangay, photoURL
+    """
+    # Only allow specific fields to be updated
+    allowed_fields = {"name", "barangay", "photoURL"}
+    
+    # Extract only allowed fields from payload
+    updates = {}
+    for field in allowed_fields:
+        if field in payload and payload[field] is not None:
+            updates[field] = payload[field]
+    
+    # Map frontend field names to database column names
+    if "name" in updates:
+        current_user.userName = updates["name"]
+    if "barangay" in updates:
+        current_user.userLocation = updates["barangay"]
+    if "photoURL" in updates:
+        current_user.userProfilePicture = updates["photoURL"]
+    
+    # Save to database
+    db.commit()
+    db.refresh(current_user)
+    
+    # Log the action
+    log_action(
+        db, current_user, "Profile Updated", "users", 
+        str(current_user.userID), 
+        f"{current_user.userName} updated their profile"
+    )
+    
+    return UserResponse.model_validate(current_user)
+
+
+@router.delete("/users/me", response_model=MessageResponse,
+               summary="Citizen: Soft-delete their own account")
+def delete_my_account(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Allows authenticated citizen to soft-delete their own account.
+    Account is marked as deleted but NOT removed from database.
+    Account is also deactivated.
+    """
+    # Soft delete: mark as deleted and inactive
+    current_user.userIsDeleted = True
+    current_user.userIsActive = False
+    current_user.deletedAt = datetime.utcnow()
+    
+    db.commit()
+    
+    # Log the action
+    log_action(
+        db, current_user, "Account Deleted", "users",
+        str(current_user.userID),
+        f"Citizen {current_user.userName} soft-deleted their own account"
+    )
+    
+    return {"message": "Your account has been deleted. We're sorry to see you go!"}
 
 
 @router.post("/logout", response_model=MessageResponse, summary="Logout (client clears token)")

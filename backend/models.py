@@ -46,7 +46,6 @@ class CommentType(str, enum.Enum):
 
 
 # ─── TABLE: USERS ─────────────────────────────────────────────────────────────
-
 class User(Base):
     __tablename__ = "users"
 
@@ -66,6 +65,7 @@ class User(Base):
     userIsActive        = Column(Boolean, default=True)
     userIsDeleted       = Column(Boolean, default=False)
     lastLogin           = Column(DateTime, nullable=True)
+    deletedAt           = Column(DateTime, nullable=True)  # ADD THIS LINE
 
     # Relationships
     projects            = relationship("Project", back_populates="creator", foreign_keys="Project.projectCreatedBy")

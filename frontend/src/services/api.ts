@@ -589,21 +589,42 @@ export async function deleteNewsletterApi(newsletterId: number): Promise<any> {
   })
 }
 
-// TEMPORARY STUB — real endpoint (/api/users/me/profile) may not
-// accept `barangay` yet. This fakes a successful save locally so
-// the UI flow works; swap back to the real fetch once the backend
-// is updated to accept { name, barangay, photoURL }.
-export async function updateProfileApi(payload: { name: string; barangay: string; photoURL: string }) {
-  console.warn('[stub] updateProfileApi called — no real backend request was made.', payload)
-  await new Promise(resolve => setTimeout(resolve, 500)) // fake latency
-  return payload
+// ─── CITIZEN PROFILE MANAGEMENT ─────────────────────────────────────────────
+
+/**
+ * Update authenticated citizen's own profile
+ * Saves changes PERMANENTLY to the database
+ * @param payload { name, barangay, photoURL }
+ * @returns Updated user data
+ */
+export async function updateProfileApi(payload: { name: string; barangay: string; photoURL: string }): Promise<UserAccount> {
+  if (!payload.name?.trim()) {
+    throw new Error('Name cannot be empty')
+  }
+  if (!payload.barangay) {
+    throw new Error('Barangay is required')
+  }
+
+  const result = await request<UserAccount>('/auth/users/me', {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+
+  return result
 }
 
-// TEMPORARY STUB — replace with a real backend call once the
-// "delete my own account" endpoint exists. For now this just
-// simulates a successful delete so the UI flow can be tested.
-export async function deleteAccountApi(): Promise<void> {
-  console.warn('[stub] deleteAccountApi called — no real backend request was made.')
-  await new Promise(resolve => setTimeout(resolve, 500)) // fake latency
-  return
+/**
+ * Soft-delete authenticated citizen's own account
+ * Account is marked as deleted in database and deactivated
+ * @returns Success message
+ */
+export async function deleteAccountApi(): Promise<{ message: string }> {
+  const result = await request<{ message: string }>('/auth/users/me', {
+    method: 'DELETE',
+  })
+
+  // Clear token after successful deletion
+  setStoredToken(null)
+
+  return result
 }
