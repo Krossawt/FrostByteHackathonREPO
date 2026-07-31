@@ -225,7 +225,11 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
         category: suggestionCat,
         suggestionText: comment.trim(),
       })
-      setLocalComments((prev) => [created, ...prev])
+      const newSugg: SuggestionItem = {
+        ...created,
+        votesCount: 0,
+      }
+      setLocalComments((prev) => [newSugg, ...prev])
       setSubmitted(true)
       setComment('')
       setTimeout(() => setSubmitted(false), 4000)

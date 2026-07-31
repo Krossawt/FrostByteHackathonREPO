@@ -122,8 +122,8 @@ def require_superadmin(current_user: User = Depends(get_current_user)) -> User:
 
 
 def require_sk_officer(current_user: User = Depends(get_current_user)) -> User:
-    """Allows Chairperson, Secretary, Treasurer, or Super Admin."""
-    allowed = {UserRole.CHAIRPERSON, UserRole.SECRETARY, UserRole.TREASURER, UserRole.SUPER_ADMIN}
+    """Allows Chairperson, Secretary, Treasurer, Kagawad, or Super Admin."""
+    allowed = {UserRole.CHAIRPERSON, UserRole.SECRETARY, UserRole.TREASURER, UserRole.KAGAWAD, UserRole.SUPER_ADMIN}
     if current_user.userRole not in allowed:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="SK Officer access required")
     return current_user

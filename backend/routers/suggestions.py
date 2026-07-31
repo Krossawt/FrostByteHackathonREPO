@@ -38,6 +38,9 @@ def list_suggestions(
     if barangay and barangay.strip() and barangay.strip().lower() not in {"all", "santa rosa city"}:
         query = query.filter(Suggestion.barangay == barangay)
     items = query.order_by(Suggestion.createdAt.desc()).offset(skip).limit(limit).all()
+    for s in items:
+        if s.votesCount is None:
+            s.votesCount = 0
     return [SuggestionResponse.model_validate(s) for s in items]
 
 

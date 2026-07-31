@@ -54,8 +54,16 @@ function storeUser(user: UserAccount | null, _rememberMe = true) {
 export async function loginAsync(emailOrUsername: string, password: string, rememberMe = false): Promise<UserAccount | null> {
   try {
     const res: any = await loginApi(emailOrUsername, password)
-    const userRoleStr = (res.user?.userRole || 'Guest').toLowerCase()
-    const mappedRole = userRoleStr.includes('admin') ? 'superadmin' : userRoleStr.includes('sk') ? 'sk' : 'citizen'
+    const rawRole = String(res.user?.userRole || 'Guest')
+    const userRoleStr = rawRole.toLowerCase()
+    const isKagawad = rawRole.includes('Kagawad')
+
+    // SK Kagawads operate with Citizen functions while retaining their Kagawad title & Super Admin account management
+    const mappedRole = userRoleStr.includes('admin')
+      ? 'superadmin'
+      : (userRoleStr.includes('sk') && !isKagawad)
+        ? 'sk'
+        : 'citizen'
 
     const user: UserAccount = {
       id: String(res.user?.userID || '1'),
@@ -65,7 +73,7 @@ export async function loginAsync(emailOrUsername: string, password: string, reme
       photoURL: res.user?.userProfilePicture || undefined,
       role: mappedRole as any,
       barangay: res.user?.userLocation !== 'Santa Rosa City' ? res.user?.userLocation : undefined,
-      skPosition: res.user?.userRole?.includes('Chairperson') ? 'Chairperson' : res.user?.userRole?.includes('Secretary') ? 'Secretary' : res.user?.userRole?.includes('Treasurer') ? 'Treasurer' : undefined,
+      skPosition: isKagawad ? 'Kagawad' : res.user?.userRole?.includes('Chairperson') ? 'Chairperson' : res.user?.userRole?.includes('Secretary') ? 'Secretary' : res.user?.userRole?.includes('Treasurer') ? 'Treasurer' : undefined,
       isStaRosa: res.user?.userIsStaRosa ?? true,
       isActive: res.user?.userIsActive ?? true,
     }

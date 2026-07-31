@@ -20,6 +20,7 @@ class UserRole(str, enum.Enum):
     CHAIRPERSON  = "SK Chairperson"
     SECRETARY    = "SK Secretary"
     TREASURER    = "SK Treasurer"
+    KAGAWAD      = "SK Kagawad"
     GUEST        = "Guest"
     SYSTEM       = "System"
 

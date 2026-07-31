@@ -83,7 +83,7 @@ def create_account(
         userLocation=payload.userLocation,
         userIsStaRosa=payload.userIsStaRosa,
         userIsSK=payload.userIsSK or payload.userRole in {
-            UserRole.CHAIRPERSON, UserRole.SECRETARY, UserRole.TREASURER
+            UserRole.CHAIRPERSON, UserRole.SECRETARY, UserRole.TREASURER, UserRole.KAGAWAD
         },
         userSKTermStart=payload.userSKTermStart,
         userSKTermEnd=payload.userSKTermEnd,
@@ -131,7 +131,7 @@ def update_account(
     if "userRole" in dump and dump["userRole"]:
         role = dump.pop("userRole")
         user.userRole = role
-        user.userIsSK = role in {UserRole.CHAIRPERSON, UserRole.SECRETARY, UserRole.TREASURER}
+        user.userIsSK = role in {UserRole.CHAIRPERSON, UserRole.SECRETARY, UserRole.TREASURER, UserRole.KAGAWAD}
 
     for field, value in dump.items():
         setattr(user, field, value)

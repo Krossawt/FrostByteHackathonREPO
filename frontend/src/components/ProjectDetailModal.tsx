@@ -189,6 +189,8 @@ export default function ProjectDetailModal({
   const [editBarangay, setEditBarangay] = useState(project?.barangay || '')
   const [editStatus, setEditStatus] = useState<string>(normalizeProjectStatus(project))
   const [pendingStatusConfirm, setPendingStatusConfirm] = useState<string | null>(null)
+  const [quickProgress, setQuickProgress] = useState<number>(project?.progress || 0)
+  const [isSavingQuickProgress, setIsSavingQuickProgress] = useState(false)
 
   // Comment form state
   const [cText, setCText] = useState('')
@@ -214,6 +216,7 @@ export default function ProjectDetailModal({
     const safeProject = currentProject
     let active = true
     setDetailProject(safeProject)
+    setQuickProgress(safeProject.progress || 0)
     setEditTitle(safeProject.title || '')
     setEditCategory(safeProject.category || 'Education')
     setEditBudget(String(safeProject.proposedBudget || ''))
@@ -242,6 +245,7 @@ export default function ProjectDetailModal({
         if (!active) return
         const mapped = mapApiProjectToReportProject(res, safeProject.barangay)
         setDetailProject(mapped)
+        setQuickProgress(mapped.progress || 0)
         setEditTitle(mapped.title || '')
         setEditCategory(mapped.category || 'Education')
         setEditBudget(String(mapped.proposedBudget || ''))
@@ -304,7 +308,8 @@ export default function ProjectDetailModal({
               author: c.authorName || 'Citizen',
               text: c.commentDetails,
               type: c.commentType || 'comment',
-              upvotes: c.upvotes || 0,
+              votes: c.votesCount ?? c.votes ?? c.upvotes ?? 0,
+              upvotes: c.votesCount ?? c.votes ?? c.upvotes ?? 0,
               date: c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'Just now',
             })))
           }
@@ -443,6 +448,28 @@ export default function ProjectDetailModal({
       setOcrMsg(`❌ OCR failed: ${err.message || 'Unknown error'}. Please fill fields manually.`)
     } finally {
       setScanningOcr(false)
+    }
+  }
+
+  const handleSaveQuickProgress = async (newVal?: number) => {
+    const targetVal = typeof newVal === 'number' ? newVal : quickProgress
+    if (!activeProject?.id) return
+    setIsSavingQuickProgress(true)
+
+    try {
+      const targetId = activeProject.projectId || Number(activeProject.id)
+      const updated = await updateProjectApi(targetId, {
+        projectProgress: targetVal,
+      })
+      const formatted = mapApiProjectToReportProject(updated, activeProject.barangay)
+      setDetailProject(formatted)
+      setQuickProgress(formatted.progress)
+      if (onProjectUpdated) onProjectUpdated(formatted)
+      setFeedback({ type: 'success', message: `Project progress updated to ${formatted.progress}%!` })
+    } catch (err: any) {
+      setFeedback({ type: 'info', message: err.message || 'Failed to update progress' })
+    } finally {
+      setIsSavingQuickProgress(false)
     }
   }
 
@@ -763,6 +790,85 @@ export default function ProjectDetailModal({
                       <div className="project-modal-stat-label">Remaining</div>
                     </div>
                   </div>
+
+                  {/* ── Direct Progress Updater (Always visible for authorized users when project is selected) ── */}
+                  {canEditProject && (
+                    <div style={{
+                      background: 'linear-gradient(135deg, rgba(118, 0, 49, 0.05) 0%, rgba(180, 83, 9, 0.05) 100%)',
+                      border: '1.5px solid rgba(118, 0, 49, 0.2)',
+                      borderRadius: '12px',
+                      padding: '0.9rem 1.1rem',
+                      margin: '1.2rem 0 1rem 0',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.6rem',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                          <span style={{ fontSize: '1rem' }}>⚡</span>
+                          <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '0.88rem', color: 'var(--maroon)' }}>
+                            Project Progress Updater
+                          </span>
+                        </div>
+                        <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '1rem', color: 'var(--maroon)' }}>
+                          {quickProgress}% Complete
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          step="5"
+                          value={quickProgress}
+                          onChange={e => setQuickProgress(Number(e.target.value))}
+                          style={{ flex: 1, accentColor: 'var(--maroon)', cursor: 'pointer', height: '8px' }}
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-primary btn-sm"
+                          disabled={isSavingQuickProgress || quickProgress === activeProject.progress}
+                          onClick={() => handleSaveQuickProgress()}
+                          style={{ padding: '0.38rem 0.95rem', fontSize: '0.8rem', fontWeight: 700, borderRadius: '6px' }}
+                        >
+                          {isSavingQuickProgress ? 'Saving…' : 'Save Progress'}
+                        </button>
+                      </div>
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', gap: '0.35rem' }}>
+                          {[0, 25, 50, 75, 100].map(pct => (
+                            <button
+                              key={pct}
+                              type="button"
+                              onClick={() => {
+                                setQuickProgress(pct)
+                                handleSaveQuickProgress(pct)
+                              }}
+                              style={{
+                                padding: '0.22rem 0.6rem',
+                                fontSize: '0.74rem',
+                                borderRadius: '5px',
+                                border: quickProgress === pct ? '1.5px solid var(--maroon)' : '1px solid #d1d5db',
+                                background: quickProgress === pct ? 'var(--maroon)' : '#fff',
+                                color: quickProgress === pct ? '#fff' : '#374151',
+                                cursor: 'pointer',
+                                fontWeight: 700,
+                                transition: 'all 120ms ease',
+                              }}
+                            >
+                              {pct}%
+                            </button>
+                          ))}
+                        </div>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--muted)', fontFamily: 'var(--font-display)' }}>
+                          Drag slider or click preset % to update
+                        </span>
+                      </div>
+                    </div>
+                  )}
 
                   <div style={{ margin: '1.2rem 0' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
