@@ -48,6 +48,11 @@ function getStatusLevel(st?: string): number {
 
 export default function CitizenHome({ user }: CitizenHomeProps) {
   const barangay = user?.barangay || 'Balibago'
+  const skPosition = user?.skPosition
+  const canEditProjectCard = skPosition === 'Chairperson' || skPosition === 'Secretary'
+  const canAttachReceiptCard = skPosition === 'Chairperson' || skPosition === 'Treasurer'
+
+  const [pendingAction, setPendingAction] = useState<'edit' | 'receipt' | null>(null)
   const [summary, setSummary] = useState({ spent: 0, annualBudget: 0, remaining: 0 })
   const [localProjects, setLocalProjects] = useState<ReportProject[]>([])
   const [news, setNews] = useState<any[]>([])
@@ -437,20 +442,24 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
                           <div className="v-card-budget-label">Budget</div>
                         </div>
                         <div className="v-card-actions" style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }} onClick={e => e.stopPropagation()}>
-                          {!['ongoing', 'in progress'].includes(String(p.projectStatus || p.status).toLowerCase()) ? (
-                            <button className="btn btn-secondary btn-sm" disabled style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem', opacity: 0.65, cursor: 'not-allowed' }} title="Receipt attachment allowed only when project is Ongoing">
-                              🔒 Receipts Locked
-                            </button>
-                          ) : (
-                            <button className="btn btn-gold btn-sm" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }}
-                              onClick={() => setSelectedProject(p)}>
-                              Attach Receipt
+                          {canAttachReceiptCard && (
+                            !['ongoing', 'in progress'].includes(String(p.projectStatus || p.status).toLowerCase()) ? (
+                              <button className="btn btn-secondary btn-sm" disabled style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem', opacity: 0.65, cursor: 'not-allowed' }} title="Receipt attachment allowed only when project is Ongoing">
+                                🔒 Receipts Locked
+                              </button>
+                            ) : (
+                              <button className="btn btn-gold btn-sm" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }}
+                                onClick={() => { setSelectedProject(p); setPendingAction('receipt') }}>
+                                Attach Receipt
+                              </button>
+                            )
+                          )}
+                          {canEditProjectCard && (
+                            <button className="btn btn-secondary btn-sm" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem', fontWeight: 700 }}
+                              onClick={() => { setSelectedProject(p); setPendingAction('edit') }}>
+                              ✏️ Edit
                             </button>
                           )}
-                          <button className="btn btn-secondary btn-sm" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem', fontWeight: 700 }}
-                            onClick={() => setSelectedProject(p)}>
-                            ✏️ Edit
-                          </button>
                         </div>
                       </div>
                     </div>
@@ -640,7 +649,14 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
 
         {/* ── Modals ── */}
         {selectedProject && (
-          <ProjectDetailModal project={selectedProject} user={user} onClose={() => setSelectedProject(null)} />
+          <ProjectDetailModal
+            project={selectedProject}
+            user={user}
+            initialTab={pendingAction === 'receipt' ? 'finance' : 'overview'}
+            autoShowReceiptForm={pendingAction === 'receipt'}
+            autoEdit={pendingAction === 'edit'}
+            onClose={() => { setSelectedProject(null); setPendingAction(null) }}
+          />
         )}
 
         {showTxnModal && (

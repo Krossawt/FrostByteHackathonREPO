@@ -39,7 +39,7 @@ interface ProjectDetailModalProps {
   onClose: () => void
   initialTab?: ModalTab
   autoShowReceiptForm?: boolean
-  autoEditProject?: boolean
+  autoEdit?: boolean
   onAddReceipt?: (projectId: string, receipt: Receipt) => void
   onProjectUpdated?: (updated: ReportProject) => void
 }
@@ -103,7 +103,7 @@ export default function ProjectDetailModal({
   onClose,
   initialTab,
   autoShowReceiptForm,
-  autoEditProject,
+  autoEdit,
   onAddReceipt,
   onProjectUpdated,
 }: ProjectDetailModalProps) {
@@ -236,7 +236,7 @@ export default function ProjectDetailModal({
       desc: safeProject.description || '',
       status: normalizeProjectStatus(safeProject),
     })
-    setIsEditing(!!autoEditProject)
+    setIsEditing(!!autoEdit)
     setIsLoadingProject(true)
     setDetailError('')
 
@@ -430,14 +430,14 @@ export default function ProjectDetailModal({
       // ── Apply extracted values to form ─────────────────────────────────
       if (extractedVendor) setRVendor(extractedVendor)
       if (extractedAmount) setRAmount(extractedAmount)
-      if (extractedDate)   setRDate(extractedDate)
-      if (extractedDesc)   setRDesc(extractedDesc)
+      if (extractedDate) setRDate(extractedDate)
+      if (extractedDesc) setRDesc(extractedDesc)
 
       const found: string[] = []
       if (extractedVendor) found.push(`Vendor: "${extractedVendor}"`)
       if (extractedAmount) found.push(`Amount: ₱${Number(extractedAmount).toLocaleString()}`)
-      if (extractedDate)   found.push(`Date: ${extractedDate}`)
-      if (extractedDesc)   found.push(`Description: "${extractedDesc}"`)
+      if (extractedDate) found.push(`Date: ${extractedDate}`)
+      if (extractedDesc) found.push(`Description: "${extractedDesc}"`)
 
       if (found.length > 0) {
         setOcrMsg(`✅ OCR Complete! Extracted — ${found.join(' · ')}. Please review and correct if needed.`)
@@ -855,18 +855,18 @@ export default function ProjectDetailModal({
                                 border: isCurrent
                                   ? '2px solid var(--maroon)'
                                   : isDisabled
-                                  ? '1px dashed #ccc'
-                                  : '1.5px solid rgba(118,0,49,0.25)',
+                                    ? '1px dashed #ccc'
+                                    : '1.5px solid rgba(118,0,49,0.25)',
                                 background: isCurrent
                                   ? 'var(--maroon)'
                                   : isDisabled
-                                  ? '#f5f5f5'
-                                  : '#fff',
+                                    ? '#f5f5f5'
+                                    : '#fff',
                                 color: isCurrent
                                   ? '#fff'
                                   : isDisabled
-                                  ? '#aaa'
-                                  : 'var(--maroon)',
+                                    ? '#aaa'
+                                    : 'var(--maroon)',
                                 cursor: isDisabled ? 'not-allowed' : 'pointer',
                                 opacity: isDisabled ? 0.55 : 1,
                                 transition: 'all 150ms ease',
@@ -974,18 +974,18 @@ export default function ProjectDetailModal({
                                     border: isCurrent
                                       ? '2px solid var(--maroon)'
                                       : isDisabled
-                                      ? '1px dashed #ccc'
-                                      : '1.5px solid rgba(118,0,49,0.25)',
+                                        ? '1px dashed #ccc'
+                                        : '1.5px solid rgba(118,0,49,0.25)',
                                     background: isCurrent
                                       ? 'var(--maroon)'
                                       : isDisabled
-                                      ? '#f5f5f5'
-                                      : '#fff',
+                                        ? '#f5f5f5'
+                                        : '#fff',
                                     color: isCurrent
                                       ? '#fff'
                                       : isDisabled
-                                      ? '#aaa'
-                                      : 'var(--maroon)',
+                                        ? '#aaa'
+                                        : 'var(--maroon)',
                                     cursor: isDisabled ? 'not-allowed' : 'pointer',
                                     opacity: isDisabled ? 0.55 : 1,
                                     transition: 'all 150ms ease',

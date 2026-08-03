@@ -535,27 +535,37 @@ export default function SKProjects({ user }: SKProjectsProps) {
                       <div className="v-card-budget">₱{(p.proposedBudget / 1000).toFixed(0)}K</div>
                       <div className="v-card-budget-label">Budget</div>
                     </div>
-                    {/* SK actions */}
-                    <div className="v-card-actions" style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }} onClick={e => e.stopPropagation()}>
-                      {!['ongoing', 'in progress'].includes(String(p.projectStatus || p.status).toLowerCase()) ? (
-                        <button className="btn btn-secondary btn-sm" disabled style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem', opacity: 0.65, cursor: 'not-allowed' }} title="Receipt attachment allowed only when project is Ongoing">
-                          🔒 Receipts Locked
-                        </button>
-                      ) : (
-                        <button className="btn btn-gold btn-sm" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }}
-                          onClick={() => { setSelectedProject(p); setOpenReceiptDirect(true) }}>
-                          Attach Receipt
-                        </button>
-                      )}
-                      <button className="btn btn-secondary btn-sm" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem', fontWeight: 700 }}
-                        onClick={e => { e.stopPropagation(); openEditForm(p) }}>
-                        ✏️ Edit
-                      </button>
-                      <button className="btn btn-danger btn-sm" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }}
-                        onClick={e => { e.stopPropagation(); handleDeleteProject(p) }}>
-                        Delete
-                      </button>
-                    </div>
+                    {/* SK actions — gated by role: Chairperson sees all three,
+                        Secretary sees Edit + Delete only, Treasurer sees
+                        Attach Receipt only. */}
+                    {canShowActions && (
+                      <div className="v-card-actions" style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }} onClick={e => e.stopPropagation()}>
+                        {canAttachReceipt && (
+                          !['ongoing', 'in progress'].includes(String(p.projectStatus || p.status).toLowerCase()) ? (
+                            <button className="btn btn-secondary btn-sm" disabled style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem', opacity: 0.65, cursor: 'not-allowed' }} title="Receipt attachment allowed only when project is Ongoing">
+                              🔒 Receipts Locked
+                            </button>
+                          ) : (
+                            <button className="btn btn-gold btn-sm" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }}
+                              onClick={() => { setSelectedProject(p); setOpenReceiptDirect(true); setOpenEditDirect(false) }}>
+                              Attach Receipt
+                            </button>
+                          )
+                        )}
+                        {canEdit && (
+                          <>
+                            <button className="btn btn-secondary btn-sm" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem', fontWeight: 700 }}
+                              onClick={e => { e.stopPropagation(); setSelectedProject(p); setOpenReceiptDirect(false); setOpenEditDirect(true) }}>
+                              ✏️ Edit
+                            </button>
+                            <button className="btn btn-danger btn-sm" style={{ fontSize: '0.72rem', padding: '0.3rem 0.6rem' }}
+                              onClick={e => { e.stopPropagation(); handleDeleteProject(p) }}>
+                              Delete
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -704,18 +714,18 @@ export default function SKProjects({ user }: SKProjectsProps) {
                                   border: isCurrent
                                     ? '2px solid var(--maroon)'
                                     : isDisabled
-                                    ? '1px dashed #ccc'
-                                    : '1.5px solid rgba(118,0,49,0.25)',
+                                      ? '1px dashed #ccc'
+                                      : '1.5px solid rgba(118,0,49,0.25)',
                                   background: isCurrent
                                     ? 'var(--maroon)'
                                     : isDisabled
-                                    ? '#f5f5f5'
-                                    : '#fff',
+                                      ? '#f5f5f5'
+                                      : '#fff',
                                   color: isCurrent
                                     ? '#fff'
                                     : isDisabled
-                                    ? '#aaa'
-                                    : 'var(--maroon)',
+                                      ? '#aaa'
+                                      : 'var(--maroon)',
                                   cursor: isDisabled ? 'not-allowed' : 'pointer',
                                   opacity: isDisabled ? 0.55 : 1,
                                   transition: 'all 150ms ease',
@@ -791,7 +801,7 @@ export default function SKProjects({ user }: SKProjectsProps) {
             user={user}
             initialTab={openReceiptDirect ? 'finance' : 'overview'}
             autoShowReceiptForm={openReceiptDirect}
-            autoEditProject={openEditDirect}
+            autoEdit={openEditDirect}
             onClose={() => { setSelectedProject(null); setOpenReceiptDirect(false); setOpenEditDirect(false) }}
             onAddReceipt={handleAddReceipt}
             onProjectUpdated={handleProjectUpdated}
