@@ -501,14 +501,14 @@ function App() {
                     <button
                       type="button"
                       onClick={e => { e.preventDefault(); setPolicyType('terms') }}
-                      style={{ background: 'none', border: 'none', padding: 0, color: 'inherit', font: 'inherit', cursor: 'pointer', textAlign: 'left' }}
+                      style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}
                     >
                       Terms &amp; Conditions
                     </button>
                     <button
                       type="button"
                       onClick={e => { e.preventDefault(); setPolicyType('privacy') }}
-                      style={{ background: 'none', border: 'none', padding: 0, color: 'inherit', font: 'inherit', cursor: 'pointer', textAlign: 'left' }}
+                      style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}
                     >
                       Privacy Policy
                     </button>
