@@ -8,7 +8,7 @@ POST /api/v1/suggestions                   — Post a new suggestion (Citizens o
 POST /api/v1/suggestions/{id}/vote        — Upvote a suggestion (Limit 1 per user)
 POST /api/v1/suggestions/{id}/reply       — Reply to a suggestion (SK officials & users)
 """
-
+from moderation import check_text
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
@@ -55,6 +55,13 @@ def create_suggestion(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only registered citizens can post suggestions. SK officials manage and review them.",
+        )
+
+    is_flagged, _ = check_text(payload.suggestionText)
+    if is_flagged:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Your suggestion violates our community guidelines. Please refrain from using inappropriate languages and try again.",
         )
 
     suggestion = Suggestion(
@@ -133,6 +140,12 @@ def update_suggestion(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only edit your own suggestions.")
 
     if payload.suggestionText and payload.suggestionText.strip():
+        is_flagged, _ = check_text(payload.suggestionText)
+        if is_flagged:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Your suggestion contains inappropriate language. Please rephrase and try again.",
+            )
         suggestion.suggestionText = payload.suggestionText.strip()
     if payload.category:
         suggestion.category = payload.category
@@ -173,6 +186,13 @@ def reply_suggestion(
     suggestion = db.query(Suggestion).filter(Suggestion.suggestionID == suggestion_id).first()
     if not suggestion:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Suggestion not found")
+
+    is_flagged, _ = check_text(payload.replyText)
+    if is_flagged:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Your reply contains inappropriate language. Please rephrase and try again.",
+        )
 
     role_val = str(getattr(current_user.userRole, 'value', current_user.userRole))
 
