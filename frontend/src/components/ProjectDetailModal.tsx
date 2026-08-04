@@ -10,6 +10,7 @@ import type { ReportProject, Receipt, UserAccount } from '../types'
 import CameraCaptureModal from './CameraCaptureModal'
 import ConfirmDialog from './ConfirmDialog'
 import Portal from './Portal'
+import DateInput from './DateInput'
 import { fetchCommentsApi, fetchProjectByIdApi, updateProjectApi, postCommentApi, createPurchaseOrderApi, fetchPurchaseOrdersApi, uploadReceiptImageApi, resolveImageUrl, normalizeProjectStatus, isProjectOngoing } from '../services/api'
 
 const CATEGORY_IMAGES: Record<string, string> = {
@@ -1015,11 +1016,11 @@ export default function ProjectDetailModal({
                         <div className="form-row-2">
                           <div className="form-group">
                             <label className="form-label">Start Date</label>
-                            <input className="form-input" type="date" value={editStart} onChange={e => setEditStart(e.target.value)} />
+                            <DateInput className="form-input" value={editStart} onChange={setEditStart} />
                           </div>
                           <div className="form-group">
                             <label className="form-label">End Date</label>
-                            <input className="form-input" type="date" value={editEnd} onChange={e => setEditEnd(e.target.value)} />
+                            <DateInput className="form-input" value={editEnd} onChange={setEditEnd} />
                           </div>
                         </div>
                         <div className="form-group">
@@ -1317,7 +1318,7 @@ export default function ProjectDetailModal({
                       <div className="form-row-2">
                         <div className="form-group">
                           <label className="form-label">Date *</label>
-                          <input className="form-input" type="date" value={rDate} onChange={e => setRDate(e.target.value)} />
+                          <DateInput className="form-input" value={rDate} onChange={setRDate} />
                         </div>
                         <div className="form-group">
                           <label className="form-label">Description / Purpose</label>

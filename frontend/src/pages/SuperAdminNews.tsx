@@ -3,6 +3,7 @@ import type { NewsItem } from '../types'
 import ConfirmDialog from '../components/ConfirmDialog'
 import Portal from '../components/Portal'
 import { fetchNewsApi, createNewsletterApi, updateNewsletterApi, deleteNewsletterApi, uploadNewsImageApi, resolveImageUrl } from '../services/api'
+import DateInput from '../components/DateInput'
 
 const CATEGORIES = ['Transparency', 'Youth Programs', 'SK Update', 'Health', 'Education', 'Environment', 'Sports', 'City News', 'Emergency']
 
@@ -375,7 +376,7 @@ export default function SuperAdminNews() {
                       </div>
                       <div className="form-group">
                         <label className="form-label">Date Published *</label>
-                        <input className="form-input" type="date" value={formDate} onChange={e => setFormDate(e.target.value)} required />
+                        <DateInput className="form-input" value={formDate} onChange={setFormDate} />
                       </div>
                     </div>
 

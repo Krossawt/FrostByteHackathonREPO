@@ -241,6 +241,25 @@ export default function Landing() {
 
   return (
     <div className="landing-container">
+      <style>{`
+        @media (max-width: 400px) {
+          .brgy-budget-row {
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: 0.15rem !important;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px dashed rgba(118, 0, 49, 0.1);
+          }
+          .brgy-budget-row:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+          }
+          .brgy-budget-row strong {
+            font-size: 1rem;
+          }
+        }
+      `}</style>
 
       {/* ── News Ticker ── */}
       <NewsTicker />
@@ -452,16 +471,16 @@ export default function Landing() {
                 <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.92rem', marginBottom: '0.5rem' }}>
                   Budget Utilization — Brgy. {selectedBrgy}
                 </div>
-                <div style={{ display: 'grid', gap: '0.35rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontFamily: 'var(--font-display)' }}>
+                <div style={{ display: 'grid', gap: '0.45rem' }}>
+                  <div className="brgy-budget-row" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontFamily: 'var(--font-display)' }}>
                     <span style={{ color: 'var(--muted)' }}>Annual Allocation:</span>
                     <strong style={{ color: 'var(--maroon)' }}>₱{(brgyData?.annualBudget ?? 0).toLocaleString()}</strong>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontFamily: 'var(--font-display)' }}>
+                  <div className="brgy-budget-row" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontFamily: 'var(--font-display)' }}>
                     <span style={{ color: 'var(--muted)' }}>Amount Disbursed:</span>
                     <strong style={{ color: '#b45309' }}>₱{(brgyData?.spent ?? 0).toLocaleString()}</strong>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontFamily: 'var(--font-display)' }}>
+                  <div className="brgy-budget-row" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', fontFamily: 'var(--font-display)' }}>
                     <span style={{ color: 'var(--muted)' }}>Remaining Balance:</span>
                     <strong style={{ color: '#166534' }}>₱{(brgyData?.remaining ?? 0).toLocaleString()}</strong>
                   </div>

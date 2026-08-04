@@ -3849,6 +3849,7 @@ tbody tr:last-child td {
     font-size: 0.92rem;
   }
 
+
   .brand-tagline {
     font-size: 0.56rem;
   }
@@ -3879,6 +3880,58 @@ tbody tr:last-child td {
     flex-direction: column;
     align-items: stretch;
     gap: 0.6rem;
+  }
+}
+
+@media (max-width: 400px) {
+  .header-inner {
+    gap: 0.35rem;
+  }
+
+  .brand-block {
+    max-width: 62%;
+  }
+
+  .brand-logos {
+    gap: 0.22rem;
+  }
+
+  .brand-logo-img {
+    height: 20px;
+  }
+
+  .brand-logo-img.logo-main {
+    height: 24px;
+  }
+
+  .brand-divider {
+    height: 16px;
+  }
+
+  .brand-tagline {
+    display: block;
+    font-size: 0.52rem;
+    white-space: normal;
+    line-height: 1.2;
+    margin-top: 0.1rem;
+  }
+
+  .mobile-only {
+    gap: 0.25rem !important;
+  }
+
+  .mobile-only .btn-sm {
+    padding: 0.38rem 0.5rem !important;
+    font-size: 0.6rem !important;
+  }
+
+  .landing-menu-toggle {
+    padding: 0.25rem !important;
+  }
+
+  .landing-menu-toggle svg {
+    width: 19px !important;
+    height: 19px !important;
   }
 }
 

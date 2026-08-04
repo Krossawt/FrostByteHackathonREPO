@@ -2,6 +2,7 @@ import { useState, useEffect, FormEvent } from 'react'
 import type { UserAccount } from '../types'
 import ProjectDetailModal from '../components/ProjectDetailModal'
 import ConfirmDialog from '../components/ConfirmDialog'
+import DateInput from '../components/DateInput'
 import type { ReportProject } from '../types'
 import Portal from '../components/Portal'
 import { fetchProjectsApi, createProjectApi, updateProjectApi, deleteProjectApi, normalizeProjectStatus, isProjectOngoing } from '../services/api'
@@ -657,17 +658,11 @@ export default function SKProjects({ user }: SKProjectsProps) {
                     <div className="form-row-2">
                       <div className="form-group">
                         <label className="form-label">Start Date *</label>
-                        <input className="form-input" type="date" value={newStart} onChange={e => setNewStart(e.target.value)} />
+                        <DateInput className="form-input" value={newStart} onChange={setNewStart} />
                       </div>
                       <div className="form-group">
                         <label className="form-label">End Date *</label>
-                        <input
-                          className="form-input"
-                          type="date"
-                          value={newEnd}
-                          min={newStart || undefined}
-                          onChange={e => setNewEnd(e.target.value)}
-                        />
+                        <DateInput className="form-input" value={newEnd} onChange={setNewEnd} min={newStart || undefined} />
                         {newEnd && newStart && new Date(newEnd) <= new Date(newStart) && (
                           <div style={{ fontSize: '0.75rem', color: '#b91c1c', fontFamily: 'var(--font-display)', fontWeight: 600, marginTop: '0.25rem' }}>
                             End date must be after start date

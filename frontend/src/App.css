@@ -37,3 +37,30 @@
 .account-table tr:hover {
   background: rgba(254, 236, 65, 0.12);
 }
+
+/* ─── Native date input — right-aligned, consistent sizing ──────────────────── */
+input[type="date"].form-input {
+  text-align: right;
+  font-size: 0.85rem;
+}
+
+/* Chrome / Edge / Android Chrome — the actual text field inside the input */
+input[type="date"].form-input::-webkit-datetime-edit {
+  text-align: right;
+  font-size: 0.85rem;
+}
+
+input[type="date"].form-input::-webkit-datetime-edit-fields-wrapper {
+  text-align: right;
+}
+
+/* Safari (desktop + iOS) renders the whole value as one block */
+input[type="date"].form-input::-webkit-date-and-time-value {
+  text-align: right;
+}
+
+/* Push the calendar icon to sit flush at the far right, consistent everywhere */
+input[type="date"].form-input::-webkit-calendar-picker-indicator {
+  margin-left: 0.5rem;
+  padding: 0;
+}
