@@ -89,12 +89,70 @@ export default function BarangayTransactionsModal({ barangay, onClose }: Baranga
 
   return (
     <Portal>
+      <style>{`
+        .txn-modal-overlay {
+          padding-top: 5.5rem;
+        }
+        .txn-modal {
+          width: min(840px, 95vw);
+          max-height: 82vh;
+        }
+        .txn-modal-body {
+          min-height: 0;
+        }
+        .txn-table-wrap {
+          width: 100%;
+          max-width: 100%;
+          overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
+        }
+        .txn-table {
+          min-width: 560px;
+        }
+
+        /* iPhone SE / small phones — same look, just scaled to fit */
+        @media (max-width: 400px) {
+          .txn-modal-overlay {
+            padding-top: 1rem !important;
+            padding-bottom: 1rem !important;
+            padding-left: 0.5rem;
+            padding-right: 0.5rem;
+          }
+          .txn-modal {
+            width: 100% !important;
+            max-width: 100vw;
+            max-height: 92vh !important;
+          }
+          .txn-modal-body {
+            padding: 0.9rem 0.85rem !important;
+          }
+          .txn-table-wrap {
+            border-left: none !important;
+            border-right: none !important;
+          }
+          .txn-table {
+            min-width: 480px;
+            font-size: 0.78rem;
+          }
+          .txn-table th,
+          .txn-table td {
+            padding: 0.5rem 0.6rem !important;
+          }
+          .txn-metrics {
+            margin-bottom: 0.6rem !important;
+            gap: 0.5rem !important;
+          }
+          .txn-search-row {
+            margin-bottom: 0.5rem !important;
+          }
+        }
+      `}</style>
       <div
-        className="modal-overlay"
-        style={{ paddingTop: '5.5rem', paddingBottom: '2rem', alignItems: 'flex-start' }}
+        className="modal-overlay txn-modal-overlay"
+        style={{ paddingBottom: '2rem', alignItems: 'flex-start' }}
         onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
       >
-        <div className="modal" style={{ width: 'min(840px, 95vw)', maxHeight: '82vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div className="modal txn-modal" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
           {/* Modal Header */}
           <div className="modal-header" style={{ background: 'linear-gradient(135deg, var(--maroon) 0%, var(--maroon-dark) 100%)', color: '#fff', padding: '1.1rem 1.5rem', flexShrink: 0 }}>
@@ -113,7 +171,7 @@ export default function BarangayTransactionsModal({ barangay, onClose }: Baranga
             </button>
           </div>
 
-          <div className="modal-body" style={{ padding: '1.2rem 1.5rem', overflowY: 'auto', flex: 1 }}>
+          <div className="modal-body txn-modal-body" style={{ padding: '1.2rem 1.5rem', overflowY: 'auto', flex: 1, minHeight: 0 }}>
 
             {isLoading ? (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '3rem', gap: '0.75rem', color: 'var(--muted)' }}>
@@ -129,7 +187,7 @@ export default function BarangayTransactionsModal({ barangay, onClose }: Baranga
             ) : (
               <>
                 {/* Top Metrics */}
-                <div className="card-grid card-grid-2" style={{ marginBottom: '1.2rem' }}>
+                <div className="card-grid card-grid-2 txn-metrics" style={{ marginBottom: '1.2rem' }}>
                   <div className="stat-card card-accent" style={{ padding: '0.85rem 1.2rem' }}>
                     <div className="stat-value" style={{ fontSize: '1.4rem' }}>
                       ₱{Math.round(totalDisbursed).toLocaleString('en-PH')}
@@ -145,24 +203,23 @@ export default function BarangayTransactionsModal({ barangay, onClose }: Baranga
                 </div>
 
                 {/* Search */}
-                <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
-                  <div className="search-wrap" style={{ flex: 1, minWidth: '220px' }}>
-                    <svg className="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
-                    </svg>
-                    <input
-                      className="search-input"
-                      type="text"
-                      placeholder="Search vendor or project…"
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                    />
-                  </div>
+                <div className="txn-search-row" style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>                  <div className="search-wrap" style={{ flex: 1, minWidth: '220px' }}>
+                  <svg className="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+                  </svg>
+                  <input
+                    className="search-input"
+                    type="text"
+                    placeholder="Search vendor or project…"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                </div>
                 </div>
 
                 {/* Table */}
                 {filtered.length > 0 ? (
-                  <div style={{ background: '#fff', border: '1.5px solid rgba(118,0,49,0.12)', overflowX: 'auto' }}>
+                  <div className="txn-table-wrap" style={{ background: '#fff', border: '1.5px solid rgba(118,0,49,0.12)' }}>
                     <table className="txn-table">
                       <thead>
                         <tr>

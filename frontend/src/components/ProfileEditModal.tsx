@@ -160,7 +160,7 @@ export default function ProfileEditModal({ user, onClose, onDiscard, onSave, onD
                 onClick={e => { if (e.target === e.currentTarget) requestClose() }}
             >
                 <div className="modal" style={{ width: 'min(520px, 95vw)', maxHeight: '92vh', display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden', borderRadius: '24px', border: '1px solid rgba(255,255,255,0.4)', boxShadow: '0 24px 60px rgba(0,0,0,0.35)' }}>
-                    
+
                     {/* Top Decorative Banner */}
                     <div style={{
                         background: 'linear-gradient(135deg, #760031 0%, #4a001f 60%, #1a000b 100%)',
@@ -178,17 +178,19 @@ export default function ProfileEditModal({ user, onClose, onDiscard, onSave, onD
                                 background: 'rgba(255,255,255,0.15)', color: '#fff',
                                 border: 'none', borderRadius: '50%', width: '32px', height: '32px',
                                 cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                backdropFilter: 'blur(8px)'
+                                backdropFilter: 'blur(8px)', flexShrink: 0, zIndex: 2
                             }}
                         >
                             ✕
                         </button>
-                        <div style={{ fontSize: '0.75rem', letterSpacing: '0.15em', textTransform: 'uppercase', color: '#FEEC41', fontWeight: 800, marginBottom: '0.2rem' }}>
-                            CITIZEN ACCOUNT MANAGEMENT
+                        <div style={{ padding: '0 2.5rem' }}>
+                            <div style={{ fontSize: 'clamp(0.62rem, 2.6vw, 0.75rem)', letterSpacing: '0.1em', textTransform: 'uppercase', color: '#FEEC41', fontWeight: 800, marginBottom: '0.2rem' }}>
+                                CITIZEN ACCOUNT MANAGEMENT
+                            </div>
+                            <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: 'clamp(1.1rem, 4.5vw, 1.4rem)', margin: 0, color: '#fff' }}>
+                                My Profile Settings
+                            </h2>
                         </div>
-                        <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: '1.4rem', margin: 0, color: '#fff' }}>
-                            My Profile Settings
-                        </h2>
                     </div>
 
                     {/* Avatar Header overlap */}
@@ -361,15 +363,25 @@ export default function ProfileEditModal({ user, onClose, onDiscard, onSave, onD
                                         🗑️ Delete Account
                                     </button>
                                 ) : (
-                                    <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', padding: '0.85rem', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                                        <span style={{ fontSize: '0.82rem', color: '#991b1b', fontWeight: 700 }}>
+                                    <div style={{ background: '#ffffff', border: '1.5px solid #dc2626', padding: '1rem', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '0.75rem', boxShadow: '0 2px 10px rgba(220,38,38,0.1)' }}>
+                                        <style>{`
+                                            @media (max-width: 480px) {
+                                                .delete-confirm-actions { flex-direction: column; }
+                                                .delete-confirm-actions button { width: 100%; }
+                                            }
+                                        `}</style>
+                                        <span style={{ fontSize: '0.85rem', color: '#7f1d1d', fontWeight: 700, lineHeight: 1.45 }}>
                                             ⚠️ Permanent Action: Are you sure you want to delete your citizen account?
                                         </span>
-                                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                        <div className="delete-confirm-actions" style={{ display: 'flex', gap: '0.5rem' }}>
                                             <button
                                                 type="button"
-                                                className="btn btn-secondary btn-sm"
-                                                style={{ flex: 1, fontWeight: 700 }}
+                                                className="btn btn-sm"
+                                                style={{
+                                                    flex: 1, minWidth: 0, fontWeight: 800,
+                                                    background: '#fff', color: '#166534',
+                                                    border: '1.5px solid #166534'
+                                                }}
                                                 onClick={() => setConfirmingDelete(false)}
                                                 disabled={deleting}
                                             >
@@ -377,8 +389,8 @@ export default function ProfileEditModal({ user, onClose, onDiscard, onSave, onD
                                             </button>
                                             <button
                                                 type="button"
-                                                className="btn btn-danger btn-sm"
-                                                style={{ flex: 1, fontWeight: 800, background: '#dc2626' }}
+                                                className="btn btn-sm"
+                                                style={{ flex: 1, minWidth: 0, fontWeight: 800, background: '#dc2626', color: '#fff', border: 'none' }}
                                                 onClick={handleDeleteAccount}
                                                 disabled={deleting}
                                             >

@@ -311,8 +311,8 @@ function App() {
                 </>
               )}
 
-              {/* Profile icon — kept OUTSIDE the hamburger dropdown, always visible on mobile */}
-              {user && (
+              {/* Profile icon — kept OUTSIDE the hamburger dropdown, always visible on mobile — citizens only */}
+              {user?.role === 'citizen' && (
                 <button
                   className="profile-icon-btn"
                   onClick={() => setShowProfileModal(true)}

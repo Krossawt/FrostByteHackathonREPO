@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import type { UserAccount, ReportProject } from '../types'
 import ProjectDetailModal from '../components/ProjectDetailModal'
 import BarangayTransactionsModal from '../components/BarangayTransactionsModal'
 import { DonutChart } from '../components/MiniChart'
 import SingleNewsCarousel from '../components/SingleNewsCarousel'
+import ConfirmDialog from '../components/ConfirmDialog'
 import { fetchProjectsApi, fetchBarangayReportApi, fetchNewsApi, fetchSuggestionsApi, voteSuggestionApi, replySuggestionApi, normalizeProjectStatus } from '../services/api'
 import type { SuggestionItem } from '../services/api'
 import Portal from '../components/Portal'
@@ -227,6 +229,14 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
   const [activeReplyId, setActiveReplyId] = useState<number | null>(null)
   const [replyInputText, setReplyInputText] = useState('')
   const [isSubmittingReply, setIsSubmittingReply] = useState(false)
+  const [confirmDiscardReply, setConfirmDiscardReply] = useState(false)
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'info'; message: string } | null>(null)
+
+  useEffect(() => {
+    if (!feedback) return
+    const timer = setTimeout(() => setFeedback(null), 3000)
+    return () => clearTimeout(timer)
+  }, [feedback])
 
   const handleVote = async (id: number) => {
     const alreadyVoted = votedIds.has(id)
@@ -239,6 +249,7 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
         else next.add(id)
         return next
       })
+      setFeedback({ type: 'success', message: alreadyVoted ? 'Acknowledgment removed' : 'Suggestion acknowledged' })
     } catch {
       setLocalComments((prev) => prev.map((c) => {
         if (c.suggestionID !== id) return c
@@ -262,11 +273,27 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
       setLocalComments((prev) => prev.map((c) => c.suggestionID === suggestionId ? updated : c))
       setReplyInputText('')
       setActiveReplyId(null)
+      setFeedback({ type: 'success', message: 'Response posted successfully' })
     } catch (err: any) {
       console.warn('API error sending reply:', err)
     } finally {
       setIsSubmittingReply(false)
     }
+  }
+
+  const handleCancelReply = () => {
+    if (replyInputText.trim()) {
+      setConfirmDiscardReply(true)
+    } else {
+      setActiveReplyId(null)
+    }
+  }
+
+  const confirmDiscardReplyAction = () => {
+    setConfirmDiscardReply(false)
+    setReplyInputText('')
+    setActiveReplyId(null)
+    setFeedback({ type: 'info', message: 'Response discarded' })
   }
 
   return (
@@ -297,6 +324,124 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
               display: none !important;
             }
           }
+
+          .header-action-cluster {
+            display: flex;
+            flex-direction: column;
+            gap: 0.6rem;
+            align-self: flex-start;
+            margin-top: 0.4rem;
+            align-items: flex-end;
+          }
+          .btn-community-feed {
+            width: 100%;
+            justify-content: center;
+            display: inline-flex;
+            align-items: center;
+          }
+          .header-action-row {
+            display: flex;
+            gap: 0.6rem;
+            width: 100%;
+            justify-content: flex-end;
+          }
+
+          @media (max-width: 480px) {
+            .header-action-cluster {
+              width: 100%;
+              align-items: stretch;
+            }
+            .header-action-row {
+              gap: 0.4rem;
+            }
+            .header-action-row .btn {
+              min-width: 0;
+              justify-content: center;
+              padding-left: 0.4rem;
+              padding-right: 0.4rem;
+              font-size: 0.68rem;
+              white-space: nowrap;
+              gap: 0.25rem !important;
+            }
+            .header-action-row .btn svg {
+              width: 12px;
+              height: 12px;
+              flex-shrink: 0;
+            }
+            .header-action-row .view-report-btn {
+              flex: 0.85 1 0;
+            }
+            .header-action-row .btn-gold {
+              flex: 1.15 1 0;
+            }
+          }
+
+          @media (max-width: 360px) {
+            .header-action-row .btn {
+              font-size: 0.62rem;
+              padding-left: 0.3rem;
+              padding-right: 0.3rem;
+            }
+          }
+
+          /* Suggestion card — category badge */
+          .comment-category-badge {
+            margin-left: 0.4rem;
+            font-size: 0.72rem;
+            color: var(--muted);
+            background: rgba(118,0,49,0.07);
+            padding: 0.1rem 0.5rem;
+            border-radius: 12px;
+            font-family: var(--font-display);
+            font-weight: 600;
+            display: inline-block;
+          }
+
+          /* Suggestion card — footer actions */
+          .comment-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px solid rgba(118,0,49,0.06);
+            padding-top: 0.5rem;
+            margin-top: 0.4rem;
+          }
+          .comment-actions {
+            display: flex;
+            gap: 0.8rem;
+            align-items: center;
+          }
+          .comment-submission-meta {
+            font-size: 0.72rem;
+            color: var(--muted);
+            font-family: var(--font-display);
+            text-align: right;
+          }
+
+          @media (max-width: 640px) {
+          .comment-category-badge {
+            display: inline-block;
+            width: fit-content;
+            margin-left: 0;
+            margin-top: 0.25rem;
+          }
+          .comment-footer {
+            flex-wrap: wrap;
+          }
+          .comment-actions {
+            width: 100%;
+              justify-content: space-between;
+            }
+            .comment-submission-meta {
+              width: 100%;
+              margin-top: 0.35rem;
+            }
+          }
+
+          @keyframes toastPop {
+            from { opacity: 0; transform: translateX(-50%) translateY(-12px) scale(0.96); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+          }
         `}</style>
 
         {/* ── Page Intro ── */}
@@ -308,29 +453,41 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
               Track Barangay {barangay}'s SK budget utilization, active projects, and community engagement. Click any project card to inspect financial details and leave feedback.
             </p>
           </div>
-          <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignSelf: 'flex-start', marginTop: '0.4rem' }}>
-            <button
-              className="btn btn-sm view-report-btn"
-              onClick={() => setShowReportModal(true)}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+          <div className="header-action-cluster">
+            <a
+              href="#community-feed"
+              onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
+                e.preventDefault()
+                document.getElementById('community-feed')?.scrollIntoView({ behavior: 'smooth' })
+              }}
+              className="btn btn-secondary btn-sm btn-community-feed"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <polyline points="14 2 14 8 20 8" />
-                <path d="M9 13h6M9 17h6M9 9h1" strokeWidth="1.6" />
-              </svg>
-              View Report
-            </button>
-            <button
-              className="btn btn-gold btn-sm"
-              onClick={() => setShowTxnModal(true)}
-              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" />
-              </svg>
-              Track Funds &amp; Receipts
-            </button>
+              View Community Feed ↓
+            </a>
+            <div className="header-action-row">
+              <button
+                className="btn btn-sm view-report-btn"
+                onClick={() => setShowReportModal(true)}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                  <path d="M9 13h6M9 17h6M9 9h1" strokeWidth="1.6" />
+                </svg>
+                View Report
+              </button>
+              <button
+                className="btn btn-gold btn-sm"
+                onClick={() => setShowTxnModal(true)}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" />
+                </svg>
+                Track Funds &amp; Receipts
+              </button>
+            </div>
           </div>
         </div>
 
@@ -474,7 +631,7 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
             )}
 
             {/* ── Citizen Suggestions Feed (Read-Only for SK Officials) ── */}
-            <div style={{ background: '#fff', border: '1.5px solid rgba(118,0,49,0.14)', boxShadow: '0 8px 24px rgba(118,0,49,0.06)', padding: '1.5rem' }}>
+            <div id="community-feed" style={{ background: '#fff', border: '1.5px solid rgba(118,0,49,0.14)', boxShadow: '0 8px 24px rgba(118,0,49,0.06)', padding: '1.5rem', scrollMarginTop: 'calc(var(--header-height, 78px) + 1rem)' }}>
               <div style={{ display: 'flex', gap: '0.85rem', alignItems: 'flex-start', marginBottom: '1.2rem', borderBottom: '1px solid rgba(118,0,49,0.08)', paddingBottom: '0.85rem' }}>
                 <div style={{ width: '42px', height: '42px', background: 'rgba(118,0,49,0.1)', color: 'var(--maroon)', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '50%', fontSize: '1.2rem', flexShrink: 0 }}>
                   💡
@@ -500,14 +657,14 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
                   </div>
                 ) : localComments.map((c) => (
                   <div key={c.suggestionID} className="comment-card" style={{ background: 'rgba(255,255,255,0.95)', border: '1.5px solid rgba(118,0,49,0.1)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
-                        <div style={{ width: '30px', height: '30px', background: 'rgba(118,0,49,0.1)', color: 'var(--maroon)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '0.8rem' }}>
+                        <div style={{ width: '30px', height: '30px', background: 'rgba(118,0,49,0.1)', color: 'var(--maroon)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '0.8rem', flexShrink: 0 }}>
                           {c.authorName?.charAt(0) ?? 'C'}
                         </div>
                         <div>
                           <span className="comment-author">{c.authorName}</span>
-                          <span style={{ marginLeft: '0.4rem', fontSize: '0.72rem', color: 'var(--muted)', background: 'rgba(118,0,49,0.07)', padding: '0.1rem 0.5rem', borderRadius: '12px', fontFamily: 'var(--font-display)', fontWeight: 600 }}>{c.category}</span>
+                          <span className="comment-category-badge">{c.category}</span>
                         </div>
                       </div>
                       <span className="comment-date">{c.createdAt ? new Date(c.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Today'}</span>
@@ -517,8 +674,8 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
                       {c.suggestionText}
                     </p>
 
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(118,0,49,0.06)', paddingTop: '0.5rem', marginTop: '0.4rem' }}>
-                      <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center' }}>
+                    <div className="comment-footer">
+                      <div className="comment-actions">
                         <button
                           type="button"
                           onClick={() => handleVote(c.suggestionID)}
@@ -571,7 +728,7 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
                         </button>
                       </div>
 
-                      <span style={{ fontSize: '0.72rem', color: 'var(--muted)', fontFamily: 'var(--font-display)' }}>
+                      <span className="comment-submission-meta">
                         Barangay {barangay} · Citizen Submission
                       </span>
                     </div>
@@ -614,22 +771,32 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
                           placeholder="Type official response to this suggestion…"
                           style={{ resize: 'vertical', fontSize: '0.84rem' }}
                         />
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
-                          <button
-                            type="button"
-                            className="btn btn-secondary btn-sm"
-                            onClick={() => setActiveReplyId(null)}
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-primary btn-sm"
-                            disabled={isSubmittingReply || !replyInputText.trim()}
-                            onClick={() => handleSendReply(c.suggestionID)}
-                          >
-                            {isSubmittingReply ? 'Posting…' : 'Submit Response'}
-                          </button>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                          {!replyInputText.trim() && (
+                            <span style={{ fontSize: '0.72rem', color: 'var(--maroon)', fontStyle: 'italic' }}>
+                              Type a response to submit
+                            </span>
+                          )}
+                          <div style={{ display: 'flex', gap: '0.5rem', marginLeft: 'auto' }}>
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              onClick={handleCancelReply}
+                              disabled={isSubmittingReply}
+                            >
+                              Cancel
+                            </button>
+                            {replyInputText.trim() && (
+                              <button
+                                type="button"
+                                className="btn btn-primary btn-sm"
+                                disabled={isSubmittingReply}
+                                onClick={() => handleSendReply(c.suggestionID)}
+                              >
+                                {isSubmittingReply ? 'Posting...' : 'Submit Response'}
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     )}
@@ -646,6 +813,51 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
           </div>
 
         </div>
+
+        <ConfirmDialog
+          isOpen={confirmDiscardReply}
+          title="Discard Response"
+          message="Your response hasn't been posted yet. Discard it?"
+          confirmLabel="Discard"
+          cancelLabel="Keep Writing"
+          variant="danger"
+          onConfirm={confirmDiscardReplyAction}
+          onCancel={() => setConfirmDiscardReply(false)}
+        />
+
+        {feedback && (
+          <Portal>
+            <div
+              style={{
+                position: 'fixed',
+                top: 'calc(var(--header-height, 78px) + 1rem)',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                zIndex: 10000,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.6rem',
+                background: feedback.type === 'success' ? 'rgba(22, 101, 52, 0.22)' : 'rgba(118, 0, 49, 0.18)',
+                backdropFilter: 'blur(16px) saturate(1.6)',
+                WebkitBackdropFilter: 'blur(16px) saturate(1.6)',
+                color: feedback.type === 'success' ? '#0d3d20' : '#5c0026',
+                fontFamily: 'var(--font-display)',
+                fontWeight: 700,
+                fontSize: '0.9rem',
+                padding: '0.9rem 1.4rem',
+                borderRadius: '14px',
+                border: '1.5px solid rgba(255, 255, 255, 0.35)',
+                boxShadow: feedback.type === 'success'
+                  ? '0 12px 32px rgba(22,101,52,0.25), inset 0 1px 0 rgba(255,255,255,0.4)'
+                  : '0 12px 32px rgba(118,0,49,0.18), inset 0 1px 0 rgba(255,255,255,0.4)',
+                maxWidth: '90vw',
+                animation: 'toastPop 220ms ease-out',
+              }}
+            >
+              <span>{feedback.message}</span>
+            </div>
+          </Portal>
+        )}
 
         {/* ── Modals ── */}
         {selectedProject && (
@@ -829,6 +1041,6 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
         )}
 
       </div>
-    </section>
+    </section >
   )
 }

@@ -727,6 +727,93 @@ export default function ProjectDetailModal({
       <Portal>
         <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
           <div className="modal project-modal">
+            <style>{`
+    .status-section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.65rem;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    .status-section-header .form-label {
+      white-space: nowrap;
+    }
+    .status-btn-grid button {
+      box-sizing: border-box;
+      width: 100%;
+      min-width: 0;
+    }
+    .receipt-form-actions {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .receipt-form-actions .btn {
+      flex: 1 1 auto;
+      min-width: 0;
+      box-sizing: border-box;
+      white-space: normal;
+      text-align: center;
+    }
+    .receipts-locked-btn {
+      white-space: normal !important;
+      text-align: left;
+      line-height: 1.4;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    @media (max-width: 400px) {
+      .status-section-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .status-btn-grid {
+        gap: 0.35rem !important;
+      }
+      .status-btn-grid button {
+        padding: 0.5rem 0.25rem !important;
+        font-size: 0.66rem !important;
+      }
+      .status-btn-grid button span:first-child {
+        font-size: 0.85rem !important;
+      }
+      .receipt-form-actions {
+        flex-direction: column;
+      }
+      .receipt-form-actions .btn {
+        width: 100%;
+        font-size: 0.78rem !important;
+      }
+      .receipts-locked-btn {
+        font-size: 0.7rem !important;
+        padding: 0.55rem 0.7rem !important;
+      }
+      .receipt-row-responsive {
+        flex-wrap: wrap;
+        align-items: flex-start;
+      }
+      .receipt-row-responsive > div:last-child {
+        width: 100%;
+        flex-direction: row !important;
+        justify-content: space-between !important;
+        align-items: center !important;
+        margin-top: 0.5rem;
+      }
+      .total-disbursed-row {
+        gap: 0.3rem !important;
+      }
+      .over-budget-badge {
+        width: 100%;
+        box-sizing: border-box;
+        margin-left: 0 !important;
+        white-space: normal;
+        line-height: 1.4;
+      }
+    }
+  `}</style>
 
             {/* ── Cover ── */}
             <div className="project-modal-cover">
@@ -815,7 +902,7 @@ export default function ProjectDetailModal({
                       borderRadius: '12px',
                       border: '1.5px solid rgba(118,0,49,0.18)',
                     }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem' }}>
+                      <div className="status-section-header">
                         <label className="form-label" style={{ fontWeight: 800, fontSize: '0.88rem', color: 'var(--maroon)', margin: 0 }}>
                           ⚡ Change Project Status
                         </label>
@@ -823,7 +910,7 @@ export default function ProjectDetailModal({
                           Status: {normalizeProjectStatus(activeProject)}
                         </span>
                       </div>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem' }}>
+                      <div className="status-btn-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem' }}>
                         {[
                           { key: 'Incoming', label: 'Incoming', level: 1, icon: '📌' },
                           { key: 'In Progress', label: 'In Progress', level: 2, icon: '⚡' },
@@ -944,7 +1031,7 @@ export default function ProjectDetailModal({
                           <label className="form-label" style={{ fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.5rem' }}>
                             Change Project Status
                           </label>
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem' }}>
+                          <div className="status-btn-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem' }}>
                             {[
                               { key: 'Incoming', label: 'Incoming', level: 1, icon: '📌' },
                               { key: 'In Progress', label: 'In Progress', level: 2, icon: '⚡' },
@@ -1084,10 +1171,10 @@ export default function ProjectDetailModal({
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
                     <div>
                       <div className="page-kicker">Financial Records</div>
-                      <div style={{ fontSize: '1.05rem', fontFamily: 'var(--font-display)', fontWeight: 800, color: 'var(--maroon)', marginTop: '0.15rem' }}>
-                        Total Disbursed: ₱{localReceipts.reduce((s, r) => s + r.amount, 0).toLocaleString()}
+                      <div className="total-disbursed-row" style={{ fontSize: '1.05rem', fontFamily: 'var(--font-display)', fontWeight: 800, color: 'var(--maroon)', marginTop: '0.15rem', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem' }}>
+                        <span>Total Disbursed: ₱{localReceipts.reduce((s, r) => s + r.amount, 0).toLocaleString()}</span>
                         {activeProject.proposedBudget > 0 && localReceipts.reduce((s, r) => s + r.amount, 0) > activeProject.proposedBudget && (
-                          <span style={{ marginLeft: '0.6rem', fontSize: '0.78rem', background: '#fee2e2', color: '#991b1b', border: '1px solid #f87171', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 800 }}>
+                          <span className="over-budget-badge" style={{ fontSize: '0.78rem', background: '#fee2e2', color: '#991b1b', border: '1px solid #f87171', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 800 }}>
                             ⚠️ OVER BUDGET (+₱{(localReceipts.reduce((s, r) => s + r.amount, 0) - activeProject.proposedBudget).toLocaleString()})
                           </span>
                         )}
@@ -1096,7 +1183,7 @@ export default function ProjectDetailModal({
                     {canManageReceipts && (
                       !isProjectOngoing(activeProject) ? (
                         <button
-                          className="btn btn-secondary btn-sm"
+                          className="btn btn-secondary btn-sm receipts-locked-btn"
                           disabled
                           style={{ opacity: 0.7, cursor: 'not-allowed', background: '#f3f4f6', color: '#6b7280', border: '1px solid #d1d5db' }}
                           title="Receipt attachment locked — project status is currently Incoming or Completed"
@@ -1237,7 +1324,7 @@ export default function ProjectDetailModal({
                           <input className="form-input" value={rDesc} onChange={e => setRDesc(e.target.value)} placeholder="Disbursement details" />
                         </div>
                       </div>
-                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
+                      <div className="receipt-form-actions">
                         <button type="submit" className="btn btn-primary btn-sm" disabled={isSubmittingReceipt}>
                           {isSubmittingReceipt ? 'Attaching & Applying…' : 'Save & Attach Receipt'}
                         </button>
@@ -1263,7 +1350,7 @@ export default function ProjectDetailModal({
                   {localReceipts.length > 0 ? (
                     <div style={{ display: 'grid', gap: '0.75rem' }}>
                       {localReceipts.map(r => (
-                        <div key={r.id} className="receipt-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', padding: '0.85rem 1rem', background: '#fff', border: '1px solid rgba(118,0,49,0.1)' }}>
+                        <div key={r.id} className="receipt-row receipt-row-responsive" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', padding: '0.85rem 1rem', background: '#fff', border: '1px solid rgba(118,0,49,0.1)' }}>
                           <div style={{ flex: 1 }}>
                             <div className="receipt-vendor" style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '0.92rem' }}>{r.vendor}</div>
                             <div className="receipt-meta" style={{ fontSize: '0.78rem', color: 'var(--muted)', marginTop: '0.1rem' }}>
@@ -1287,7 +1374,7 @@ export default function ProjectDetailModal({
                             </div>
                             <button
                               type="button"
-                              className="btn btn-secondary btn-sm"
+                              className="btn btn-secondary btn-sm receipt-view-btn"
                               style={{ padding: '0.25rem 0.65rem', fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
                               onClick={() => setViewingReceipt(r)}
                             >

@@ -1,4 +1,5 @@
 import { useState, useEffect, FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import type { UserAccount, ReportProject } from '../types'
 import ProjectDetailModal from '../components/ProjectDetailModal'
 import BarangayTransactionsModal from '../components/BarangayTransactionsModal'
@@ -8,6 +9,7 @@ import { fetchProjectsApi, fetchBarangayReportApi, fetchNewsApi, fetchSuggestion
 import type { SuggestionItem } from '../services/api'
 import Portal from '../components/Portal'
 import html2canvas from 'html2canvas'
+import ConfirmDialog from '../components/ConfirmDialog'
 import jsPDF from 'jspdf'
 
 function formatPeso(amount: number) {
@@ -243,6 +245,16 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
   const [suggestionFilter, setSuggestionFilter] = useState<'all' | 'mine'>('all')
   const [editingSuggestionId, setEditingSuggestionId] = useState<number | null>(null)
   const [editText, setEditText] = useState('')
+  const [initialEditText, setInitialEditText] = useState('')
+  const [confirmDiscardEdit, setConfirmDiscardEdit] = useState(false)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'info'; message: string } | null>(null)
+
+  useEffect(() => {
+    if (!feedback) return
+    const timer = setTimeout(() => setFeedback(null), 3000)
+    return () => clearTimeout(timer)
+  }, [feedback])
 
   const handleVote = async (id: number) => {
     const alreadyVoted = votedIds.has(id)
@@ -274,14 +286,30 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
   const handleStartEdit = (s: SuggestionItem) => {
     setEditingSuggestionId(s.suggestionID)
     setEditText(s.suggestionText)
+    setInitialEditText(s.suggestionText)
   }
 
+  const handleCancelEdit = () => {
+    if (editText.trim() !== initialEditText.trim()) {
+      setConfirmDiscardEdit(true)
+    } else {
+      setEditingSuggestionId(null)
+    }
+  }
+
+  const confirmDiscardEditAction = () => {
+    setConfirmDiscardEdit(false)
+    setEditingSuggestionId(null)
+    setEditText('')
+    setFeedback({ type: 'info', message: 'Changes discarded' })
+  }
   const handleSaveEdit = async (id: number) => {
     if (!editText.trim()) return
     try {
       const updated = await updateSuggestionApi(id, editText.trim())
       setLocalComments(prev => prev.map(c => c.suggestionID === id ? { ...c, suggestionText: updated.suggestionText } : c))
       setEditingSuggestionId(null)
+      setFeedback({ type: 'success', message: 'Suggestion updated' })
     } catch (err) {
       console.warn('Failed to update suggestion:', err)
       setLocalComments(prev => prev.map(c => c.suggestionID === id ? { ...c, suggestionText: editText.trim() } : c))
@@ -289,11 +317,18 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
     }
   }
 
-  const handleDeleteSuggestion = async (id: number) => {
-    if (!window.confirm('Are you sure you want to delete your suggestion?')) return
+  const handleDeleteSuggestion = (id: number) => {
+    setConfirmDeleteId(id)
+  }
+
+  const confirmDeleteSuggestionAction = async () => {
+    const id = confirmDeleteId
+    setConfirmDeleteId(null)
+    if (id == null) return
     try {
       await deleteSuggestionApi(id)
       setLocalComments(prev => prev.filter(c => c.suggestionID !== id))
+      setFeedback({ type: 'info', message: 'Suggestion deleted' })
     } catch (err) {
       console.warn('Failed to delete suggestion:', err)
       setLocalComments(prev => prev.filter(c => c.suggestionID !== id))
@@ -330,6 +365,91 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
               display: none !important;
             }
           }
+
+          .header-action-cluster {
+            display: flex;
+            flex-direction: column;
+            gap: 0.6rem;
+            align-self: flex-start;
+            margin-top: 0.4rem;
+            align-items: flex-end;
+          }
+          .btn-community-feed {
+            width: 100%;
+            justify-content: center;
+            display: inline-flex;
+            align-items: center;
+          }
+          .header-action-row {
+            display: flex;
+            gap: 0.6rem;
+            width: 100%;
+            justify-content: flex-end;
+          }
+
+          @media (max-width: 480px) {
+            .header-action-cluster {
+              width: 100%;
+              align-items: stretch;
+            }
+            .header-action-row {
+              gap: 0.4rem;
+            }
+            .header-action-row .btn {
+              min-width: 0;
+              justify-content: center;
+              padding-left: 0.4rem;
+              padding-right: 0.4rem;
+              font-size: 0.68rem;
+              white-space: nowrap;
+              gap: 0.25rem !important;
+            }
+            .header-action-row .btn svg {
+              width: 12px;
+              height: 12px;
+              flex-shrink: 0;
+            }
+            .header-action-row .view-report-btn {
+              flex: 0.85 1 0;
+            }
+            .header-action-row .btn-gold {
+              flex: 1.15 1 0;
+            }
+          }
+
+          @media (max-width: 360px) {
+            .header-action-row .btn {
+              font-size: 0.62rem;
+              padding-left: 0.3rem;
+              padding-right: 0.3rem;
+            }
+          }
+
+          .comment-category-badge {
+            margin-left: 0.4rem;
+            font-size: 0.72rem;
+            color: var(--muted);
+            background: rgba(118,0,49,0.07);
+            padding: 0.1rem 0.5rem;
+            border-radius: 12px;
+            font-family: var(--font-display);
+            font-weight: 600;
+            display: inline-block;
+          }
+
+          @media (max-width: 640px) {
+            .comment-category-badge {
+              display: inline-block;
+              width: fit-content;
+              margin-left: 0;
+              margin-top: 0.25rem;
+            }
+          }
+
+          @keyframes toastPop {
+            from { opacity: 0; transform: translateX(-50%) translateY(-12px) scale(0.96); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+          }
         `}</style>
 
         {/* ── Page Intro ── */}
@@ -341,29 +461,41 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
               Track Barangay {barangay}'s SK budget utilization, active projects, and community engagement. Click any project card to inspect financial details and leave feedback.
             </p>
           </div>
-          <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignSelf: 'flex-start', marginTop: '0.4rem' }}>
-            <button
-              className="btn btn-sm view-report-btn"
-              onClick={() => setShowReportModal(true)}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+          <div className="header-action-cluster">
+            <a
+              href="#community-feed"
+              onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
+                e.preventDefault()
+                document.getElementById('community-feed')?.scrollIntoView({ behavior: 'smooth' })
+              }}
+              className="btn btn-secondary btn-sm btn-community-feed"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <polyline points="14 2 14 8 20 8" />
-                <path d="M9 13h6M9 17h6M9 9h1" strokeWidth="1.6" />
-              </svg>
-              View Report
-            </button>
-            <button
-              className="btn btn-gold btn-sm"
-              onClick={() => setShowTxnModal(true)}
-              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" />
-              </svg>
-              Track Funds &amp; Receipts
-            </button>
+              View Community Feed ↓
+            </a>
+            <div className="header-action-row">
+              <button
+                className="btn btn-sm view-report-btn"
+                onClick={() => setShowReportModal(true)}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                  <path d="M9 13h6M9 17h6M9 9h1" strokeWidth="1.6" />
+                </svg>
+                View Report
+              </button>
+              <button
+                className="btn btn-gold btn-sm"
+                onClick={() => setShowTxnModal(true)}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" />
+                </svg>
+                Track Funds &amp; Receipts
+              </button>
+            </div>
           </div>
         </div>
 
@@ -491,7 +623,7 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
             )}
 
             {/* ── Facebook-Style SK Community Suggestion Post Box & Feed ── */}
-            <div style={{ background: '#fff', border: '1.5px solid rgba(118,0,49,0.14)', boxShadow: '0 8px 24px rgba(118,0,49,0.06)', padding: '1.5rem' }}>
+            <div id="community-feed" style={{ background: '#fff', border: '1.5px solid rgba(118,0,49,0.14)', boxShadow: '0 8px 24px rgba(118,0,49,0.06)', padding: '1.5rem', scrollMarginTop: 'calc(var(--header-height, 78px) + 1rem)' }}>
               <div style={{ display: 'flex', gap: '0.85rem', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid rgba(118,0,49,0.08)', paddingBottom: '0.85rem' }}>
                 <div style={{ width: '42px', height: '42px', background: 'var(--maroon)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '0.95rem', flexShrink: 0 }}>
                   {user?.name?.charAt(0) ?? 'C'}
@@ -540,8 +672,8 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
                       </select>
                     </div>
 
-                    <button type="submit" className="btn btn-primary" style={{ padding: '0.55rem 1.4rem' }}>
-                      Post Suggestion &rarr;
+                    <button type="submit" className="btn btn-primary" style={{ padding: '0.55rem 1.4rem' }} disabled={isSubmittingComment}>
+                      {isSubmittingComment ? 'Posting...' : <>Post Suggestion &rarr;</>}
                     </button>
                   </div>
                 </form>
@@ -551,7 +683,7 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
               <div style={{ marginTop: '1.8rem', borderTop: '1px solid rgba(118,0,49,0.08)', paddingTop: '1.2rem', display: 'grid', gap: '0.9rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
                   <div className="page-kicker" style={{ margin: 0 }}>Barangay {barangay} Community Posts</div>
-                  
+
                   {/* Filter Tab: All vs My Suggestions */}
                   <div style={{ display: 'flex', gap: '0.4rem', background: 'rgba(118,0,49,0.06)', padding: '3px', borderRadius: '8px' }}>
                     <button
@@ -596,151 +728,158 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
                     {suggestionFilter === 'mine' ? "You haven't posted any suggestions yet." : "No suggestions yet. Be the first to post one above!"}
                   </div>
                 ) : localComments
-                    .filter(c => suggestionFilter === 'all' || c.authorName === user?.name || c.authorID === Number(user?.id))
-                    .map((c) => {
-                  const isAuthor = c.authorName === user?.name || c.authorID === Number(user?.id)
-                  const isEditing = editingSuggestionId === c.suggestionID
+                  .filter(c => suggestionFilter === 'all' || c.authorName === user?.name || c.authorID === Number(user?.id))
+                  .map((c) => {
+                    const isAuthor = c.authorName === user?.name || c.authorID === Number(user?.id)
+                    const isEditing = editingSuggestionId === c.suggestionID
 
-                  return (
-                    <div key={c.suggestionID} className="comment-card" style={{ background: 'rgba(255,255,255,0.95)', border: isAuthor ? '1.5px solid rgba(118,0,49,0.3)' : '1.5px solid rgba(118,0,49,0.1)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
-                          <div style={{ width: '30px', height: '30px', background: 'rgba(118,0,49,0.1)', color: 'var(--maroon)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '0.8rem' }}>
-                            {c.authorName?.charAt(0) ?? 'C'}
-                          </div>
-                          <div>
-                            <span className="comment-author">{c.authorName}</span>
-                            {isAuthor && <span style={{ marginLeft: '0.3rem', fontSize: '0.7rem', fontWeight: 800, color: 'var(--maroon)', background: 'rgba(118,0,49,0.1)', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>YOU</span>}
-                            <span style={{ marginLeft: '0.4rem', fontSize: '0.72rem', color: 'var(--muted)', background: 'rgba(118,0,49,0.07)', padding: '0.1rem 0.5rem', borderRadius: '12px', fontFamily: 'var(--font-display)', fontWeight: 600 }}>{c.category}</span>
-                          </div>
-                        </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <span className="comment-date">{c.createdAt ? new Date(c.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Today'}</span>
-
-                          {/* Creator Actions: Edit & Delete */}
-                          {isAuthor && !isEditing && (
-                            <div style={{ display: 'flex', gap: '0.3rem' }}>
-                              <button
-                                type="button"
-                                onClick={() => handleStartEdit(c)}
-                                title="Edit suggestion"
-                                style={{ background: 'none', border: '1px solid rgba(0,0,0,0.12)', padding: '0.2rem 0.5rem', borderRadius: '6px', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 600, color: '#3b82f6' }}
-                              >
-                                ✏️ Edit
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteSuggestion(c.suggestionID)}
-                                title="Delete suggestion"
-                                style={{ background: 'none', border: '1px solid rgba(220,38,38,0.2)', padding: '0.2rem 0.5rem', borderRadius: '6px', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 600, color: '#dc2626' }}
-                              >
-                                🗑️ Delete
-                              </button>
+                    return (
+                      <div key={c.suggestionID} className="comment-card" style={{ background: 'rgba(255,255,255,0.95)', border: isAuthor ? '1.5px solid rgba(118,0,49,0.3)' : '1.5px solid rgba(118,0,49,0.1)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+                            <div style={{ width: '30px', height: '30px', background: 'rgba(118,0,49,0.1)', color: 'var(--maroon)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '0.8rem', flexShrink: 0 }}>
+                              {c.authorName?.charAt(0) ?? 'C'}
                             </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {isEditing ? (
-                        <div style={{ marginTop: '0.6rem', marginBottom: '0.6rem' }}>
-                          <textarea
-                            className="form-input"
-                            rows={2}
-                            value={editText}
-                            onChange={e => setEditText(e.target.value)}
-                            style={{ fontSize: '0.88rem', marginBottom: '0.4rem' }}
-                          />
-                          <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'flex-end' }}>
-                            <button
-                              type="button"
-                              className="btn btn-secondary btn-sm"
-                              onClick={() => setEditingSuggestionId(null)}
-                              style={{ padding: '0.3rem 0.7rem', fontSize: '0.75rem' }}
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              type="button"
-                              className="btn btn-primary btn-sm"
-                              onClick={() => handleSaveEdit(c.suggestionID)}
-                              style={{ padding: '0.3rem 0.9rem', fontSize: '0.75rem' }}
-                            >
-                              Save Changes
-                            </button>
+                            <div>
+                              <span className="comment-author">{c.authorName}</span>
+                              {isAuthor && <span style={{ marginLeft: '0.3rem', fontSize: '0.7rem', fontWeight: 800, color: 'var(--maroon)', background: 'rgba(118,0,49,0.1)', padding: '0.1rem 0.4rem', borderRadius: '4px' }}>YOU</span>}
+                              <span className="comment-category-badge">{c.category}</span>
+                            </div>
                           </div>
-                        </div>
-                      ) : (
-                        <p className="comment-text" style={{ margin: '0.6rem 0', fontSize: '0.88rem', color: 'var(--ink)' }}>
-                          {c.suggestionText}
-                        </p>
-                      )}
 
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(118,0,49,0.06)', paddingTop: '0.5rem', marginTop: '0.4rem' }}>
-                        <button
-                          type="button"
-                          onClick={() => handleVote(c.suggestionID)}
-                          className="link-button"
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.4rem',
-                            fontSize: '0.76rem',
-                            color: votedIds.has(c.suggestionID) ? '#15803d' : 'var(--maroon)',
-                            fontWeight: 700,
-                            fontFamily: 'var(--font-display)',
-                            lineHeight: 1,
-                            background: votedIds.has(c.suggestionID) ? 'rgba(22, 101, 52, 0.08)' : 'transparent',
-                            padding: votedIds.has(c.suggestionID) ? '0.25rem 0.6rem' : 0,
-                            borderRadius: votedIds.has(c.suggestionID) ? '6px' : 0,
-                            transition: 'all 0.15s ease',
-                          }}
-                        >
-                          <svg
-                            width="16" height="16" viewBox="0 0 24 24"
-                            fill={votedIds.has(c.suggestionID) ? '#15803d' : 'none'}
-                            stroke={votedIds.has(c.suggestionID) ? '#15803d' : 'var(--maroon)'}
-                            strokeWidth="2"
-                            strokeLinejoin="round"
-                            style={{ display: 'block', flexShrink: 0 }}
-                          >
-                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 21 12 17.77 5.82 21 7 14.14 2 9.27l6.91-1.01L12 2z" />
-                          </svg>
-                          <span style={{ lineHeight: 1 }}>
-                            {votedIds.has(c.suggestionID) ? '✓ Agreed / Helpful' : 'Agree / Helpful'} ({c.votesCount ?? 0})
-                          </span>
-                        </button>
-                        <span style={{ fontSize: '0.72rem', color: 'var(--muted)', fontFamily: 'var(--font-display)' }}>
-                          Barangay {barangay} Feed
-                        </span>
-                      </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <span className="comment-date">{c.createdAt ? new Date(c.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Today'}</span>
 
-                      {/* SK Council Responses */}
-                      {c.replies && c.replies.length > 0 && (
-                        <div style={{ marginTop: '0.75rem', paddingTop: '0.6rem', borderTop: '1px dashed rgba(118,0,49,0.12)', display: 'grid', gap: '0.5rem' }}>
-                          <div style={{ fontSize: '0.72rem', fontFamily: 'var(--font-display)', fontWeight: 800, color: 'var(--maroon)', textTransform: 'uppercase' }}>
-                            Official SK Council Responses ({c.replies.length})
-                          </div>
-                          {c.replies.map((r) => (
-                            <div key={r.replyID} style={{ background: 'rgba(118,0,49,0.04)', borderLeft: '3px solid var(--maroon)', padding: '0.6rem 0.85rem', borderRadius: '0 6px 6px 0' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
-                                <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '0.8rem', color: 'var(--ink)' }}>
-                                  {r.authorName} <span style={{ fontSize: '0.72rem', color: 'var(--maroon)', fontWeight: 600 }}>({r.authorRole})</span>
-                                </span>
-                                <span style={{ fontSize: '0.7rem', color: 'var(--muted)', fontFamily: 'var(--font-display)' }}>
-                                  {r.createdAt ? new Date(r.createdAt).toLocaleDateString() : 'Today'}
-                                </span>
+                            {/* Creator Actions: Edit & Delete */}
+                            {isAuthor && !isEditing && (
+                              <div style={{ display: 'flex', gap: '0.3rem' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleStartEdit(c)}
+                                  title="Edit suggestion"
+                                  style={{ background: 'none', border: '1px solid rgba(0,0,0,0.12)', padding: '0.2rem 0.5rem', borderRadius: '6px', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 600, color: '#3b82f6' }}
+                                >
+                                  ✏️ Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteSuggestion(c.suggestionID)}
+                                  title="Delete suggestion"
+                                  style={{ background: 'none', border: '1px solid rgba(220,38,38,0.2)', padding: '0.2rem 0.5rem', borderRadius: '6px', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 600, color: '#dc2626' }}
+                                >
+                                  🗑️ Delete
+                                </button>
                               </div>
-                              <p style={{ margin: 0, fontSize: '0.83rem', color: 'var(--ink-2)', lineHeight: 1.5 }}>
-                                {r.replyText}
-                              </p>
-                            </div>
-                          ))}
+                            )}
+                          </div>
                         </div>
-                      )}
-                    </div>
-                  )
-                })}
+
+                        {isEditing ? (
+                          <div style={{ marginTop: '0.6rem', marginBottom: '0.6rem' }}>
+                            <textarea
+                              className="form-input"
+                              rows={2}
+                              value={editText}
+                              onChange={e => setEditText(e.target.value)}
+                              style={{ fontSize: '0.88rem', marginBottom: '0.4rem' }}
+                            />
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                              {editText.trim() === initialEditText.trim() && (
+                                <span style={{ fontSize: '0.72rem', color: 'var(--maroon)', fontStyle: 'italic', marginRight: 'auto' }}>
+                                  Edit the text to save changes
+                                </span>
+                              )}
+                              <button
+                                type="button"
+                                className="btn btn-secondary btn-sm"
+                                onClick={handleCancelEdit}
+                                style={{ padding: '0.3rem 0.7rem', fontSize: '0.75rem' }}
+                              >
+                                Cancel
+                              </button>
+                              {editText.trim() !== initialEditText.trim() && (
+                                <button
+                                  type="button"
+                                  className="btn btn-primary btn-sm"
+                                  onClick={() => handleSaveEdit(c.suggestionID)}
+                                  style={{ padding: '0.3rem 0.9rem', fontSize: '0.75rem' }}
+                                >
+                                  Save Changes
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="comment-text" style={{ margin: '0.6rem 0', fontSize: '0.88rem', color: 'var(--ink)' }}>
+                            {c.suggestionText}
+                          </p>
+                        )}
+
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(118,0,49,0.06)', paddingTop: '0.5rem', marginTop: '0.4rem' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleVote(c.suggestionID)}
+                            className="link-button"
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.4rem',
+                              fontSize: '0.76rem',
+                              color: votedIds.has(c.suggestionID) ? '#15803d' : 'var(--maroon)',
+                              fontWeight: 700,
+                              fontFamily: 'var(--font-display)',
+                              lineHeight: 1,
+                              background: votedIds.has(c.suggestionID) ? 'rgba(22, 101, 52, 0.08)' : 'transparent',
+                              padding: votedIds.has(c.suggestionID) ? '0.25rem 0.6rem' : 0,
+                              borderRadius: votedIds.has(c.suggestionID) ? '6px' : 0,
+                              transition: 'all 0.15s ease',
+                            }}
+                          >
+                            <svg
+                              width="16" height="16" viewBox="0 0 24 24"
+                              fill={votedIds.has(c.suggestionID) ? '#15803d' : 'none'}
+                              stroke={votedIds.has(c.suggestionID) ? '#15803d' : 'var(--maroon)'}
+                              strokeWidth="2"
+                              strokeLinejoin="round"
+                              style={{ display: 'block', flexShrink: 0 }}
+                            >
+                              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 21 12 17.77 5.82 21 7 14.14 2 9.27l6.91-1.01L12 2z" />
+                            </svg>
+                            <span style={{ lineHeight: 1 }}>
+                              {votedIds.has(c.suggestionID) ? '✓ Agreed / Helpful' : 'Agree / Helpful'} ({c.votesCount ?? 0})
+                            </span>
+                          </button>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--muted)', fontFamily: 'var(--font-display)' }}>
+                            Barangay {barangay} Feed
+                          </span>
+                        </div>
+
+                        {/* SK Council Responses */}
+                        {c.replies && c.replies.length > 0 && (
+                          <div style={{ marginTop: '0.75rem', paddingTop: '0.6rem', borderTop: '1px dashed rgba(118,0,49,0.12)', display: 'grid', gap: '0.5rem' }}>
+                            <div style={{ fontSize: '0.72rem', fontFamily: 'var(--font-display)', fontWeight: 800, color: 'var(--maroon)', textTransform: 'uppercase' }}>
+                              Official SK Council Responses ({c.replies.length})
+                            </div>
+                            {c.replies.map((r) => (
+                              <div key={r.replyID} style={{ background: 'rgba(118,0,49,0.04)', borderLeft: '3px solid var(--maroon)', padding: '0.6rem 0.85rem', borderRadius: '0 6px 6px 0' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
+                                  <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '0.8rem', color: 'var(--ink)' }}>
+                                    {r.authorName} <span style={{ fontSize: '0.72rem', color: 'var(--maroon)', fontWeight: 600 }}>({r.authorRole})</span>
+                                  </span>
+                                  <span style={{ fontSize: '0.7rem', color: 'var(--muted)', fontFamily: 'var(--font-display)' }}>
+                                    {r.createdAt ? new Date(r.createdAt).toLocaleDateString() : 'Today'}
+                                  </span>
+                                </div>
+                                <p style={{ margin: 0, fontSize: '0.83rem', color: 'var(--ink-2)', lineHeight: 1.5 }}>
+                                  {r.replyText}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
               </div>
             </div>
 
@@ -752,6 +891,62 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
           </div>
 
         </div>
+
+        <ConfirmDialog
+          isOpen={confirmDiscardEdit}
+          title="Discard Changes"
+          message="Any unsaved edits to your suggestion will be lost. Discard them?"
+          confirmLabel="Discard"
+          cancelLabel="Keep Editing"
+          variant="danger"
+          onConfirm={confirmDiscardEditAction}
+          onCancel={() => setConfirmDiscardEdit(false)}
+        />
+
+        <ConfirmDialog
+          isOpen={confirmDeleteId !== null}
+          title="Delete Suggestion"
+          message="This will permanently delete your suggestion. Are you sure?"
+          confirmLabel="Delete"
+          cancelLabel="Keep It"
+          variant="danger"
+          onConfirm={confirmDeleteSuggestionAction}
+          onCancel={() => setConfirmDeleteId(null)}
+        />
+
+        {feedback && (
+          <Portal>
+            <div
+              style={{
+                position: 'fixed',
+                top: 'calc(var(--header-height, 78px) + 1rem)',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                zIndex: 10000,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.6rem',
+                background: feedback.type === 'success' ? 'rgba(22, 101, 52, 0.22)' : 'rgba(118, 0, 49, 0.18)',
+                backdropFilter: 'blur(16px) saturate(1.6)',
+                WebkitBackdropFilter: 'blur(16px) saturate(1.6)',
+                color: feedback.type === 'success' ? '#0d3d20' : '#5c0026',
+                fontFamily: 'var(--font-display)',
+                fontWeight: 700,
+                fontSize: '0.9rem',
+                padding: '0.9rem 1.4rem',
+                borderRadius: '14px',
+                border: '1.5px solid rgba(255, 255, 255, 0.35)',
+                boxShadow: feedback.type === 'success'
+                  ? '0 12px 32px rgba(22,101,52,0.25), inset 0 1px 0 rgba(255,255,255,0.4)'
+                  : '0 12px 32px rgba(118,0,49,0.18), inset 0 1px 0 rgba(255,255,255,0.4)',
+                maxWidth: '90vw',
+                animation: 'toastPop 220ms ease-out',
+              }}
+            >
+              <span>{feedback.message}</span>
+            </div>
+          </Portal>
+        )}
 
         {/* ── Modals ── */}
         {selectedProject && (
