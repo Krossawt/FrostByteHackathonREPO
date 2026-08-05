@@ -11,6 +11,7 @@ import type { SuggestionItem } from '../services/api'
 import Portal from '../components/Portal'
 import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
+import { formatCurrency } from '../utils/formatCurrency';
 
 function formatPeso(amount: number) {
   return `₱${Math.round(amount || 0).toLocaleString('en-PH')}`
@@ -494,17 +495,17 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
         {/* ── Financial Stat Cards ── */}
         <div className="card-grid card-grid-4" style={{ marginBottom: '1.5rem' }}>
           <div className="stat-card card-accent">
-            <div className="stat-value">₱{(budget / 1_000_000).toFixed(2)}M</div>
+            <div className="stat-value">{formatCurrency(budget)}</div>
             <div className="stat-label">Annual Budget</div>
             <div className="stat-sub">FY 2025 · SK Allocation</div>
           </div>
           <div className="stat-card" style={{ borderLeft: '3px solid #b45309' }}>
-            <div className="stat-value" style={{ color: '#b45309' }}>₱{(spent / 1_000_000).toFixed(2)}M</div>
+            <div className="stat-value" style={{ color: '#b45309' }}>{formatCurrency(spent)}</div>
             <div className="stat-label">Amount Disbursed</div>
             <div className="stat-sub">{usagePct}% of annual budget</div>
           </div>
           <div className="stat-card" style={{ borderLeft: '3px solid #166534' }}>
-            <div className="stat-value" style={{ color: '#166534' }}>₱{(remain / 1_000_000).toFixed(2)}M</div>
+            <div className="stat-value" style={{ color: '#166534' }}>{formatCurrency(remain)}</div>
             <div className="stat-label">Remaining</div>
             <div className="stat-sub">Available for projects</div>
           </div>

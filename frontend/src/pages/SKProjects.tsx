@@ -6,6 +6,7 @@ import DateInput from '../components/DateInput'
 import type { ReportProject } from '../types'
 import Portal from '../components/Portal'
 import { fetchProjectsApi, createProjectApi, updateProjectApi, deleteProjectApi, normalizeProjectStatus, isProjectOngoing } from '../services/api'
+import { formatCurrency } from '../utils/formatCurrency';
 
 interface SKProjectsProps { user?: UserAccount | null }
 
@@ -436,17 +437,17 @@ export default function SKProjects({ user }: SKProjectsProps) {
             <div className="stat-sub">{counts.ongoing} ongoing, {counts.completed} completed</div>
           </div>
           <div className="stat-card">
-            <div className="stat-value">{totalBudget === 0 ? '₱0' : `₱${(totalBudget / 1_000_000).toFixed(2)}M`}</div>
+            <div className="stat-value">{formatCurrency(totalBudget)}</div>
             <div className="stat-label">Total Budget</div>
             <div className="stat-sub">All proposed allocations</div>
           </div>
           <div className="stat-card" style={{ borderLeft: '3px solid #b45309' }}>
-            <div className="stat-value" style={{ color: '#b45309' }}>{totalSpent === 0 ? '₱0' : `₱${(totalSpent / 1_000_000).toFixed(2)}M`}</div>
+            <div className="stat-value" style={{ color: '#b45309' }}>{formatCurrency(totalSpent)}</div>
             <div className="stat-label">Total Disbursed</div>
             <div className="stat-sub">{totalBudget > 0 ? Math.round((totalSpent / totalBudget) * 100) : 0}% utilization</div>
           </div>
           <div className="stat-card" style={{ borderLeft: '3px solid #166534' }}>
-            <div className="stat-value" style={{ color: '#166534' }}>{(totalBudget - totalSpent) === 0 ? '₱0' : `₱${((totalBudget - totalSpent) / 1_000_000).toFixed(2)}M`}</div>
+            <div className="stat-value" style={{ color: '#166534' }}>{formatCurrency(totalBudget - totalSpent)}</div>
             <div className="stat-label">Remaining</div>
             <div className="stat-sub">Available for disbursement</div>
           </div>
