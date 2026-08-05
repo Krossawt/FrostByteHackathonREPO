@@ -1,18 +1,70 @@
-const TICKER_ITEMS = [
-  'SK Q1 2025 Financial Transparency Report — Now Published for All 18 Barangays',
-  'eSKala Citizen Suggestion Portal Now Active across Santa Rosa City',
-  'SK Federation President joins City Council Education Committee',
-  'CYDO Youth Leadership Summit 2025 — 400 Participants Registered',
-  'RA 11768 Amendment: Enhanced SK Fund Guidelines Effective July 2025',
-  'Santa Rosa Named Top Youth-Friendly City in Region IV-A (Calabarzon)',
-]
+import { useEffect, useState } from 'react'
+
+interface Newsletter {
+  newsletterID: number
+  title: string
+  summary?: string
+  imageURL?: string
+  category: string
+  projectLocation?: string
+  publishedAt: string
+}
 
 export default function NewsTicker() {
+  const [tickerItems, setTickerItems] = useState<string[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchNewsletters = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        
+        // Fetch from your backend API (full URL for cross-port requests)
+        const response = await fetch('http://localhost:8000/api/v1/newsletter?limit=20')
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch newsletters: ${response.statusText}`)
+        }
+        
+        const newsletters: Newsletter[] = await response.json()
+        
+        // Extract titles and create ticker items
+        const titles = newsletters.map(n => n.title)
+        setTickerItems(titles)
+        
+        // If fewer than 3 items, duplicate them to ensure smooth scrolling
+        if (titles.length < 3) {
+          setTickerItems([...titles, ...titles, ...titles])
+        }
+      } catch (err) {
+        console.error('Error fetching newsletters:', err)
+        setError(err instanceof Error ? err.message : 'Failed to load news')
+        // Fallback to empty state - ticker won't show if no data
+        setTickerItems([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchNewsletters()
+    
+    // Optional: Refresh every 5 minutes
+    const interval = setInterval(fetchNewsletters, 5 * 60 * 1000)
+    return () => clearInterval(interval)
+  }, [])
+
+  // Don't render ticker if empty or loading
+  if (loading || tickerItems.length === 0) {
+    return null
+  }
+
   return (
     <div className="news-ticker-wrap">
       <div className="news-ticker">
         <div className="ticker-track">
-          {[...TICKER_ITEMS, ...TICKER_ITEMS].map((item, i) => (
+          {[...tickerItems, ...tickerItems].map((item, i) => (
             <span key={i} className="ticker-item">
               <span className="ticker-sep">◆</span>&nbsp;{item}&nbsp;
             </span>
