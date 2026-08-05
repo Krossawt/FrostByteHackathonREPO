@@ -25,6 +25,7 @@ import ProfileEditModal from './components/ProfileEditModal'
 import { updateProfileApi, deleteAccountApi, resolveImageUrl } from './services/api'
 import Portal from './components/Portal'
 import PolicyModal from './components/PolicyModal'
+import GlobalSearchBar from './components/GlobalSearchBar'
 
 
 const PUBLIC_NAV = [
@@ -245,6 +246,9 @@ function App() {
 
             {/* Desktop Actions */}
             <div className="header-actions desktop-only">
+              {user && (
+                <GlobalSearchBar role={user.role} skPosition={user.skPosition} />
+              )}
               {user?.role === 'superadmin' && (
                 <select
                   className="barangay-select-header"
@@ -291,6 +295,9 @@ function App() {
 
             {/* Mobile Actions + Hamburger */}
             <div className="mobile-only" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              {user && (
+                <GlobalSearchBar role={user.role} skPosition={user.skPosition} />
+              )}
               {user?.role === 'superadmin' && (
                 <select
                   className="barangay-select-header"

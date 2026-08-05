@@ -976,6 +976,307 @@ select.login-input {
   flex-shrink: 0;
 }
 
+/* ─── GLOBAL SEARCH BAR ──────────────────────────────────────────────────────── */
+
+/* Trigger button in the header */
+.gsb-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.42rem 0.85rem;
+  border: 1.5px solid rgba(118, 0, 49, 0.18);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.75);
+  color: var(--muted);
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 180ms ease, background 180ms ease, color 180ms ease, box-shadow 180ms ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.gsb-trigger:hover {
+  border-color: var(--maroon);
+  background: rgba(255, 255, 255, 0.97);
+  color: var(--maroon);
+  box-shadow: 0 0 0 3px rgba(118, 0, 49, 0.06);
+}
+
+.gsb-trigger-label {
+  font-size: 0.79rem;
+  color: inherit;
+}
+
+.gsb-kbd {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.4rem;
+  background: rgba(118, 0, 49, 0.06);
+  border: 1px solid rgba(118, 0, 49, 0.14);
+  border-radius: 4px;
+  font-family: var(--font-body);
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+
+/* Full-screen overlay */
+.gsb-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(10, 5, 15, 0.55);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: clamp(5vh, 8vh, 100px);
+  animation: gsb-fade-in 160ms ease;
+}
+
+@keyframes gsb-fade-in {
+  from { opacity: 0 }
+  to   { opacity: 1 }
+}
+
+/* Modal card */
+.gsb-modal {
+  width: min(640px, calc(100vw - 2rem));
+  background: rgba(255, 255, 255, 0.99);
+  border-radius: 16px;
+  box-shadow:
+    0 0 0 1px rgba(118, 0, 49, 0.10),
+    0 8px 32px rgba(0, 0, 0, 0.18),
+    0 32px 80px rgba(118, 0, 49, 0.10);
+  overflow: hidden;
+  animation: gsb-slide-in 180ms cubic-bezier(0.34, 1.26, 0.64, 1);
+}
+
+@keyframes gsb-slide-in {
+  from { opacity: 0; transform: translateY(-14px) scale(0.97) }
+  to   { opacity: 1; transform: translateY(0)    scale(1) }
+}
+
+/* Input row */
+.gsb-input-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1.5px solid rgba(118, 0, 49, 0.10);
+}
+
+.gsb-input-icon {
+  color: var(--maroon);
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+
+.gsb-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: var(--font-body);
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--ink);
+  line-height: 1.5;
+  caret-color: var(--maroon);
+}
+
+.gsb-input::placeholder {
+  color: var(--muted-light);
+  font-weight: 400;
+}
+
+.gsb-clear {
+  display: flex;
+  align-items: center;
+  padding: 0.25rem;
+  border: none;
+  background: rgba(118, 0, 49, 0.07);
+  border-radius: 50%;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 150ms;
+}
+.gsb-clear:hover { background: rgba(118, 0, 49, 0.14); color: var(--maroon); }
+
+.gsb-close-btn {
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.gsb-kbd--esc {
+  font-size: 0.7rem;
+  padding: 0.15rem 0.45rem;
+}
+
+/* Results area */
+.gsb-results-wrap {
+  max-height: 420px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Result list */
+.gsb-list {
+  list-style: none;
+  padding: 0.5rem 0;
+}
+
+.gsb-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 1.25rem;
+  cursor: pointer;
+  border-radius: 0;
+  transition: background 100ms ease;
+  border-left: 3px solid transparent;
+}
+
+.gsb-item:hover,
+.gsb-item--active {
+  background: rgba(118, 0, 49, 0.04);
+  border-left-color: var(--maroon);
+}
+
+.gsb-item-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.gsb-item-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.gsb-item-label {
+  display: block;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gsb-item-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.6rem;
+  border: 1px solid;
+  border-radius: 20px;
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.gsb-item-arrow {
+  font-size: 0.85rem;
+  color: var(--muted-light);
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 120ms;
+}
+
+.gsb-item--active .gsb-item-arrow,
+.gsb-item:hover .gsb-item-arrow {
+  opacity: 1;
+}
+
+/* Empty state */
+.gsb-empty {
+  padding: 2.5rem 2rem;
+  text-align: center;
+}
+
+.gsb-empty-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(118, 0, 49, 0.06);
+  color: var(--muted-light);
+  margin-bottom: 1rem;
+}
+
+.gsb-empty-title {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--ink-2);
+  margin-bottom: 0.3rem;
+}
+
+.gsb-empty-sub {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+/* Footer */
+.gsb-footer {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+  padding: 0.7rem 1.25rem;
+  border-top: 1.5px solid rgba(118, 0, 49, 0.08);
+  background: rgba(248, 246, 240, 0.6);
+  font-size: 0.73rem;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.gsb-kbd-sm {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.32rem;
+  background: rgba(118, 0, 49, 0.06);
+  border: 1px solid rgba(118, 0, 49, 0.12);
+  border-radius: 3px;
+  font-family: var(--font-body);
+  font-size: 0.66rem;
+  font-weight: 600;
+  color: var(--muted);
+  margin-right: 0.25rem;
+}
+
+/* Mobile: hide kbd hint on trigger */
+@media (max-width: 768px) {
+  .gsb-trigger .gsb-kbd {
+    display: none;
+  }
+  .gsb-trigger-label {
+    display: none;
+  }
+  .gsb-trigger {
+    padding: 0.45rem;
+    border-radius: 8px;
+  }
+}
+
+
+
 .user-chip {
   display: flex;
   align-items: center;
