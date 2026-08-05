@@ -10,17 +10,19 @@ POST /api/v1/auth/logout (client-side but endpoint for completeness)
 
 from collections import defaultdict
 import time
+import secrets
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from database import get_db
 from models import User, UserRole, AuditLog
-from schemas import UserLogin, UserRegister, Token, UserResponse, MessageResponse
+from schemas import UserLogin, UserRegister, Token, UserResponse, MessageResponse, SendOtpRequest
 from auth import (
     verify_password, hash_password, create_access_token,
     get_current_user, log_action,
     ACCESS_TOKEN_EXPIRE_MINUTES
 )
+from email_service import send_otp_email
 import os
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
@@ -30,6 +32,12 @@ LOCKOUT_THRESHOLD = 5
 LOCKOUT_DURATION = 900  # 15 minutes in seconds
 
 DUMMY_HASH = "$2b$12$e83W.D1yM/m1.5Q3b2Q7O.X8.G5g5.X8G5g5X8G5g5X8G5g5X8G5g"
+
+# ─── OTP STORE ────────────────────────────────────────────────────────────────
+# In-memory: { email: { 'otp': str, 'expires_at': float, 'name': str } }
+OTP_STORE: dict[str, dict] = {}
+OTP_TTL_SECONDS = 300        # 5 minutes
+OTP_RESEND_COOLDOWN = 30     # minimum seconds between resend requests
 
 def check_rate_limit(key: str):
     now = time.time()
@@ -47,6 +55,54 @@ def record_failed_attempt(key: str):
 
 def clear_failed_attempts(key: str):
     FAILED_ATTEMPTS.pop(key, None)
+
+
+# ─── SEND OTP ─────────────────────────────────────────────────────────────────
+
+@router.post("/send-otp", response_model=MessageResponse, summary="Send OTP to citizen email for registration")
+def send_otp(payload: SendOtpRequest, db: Session = Depends(get_db)):
+    email = payload.email.lower().strip()
+
+    # Reject if email is already registered
+    existing = db.query(User).filter(User.userEmail == email, User.userIsDeleted == False).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="An account with this email already exists.",
+        )
+
+    # Rate-limit resend: enforce cooldown
+    existing_entry = OTP_STORE.get(email)
+    if existing_entry:
+        time_since_last = time.time() - existing_entry.get("sent_at", 0)
+        if time_since_last < OTP_RESEND_COOLDOWN:
+            wait = int(OTP_RESEND_COOLDOWN - time_since_last)
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Please wait {wait} seconds before requesting another code.",
+            )
+
+    # Generate a cryptographically random 6-digit OTP
+    otp_code = f"{secrets.randbelow(900000) + 100000:06d}"
+
+    OTP_STORE[email] = {
+        "otp": otp_code,
+        "expires_at": time.time() + OTP_TTL_SECONDS,
+        "sent_at": time.time(),
+        "name": payload.userName or "",
+    }
+
+    try:
+        send_otp_email(email, otp_code, payload.userName or "")
+    except RuntimeError as exc:
+        # Remove stored OTP so user can retry
+        OTP_STORE.pop(email, None)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        )
+
+    return {"message": "Verification code sent. Please check your inbox."}
 
 
 @router.post("/login", response_model=Token, summary="Login and receive JWT")
@@ -111,9 +167,34 @@ def login(payload: UserLogin, request: Request, db: Session = Depends(get_db)):
 
 
 @router.post("/register", response_model=Token, status_code=status.HTTP_201_CREATED,
-             summary="Self-register as a Citizen (Guest role)")
+             summary="Self-register as a Citizen (Guest role) — requires email OTP")
 def register(payload: UserRegister, db: Session = Depends(get_db)):
-    existing = db.query(User).filter(User.userEmail == payload.userEmail.lower()).first()
+    email = payload.userEmail.lower().strip()
+
+    # ── OTP Verification ──────────────────────────────────────────────────────
+    stored = OTP_STORE.get(email)
+    if not stored:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No verification code found for this email. Please request a new code.",
+        )
+    if time.time() > stored["expires_at"]:
+        OTP_STORE.pop(email, None)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Verification code has expired. Please request a new one.",
+        )
+    if payload.otp != stored["otp"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Incorrect verification code. Please try again.",
+        )
+
+    # OTP verified — consume it immediately (one-time use)
+    OTP_STORE.pop(email, None)
+
+    # ── Duplicate Email Check ─────────────────────────────────────────────────
+    existing = db.query(User).filter(User.userEmail == email).first()
     if existing:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -122,7 +203,7 @@ def register(payload: UserRegister, db: Session = Depends(get_db)):
 
     user = User(
         userName=payload.userName,
-        userEmail=payload.userEmail.lower(),
+        userEmail=email,
         userHashedPassword=hash_password(payload.password),
         userLocation=payload.userLocation,
         userIsStaRosa=payload.userIsStaRosa,

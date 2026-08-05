@@ -2,7 +2,7 @@ import './App.css'
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Link, NavLink, Navigate, Route, Routes, useNavigate, useLocation } from 'react-router-dom'
 import { Menu, X } from 'lucide-react'
-import { login as loginService, loginAsync, logout as logoutService, register as registerService, registerAsync, getStoredUser } from './services/auth'
+import { login as loginService, loginAsync, logout as logoutService, register as registerService, registerAsync, sendOtp, getStoredUser } from './services/auth'
 import type { Role, UserAccount } from './types'
 import Landing from './pages/Landing'
 import LoginPage from './pages/Login'
@@ -177,8 +177,8 @@ function App() {
     return false
   }
 
-  const handleRegister = async (name: string, email: string, password: string, barangay: string, isStaRosa: boolean, username?: string): Promise<UserAccount> => {
-    const result = await registerAsync(name, email, password, barangay, isStaRosa, username)
+  const handleRegister = async (name: string, email: string, password: string, barangay: string, isStaRosa: boolean, otp: string, username?: string): Promise<UserAccount> => {
+    const result = await registerAsync(name, email, password, barangay, isStaRosa, otp, username)
     setUser(result)
     return result
   }
@@ -366,7 +366,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<PublicAuthRoute user={user}><LoginPage onLogin={handleLogin} /></PublicAuthRoute>} />
-          <Route path="/register" element={<PublicAuthRoute user={user}><RegisterPage onRegister={handleRegister} /></PublicAuthRoute>} />
+          <Route path="/register" element={<PublicAuthRoute user={user}><RegisterPage onRegister={handleRegister} onSendOtp={sendOtp} /></PublicAuthRoute>} />
           <Route path="/home" element={<Navigate to={userHomePath(user)} replace />} />
           <Route path="/about" element={<About />} />
           <Route path="/sks" element={<SKsPage />} />

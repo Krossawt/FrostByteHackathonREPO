@@ -1,5 +1,5 @@
 import type { UserAccount } from '../types'
-import { loginApi, registerCitizenApi } from './api'
+import { loginApi, registerCitizenApi, sendOtpApi } from './api'
 
 const STORAGE_KEY = 'eskala-user'
 const SESSION_KEY = 'eskala-user-session'
@@ -111,7 +111,11 @@ export function login(emailOrUsername: string, password: string, rememberMe = fa
   return null
 }
 
-export async function registerAsync(name: string, email: string, password: string, barangay: string, isStaRosa: boolean, username?: string): Promise<UserAccount> {
+export async function sendOtp(email: string, userName?: string): Promise<void> {
+  await sendOtpApi(email, userName)
+}
+
+export async function registerAsync(name: string, email: string, password: string, barangay: string, isStaRosa: boolean, otp: string, username?: string): Promise<UserAccount> {
   try {
     const created = await registerCitizenApi({
       userName: name,
@@ -119,6 +123,7 @@ export async function registerAsync(name: string, email: string, password: strin
       userPassword: password,
       userLocation: barangay,
       userIsStaRosa: isStaRosa,
+      otp,
     })
 
     const user: UserAccount = {
@@ -134,7 +139,7 @@ export async function registerAsync(name: string, email: string, password: strin
     storeUser(user, true)
     return user
   } catch (err) {
-    return register(name, email, password, barangay, isStaRosa, username)
+    throw err
   }
 }
 

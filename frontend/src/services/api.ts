@@ -277,12 +277,20 @@ export async function fetchAuditLogsApi(limit = 50): Promise<any[]> {
   return request<any[]>(`/audit-logs?limit=${limit}`)
 }
 
+export async function sendOtpApi(email: string, userName?: string): Promise<{ message: string }> {
+  return request<{ message: string }>('/auth/send-otp', {
+    method: 'POST',
+    body: JSON.stringify({ email, userName: userName || '' }),
+  })
+}
+
 export async function registerCitizenApi(payload: {
   userName: string
   userEmail: string
   userPassword: string
   userLocation: string
   userIsStaRosa?: boolean
+  otp: string
 }): Promise<any> {
   const res = await request<AuthResponse>('/auth/register', {
     method: 'POST',
@@ -292,6 +300,7 @@ export async function registerCitizenApi(payload: {
       password: payload.userPassword,
       userLocation: payload.userLocation,
       userIsStaRosa: payload.userIsStaRosa ?? true,
+      otp: payload.otp,
     }),
   })
   setStoredToken(res.accessToken, true)

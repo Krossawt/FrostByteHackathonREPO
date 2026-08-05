@@ -41,12 +41,23 @@ class UserLogin(BaseModel):
         return sanitize_str(v) or ""
 
 
+class SendOtpRequest(BaseModel):
+    email: EmailStr
+    userName: Optional[str] = None
+
+
+class VerifyOtpRequest(BaseModel):
+    email: EmailStr
+    otp: str = Field(..., min_length=6, max_length=6, pattern=r"^\d{6}$")
+
+
 class UserRegister(BaseModel):
     userName: str = Field(..., min_length=2, max_length=100)
     userEmail: EmailStr
     password: str = Field(..., min_length=8, max_length=128)
     userLocation: str = Field(..., min_length=2, max_length=100, description="Santa Rosa City Barangay")
     userIsStaRosa: bool = True
+    otp: str = Field(..., min_length=6, max_length=6, description="6-digit email verification OTP")
 
     @field_validator("userName", "userLocation", mode="before")
     @classmethod

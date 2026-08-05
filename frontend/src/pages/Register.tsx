@@ -1,4 +1,4 @@
-import { FormEvent, useState } from 'react'
+import { FormEvent, useState, useEffect, useRef } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { Menu, X } from 'lucide-react'
 import { BARANGAYS } from '../constants'
@@ -7,10 +7,11 @@ import NewsTicker from '../components/NewsTicker'
 import PolicyModal from '../components/PolicyModal'
 
 interface RegisterPageProps {
-  onRegister: (name: string, email: string, password: string, barangay: string, isStaRosa: boolean, username?: string) => Promise<UserAccount> | UserAccount | void
+  onRegister: (name: string, email: string, password: string, barangay: string, isStaRosa: boolean, otp: string, username?: string) => Promise<UserAccount> | UserAccount | void
+  onSendOtp: (email: string, userName?: string) => Promise<void>
 }
 
-export default function RegisterPage({ onRegister }: RegisterPageProps) {
+export default function RegisterPage({ onRegister, onSendOtp }: RegisterPageProps) {
   const navigate = useNavigate()
   const [name, setName] = useState('')
   const [username, setUsername] = useState('')
@@ -28,9 +29,39 @@ export default function RegisterPage({ onRegister }: RegisterPageProps) {
   const [navOpen, setNavOpen] = useState(false)
   const [policyType, setPolicyType] = useState<'terms' | 'privacy' | null>(null)
 
+  // OTP step state
+  const [showOtpModal, setShowOtpModal] = useState(false)
+  const [otp, setOtp] = useState('')
+  const [otpError, setOtpError] = useState('')
+  const [isVerifying, setIsVerifying] = useState(false)
+  const [isSendingOtp, setIsSendingOtp] = useState(false)
+  const [resendCooldown, setResendCooldown] = useState(0)
+  const otpInputRef = useRef<HTMLInputElement>(null)
+  const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
   const pwStrength = password.length >= 12 ? 'Strong' : password.length >= 8 ? 'Good' : password.length >= 4 ? 'Weak' : ''
   const pwColor = pwStrength === 'Strong' ? '#166534' : pwStrength === 'Good' ? '#b45309' : '#b91c1c'
 
+  // Start 30s resend cooldown
+  const startCooldown = () => {
+    setResendCooldown(30)
+    if (cooldownRef.current) clearInterval(cooldownRef.current)
+    cooldownRef.current = setInterval(() => {
+      setResendCooldown(prev => {
+        if (prev <= 1) { clearInterval(cooldownRef.current!); return 0 }
+        return prev - 1
+      })
+    }, 1000)
+  }
+
+  useEffect(() => () => { if (cooldownRef.current) clearInterval(cooldownRef.current) }, [])
+
+  // Auto-focus OTP input when modal opens
+  useEffect(() => {
+    if (showOtpModal) setTimeout(() => otpInputRef.current?.focus(), 120)
+  }, [showOtpModal])
+
+  // Step 1: Validate form and send OTP
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault(); setError('')
     if (!name.trim()) { setError('Full name is required.'); return }
@@ -46,26 +77,66 @@ export default function RegisterPage({ onRegister }: RegisterPageProps) {
     if (!isStaRosa) { setError('Registration is strictly restricted to Santa Rosa City, Laguna residents.'); return }
     if (!agreed) { setError('You must agree to the Terms & Conditions and Privacy Policy.'); return }
 
-    setIsSubmitting(true)
+    setIsSendingOtp(true)
     try {
-      const result = await onRegister(name.trim(), email.trim(), password, barangay, true, username.trim() || undefined)
+      await onSendOtp(email.trim(), name.trim())
+      setOtp('')
+      setOtpError('')
+      setShowOtpModal(true)
+      startCooldown()
+    } catch (err: any) {
+      setError(err.message || 'Failed to send verification code. Please try again.')
+    } finally {
+      setIsSendingOtp(false)
+    }
+  }
+
+  // Resend OTP
+  const handleResendOtp = async () => {
+    if (resendCooldown > 0) return
+    setOtpError('')
+    setIsSendingOtp(true)
+    try {
+      await onSendOtp(email.trim(), name.trim())
+      setOtp('')
+      startCooldown()
+    } catch (err: any) {
+      setOtpError(err.message || 'Could not resend code. Please try again.')
+    } finally {
+      setIsSendingOtp(false)
+    }
+  }
+
+  // Step 2: Verify OTP and create account
+  const handleVerifyOtp = async (e: FormEvent) => {
+    e.preventDefault(); setOtpError('')
+    const trimmedOtp = otp.trim()
+    if (trimmedOtp.length !== 6 || !/^\d{6}$/.test(trimmedOtp)) {
+      setOtpError('Please enter the 6-digit code sent to your email.')
+      return
+    }
+
+    setIsVerifying(true)
+    try {
+      const result = await onRegister(name.trim(), email.trim(), password, barangay, true, trimmedOtp, username.trim() || undefined)
       const storedUser: UserAccount = (result as UserAccount) || {
         id: `u-${Date.now()}`,
         name: name.trim(),
         email: email.trim(),
         username: username.trim() || email.trim().split('@')[0],
         password,
-      role: 'citizen',
-      barangay,
-      isStaRosa: true,
-      isActive: true,
-    }
-    setCreatedUser(storedUser)
-    setShowSuccessModal(true)
+        role: 'citizen',
+        barangay,
+        isStaRosa: true,
+        isActive: true,
+      }
+      setCreatedUser(storedUser)
+      setShowOtpModal(false)
+      setShowSuccessModal(true)
     } catch (err: any) {
-      setError(err.message || 'Registration failed. Please check your details.')
+      setOtpError(err.message || 'Invalid or expired code. Please try again.')
     } finally {
-      setIsSubmitting(false)
+      setIsVerifying(false)
     }
   }
 
@@ -340,8 +411,14 @@ export default function RegisterPage({ onRegister }: RegisterPageProps) {
 
             {error && <div className="notice error">{error}</div>}
 
-            <button type="submit" className="btn-login-submit">
-              Create Citizen Account &rarr;
+            <button
+              id="reg-submit-btn"
+              type="submit"
+              className="btn-login-submit"
+              disabled={isSendingOtp}
+              style={isSendingOtp ? { opacity: 0.7 } : undefined}
+            >
+              {isSendingOtp ? 'Sending Code…' : 'Verify Email & Continue →'}
             </button>
           </form>
 
@@ -351,6 +428,120 @@ export default function RegisterPage({ onRegister }: RegisterPageProps) {
           </p>
         </div>
       </main>
+
+      {/* ── OTP Verification Modal ── */}
+      {showOtpModal && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: '440px', borderRadius: '8px' }}>
+            <div className="modal-header" style={{ background: 'rgba(118,0,49,0.05)', borderColor: 'rgba(118,0,49,0.15)' }}>
+              <div>
+                <h3 className="modal-title" style={{ color: 'var(--maroon)', fontSize: '1.05rem', margin: 0 }}>
+                  Verify Your Email
+                </h3>
+                <p style={{ fontSize: '0.8rem', color: 'var(--muted)', margin: '2px 0 0' }}>
+                  Code sent to <strong style={{ color: 'var(--ink)' }}>{email}</strong>
+                </p>
+              </div>
+              <button
+                className="modal-close"
+                onClick={() => setShowOtpModal(false)}
+                title="Go back"
+                disabled={isVerifying}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12" /></svg>
+              </button>
+            </div>
+
+            <form onSubmit={handleVerifyOtp}>
+              <div className="modal-body" style={{ padding: '1.75rem 1.75rem 1.25rem' }}>
+                {/* Email shield icon */}
+                <div style={{ textAlign: 'center', marginBottom: '1.4rem' }}>
+                  <div style={{
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    width: '56px', height: '56px', borderRadius: '50%',
+                    background: 'rgba(118,0,49,0.08)', border: '2px solid rgba(118,0,49,0.18)'
+                  }}>
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--maroon)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                      <polyline points="22,6 12,13 2,6" />
+                    </svg>
+                  </div>
+                  <p style={{ margin: '0.75rem 0 0', fontSize: '0.88rem', color: 'var(--muted)', lineHeight: 1.6 }}>
+                    Enter the <strong style={{ color: 'var(--ink)' }}>6-digit code</strong> we sent to your inbox.<br />
+                    <span style={{ fontSize: '0.78rem' }}>Check your spam folder if you don't see it.</span>
+                  </p>
+                </div>
+
+                {/* OTP input */}
+                <div style={{ marginBottom: '0.75rem' }}>
+                  <input
+                    ref={otpInputRef}
+                    id="otp-input"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="\d{6}"
+                    maxLength={6}
+                    value={otp}
+                    onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="000000"
+                    autoComplete="one-time-code"
+                    className="login-input no-right-icon"
+                    style={{
+                      textAlign: 'center',
+                      fontSize: '2rem',
+                      fontWeight: 800,
+                      letterSpacing: '0.55em',
+                      fontFamily: 'monospace',
+                      paddingLeft: '1rem',
+                    }}
+                    disabled={isVerifying}
+                    required
+                  />
+                </div>
+
+                {otpError && <div className="notice error" style={{ marginBottom: '0.5rem' }}>{otpError}</div>}
+
+                {/* Resend link */}
+                <div style={{ textAlign: 'center' }}>
+                  {resendCooldown > 0 ? (
+                    <span style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>
+                      Resend in <strong style={{ color: 'var(--ink)' }}>{resendCooldown}s</strong>
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleResendOtp}
+                      disabled={isSendingOtp}
+                      style={{
+                        background: 'none', border: 'none', padding: 0,
+                        color: 'var(--maroon)', fontWeight: 700, cursor: 'pointer',
+                        fontSize: '0.82rem', textDecoration: 'underline',
+                        opacity: isSendingOtp ? 0.6 : 1
+                      }}
+                    >
+                      {isSendingOtp ? 'Sending…' : 'Resend code'}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="modal-footer" style={{ background: '#F0EEE6', justifyContent: 'space-between' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowOtpModal(false)} disabled={isVerifying}>
+                  Back
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={isVerifying || otp.length !== 6}
+                  style={isVerifying || otp.length !== 6 ? { opacity: 0.7 } : undefined}
+                >
+                  {isVerifying ? 'Verifying…' : 'Create Account →'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* ── Account Created Successfully Modal ── */}
       {showSuccessModal && createdUser && (
