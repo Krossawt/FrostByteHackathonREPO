@@ -17,6 +17,7 @@ from database import get_db
 from models import User, AnnualBudgetReport, AuditLog
 from schemas import BudgetReportResponse, BudgetReportOverride, BudgetReportCreate, MessageResponse
 from auth import require_sk_officer, require_authenticated, log_action
+from cache import cache
 
 router = APIRouter(prefix="/api/v1/budget-reports", tags=["Annual Budget Reports"])
 
@@ -56,6 +57,9 @@ def create_budget_report(
 
     log_action(db, current_user, "Posted Approved ABYIP", "annual_budget_reports", str(report.budgetID),
                f"Approved ABYIP posted for {payload.budgetBarangay} FY{payload.budgetYear} — ₱{payload.budgetValue:,.2f}")
+
+    # New budget report changes consolidated totals — drop the reports cache
+    cache.invalidate_prefix("reports:")
 
     return BudgetReportResponse.model_validate(report)
 
@@ -174,6 +178,9 @@ async def upload_budget_report(
     db.add(entry)
     db.commit()
 
+    # Uploaded budget affects consolidated totals — drop the reports cache
+    cache.invalidate_prefix("reports:")
+
     return BudgetReportResponse.model_validate(report)
 
 
@@ -202,5 +209,8 @@ def override_budget_report(
 
     log_action(db, current_user, "Budget Report Override", "annual_budget_reports", str(report_id),
                f"Manual override applied to budget report #{report_id}: {report.budgetBarangay} FY{report.budgetYear} = ₱{report.budgetValue:,.2f}")
+
+    # Overridden budget value changes consolidated totals — drop the reports cache
+    cache.invalidate_prefix("reports:")
 
     return BudgetReportResponse.model_validate(report)

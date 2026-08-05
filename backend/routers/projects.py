@@ -25,6 +25,7 @@ from auth import (
     require_chairperson, require_sk_officer,
     get_optional_user, log_action
 )
+from cache import cache
 
 router = APIRouter(prefix="/api/v1/projects", tags=["Projects"])
 
@@ -129,6 +130,9 @@ def create_project(
     log_action(db, current_user, "Project Created", "projects", str(project.projectID),
                f"'{project.projectName}' created in {project.projectLocation} — status: Incoming")
 
+    # New project changes report totals — drop the reports cache
+    cache.invalidate_prefix("reports:")
+
     return ProjectResponse.model_validate(project)
 
 
@@ -177,6 +181,11 @@ def update_project(
     log_action(db, current_user, "Project Updated", "projects", str(project_id),
                f"Updated '{project.projectName}' — status: {old_status} → {new_status}")
 
+    # Project update (especially status change) affects report totals and may
+    # have auto-created a newsletter entry — invalidate both caches
+    cache.invalidate_prefix("reports:")
+    cache.delete("newsletter:list")
+
     return ProjectResponse.model_validate(project)
 
 
@@ -192,5 +201,8 @@ def delete_project(
 
     log_action(db, current_user, "Project Deleted", "projects", str(project_id),
                f"Soft-deleted: '{project.projectName}'")
+
+    # Deleted project changes report totals — drop the reports cache
+    cache.invalidate_prefix("reports:")
 
     return {"message": f"Project '{project.projectName}' has been deleted"}

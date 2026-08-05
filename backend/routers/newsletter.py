@@ -15,6 +15,7 @@ from database import get_db
 from models import User, Newsletter
 from schemas import NewsletterCreate, NewsletterUpdate, NewsletterResponse, MessageResponse
 from auth import require_superadmin, get_optional_user, log_action
+from cache import cache
 
 router = APIRouter(prefix="/api/v1/newsletter", tags=["Newsletter"])
 
@@ -32,6 +33,13 @@ def list_newsletters(
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_optional_user),
 ):
+    # Only cache the default unfiltered first-page request (most common call)
+    use_cache = (not location and not category and not search and skip == 0 and limit == 50)
+    if use_cache:
+        cached = cache.get("newsletter:list")
+        if cached is not None:
+            return cached
+
     query = db.query(Newsletter).filter(
         Newsletter.isDeleted == False,
         or_(Newsletter.isPublished == True, Newsletter.isPublished.is_(None)),
@@ -45,7 +53,12 @@ def list_newsletters(
         query = query.filter(Newsletter.title.ilike(f"%{search}%"))
 
     items = query.order_by(Newsletter.publishedAt.desc()).offset(skip).limit(limit).all()
-    return [NewsletterResponse.model_validate(n) for n in items]
+    result = [NewsletterResponse.model_validate(n) for n in items]
+
+    if use_cache:
+        cache.set("newsletter:list", result, 60)  # 60-second TTL
+
+    return result
 
 
 @router.get("/{newsletter_id}", response_model=NewsletterResponse, summary="Get newsletter detail (public)")
@@ -135,6 +148,9 @@ def create_newsletter(
     log_action(db, current_user, "Newsletter Created", "newsletter", str(item.newsletterID),
                f"Super Admin created newsletter: '{payload.title}'")
 
+    # Invalidate the newsletter list cache so the new entry is visible immediately
+    cache.delete("newsletter:list")
+
     return NewsletterResponse.model_validate(item)
 
 
@@ -162,6 +178,9 @@ def update_newsletter(
     log_action(db, current_user, "Newsletter Updated", "newsletter", str(newsletter_id),
                f"Updated newsletter: '{item.title}'")
 
+    # Invalidate the newsletter list cache so the updated entry is visible immediately
+    cache.delete("newsletter:list")
+
     return NewsletterResponse.model_validate(item)
 
 
@@ -186,5 +205,8 @@ def delete_newsletter(
 
     log_action(db, current_user, "Newsletter Archived", "newsletter", str(newsletter_id),
                f"Archived newsletter: '{item.title}'")
+
+    # Invalidate the newsletter list cache so the archived entry disappears immediately
+    cache.delete("newsletter:list")
 
     return {"message": f"Newsletter '{item.title}' has been archived"}

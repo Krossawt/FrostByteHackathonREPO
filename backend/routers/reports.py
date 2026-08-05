@@ -13,6 +13,7 @@ from sqlalchemy import func
 from database import get_db
 from models import User, Project, ProjectStatus, AnnualBudgetReport, UserRole
 from schemas import CityConsolidatedReport, BarangaySummary, UserResponse
+from cache import cache
 
 router = APIRouter(prefix="/api/v1/reports", tags=["Reports & Dashboard"])
 
@@ -28,6 +29,13 @@ BARANGAYS = [
             summary="City-wide financial and project summary (public)")
 @router.get("/summary", response_model=CityConsolidatedReport, include_in_schema=False)
 def get_consolidated_report(db: Session = Depends(get_db)):
+    CACHE_KEY = "reports:consolidated"
+    CACHE_TTL = 60  # seconds
+
+    cached = cache.get(CACHE_KEY)
+    if cached is not None:
+        return cached
+
     barangay_summaries = []
     total_budget_sum = db.query(func.coalesce(func.sum(AnnualBudgetReport.budgetValue), 0.0)).scalar()
     total_budget = float(total_budget_sum or 0.0)
@@ -83,7 +91,7 @@ def get_consolidated_report(db: Session = Depends(get_db)):
         User.userIsActive == True,
     ).count()
 
-    return CityConsolidatedReport(
+    result = CityConsolidatedReport(
         totalBudget=total_budget,
         totalSpent=total_spent,
         totalRemaining=max(total_budget - total_spent, 0.0),
@@ -94,10 +102,20 @@ def get_consolidated_report(db: Session = Depends(get_db)):
         skOfficialsCount=sk_officials_count,
         barangays=barangay_summaries,
     )
+    cache.set(CACHE_KEY, result, CACHE_TTL)
+    return result
 
 
 @router.get("/barangay/{barangay_name}", summary="Per-barangay financial and project summary (public)")
 def get_barangay_report(barangay_name: str, db: Session = Depends(get_db)):
+    # Normalise key: lowercase, stripped so "Balibago" and "balibago" share one entry
+    CACHE_KEY = f"reports:barangay:{barangay_name.strip().lower()}"
+    CACHE_TTL = 30  # seconds
+
+    cached = cache.get(CACHE_KEY)
+    if cached is not None:
+        return cached
+
     target_brgy = barangay_name.strip()
     matched_brgy = next((b for b in BARANGAYS if b.lower() == target_brgy.lower()), None)
     canonical_name = matched_brgy if matched_brgy else target_brgy
@@ -136,7 +154,7 @@ def get_barangay_report(barangay_name: str, db: Session = Depends(get_db)):
 
     spent = sum(float(p.projectBreakdown or 0) for p in projects)
 
-    return {
+    result = {
         "barangay": barangay_name,
         "annualBudget": latest_budget,
         "spent": spent,
@@ -174,6 +192,8 @@ def get_barangay_report(barangay_name: str, db: Session = Depends(get_db)):
             for o in officials
         ],
     }
+    cache.set(CACHE_KEY, result, CACHE_TTL)
+    return result
 
 
 @router.get("/sk-officials", response_model=List[UserResponse],
@@ -182,6 +202,14 @@ def list_sk_officials(
     barangay: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
+    # Cache key includes barangay so filtered and unfiltered results are separate entries
+    CACHE_KEY = f"reports:sk-officials:{(barangay or '').strip().lower()}"
+    CACHE_TTL = 120  # seconds — SK list rarely changes
+
+    cached = cache.get(CACHE_KEY)
+    if cached is not None:
+        return cached
+
     query = db.query(User).filter(
         User.userIsSK == True,
         User.userIsDeleted == False,
@@ -191,12 +219,21 @@ def list_sk_officials(
         query = query.filter(User.userLocation == barangay)
 
     officials = query.order_by(User.userLocation, User.userRole).all()
-    return [UserResponse.model_validate(o) for o in officials]
+    result = [UserResponse.model_validate(o) for o in officials]
+    cache.set(CACHE_KEY, result, CACHE_TTL)
+    return result
 
 
 @router.get("/sk-officials/{barangay_name}", response_model=List[UserResponse],
             summary="List SK officials for a specific barangay (public)")
 def get_barangay_officials(barangay_name: str, db: Session = Depends(get_db)):
+    CACHE_KEY = f"reports:sk-officials-brgy:{barangay_name.strip().lower()}"
+    CACHE_TTL = 120  # seconds
+
+    cached = cache.get(CACHE_KEY)
+    if cached is not None:
+        return cached
+
     if barangay_name not in BARANGAYS:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Barangay not found")
     officials = (
@@ -210,4 +247,6 @@ def get_barangay_officials(barangay_name: str, db: Session = Depends(get_db)):
         .order_by(User.userRole)
         .all()
     )
-    return [UserResponse.model_validate(o) for o in officials]
+    result = [UserResponse.model_validate(o) for o in officials]
+    cache.set(CACHE_KEY, result, CACHE_TTL)
+    return result
