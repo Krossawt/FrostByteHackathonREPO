@@ -37,7 +37,7 @@ DUMMY_HASH = "$2b$12$e83W.D1yM/m1.5Q3b2Q7O.X8.G5g5.X8G5g5X8G5g5X8G5g5X8G5g"
 # In-memory: { email: { 'otp': str, 'expires_at': float, 'name': str } }
 OTP_STORE: dict[str, dict] = {}
 OTP_TTL_SECONDS = 300        # 5 minutes
-OTP_RESEND_COOLDOWN = 30     # minimum seconds between resend requests
+OTP_RESEND_COOLDOWN = 120    # 2 minutes between resend requests
 
 def check_rate_limit(key: str):
     now = time.time()

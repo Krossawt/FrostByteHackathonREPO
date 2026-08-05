@@ -42,9 +42,9 @@ export default function RegisterPage({ onRegister, onSendOtp }: RegisterPageProp
   const pwStrength = password.length >= 12 ? 'Strong' : password.length >= 8 ? 'Good' : password.length >= 4 ? 'Weak' : ''
   const pwColor = pwStrength === 'Strong' ? '#166534' : pwStrength === 'Good' ? '#b45309' : '#b91c1c'
 
-  // Start 30s resend cooldown
+  // Start 2-minute resend cooldown
   const startCooldown = () => {
-    setResendCooldown(30)
+    setResendCooldown(120)
     if (cooldownRef.current) clearInterval(cooldownRef.current)
     cooldownRef.current = setInterval(() => {
       setResendCooldown(prev => {

@@ -1,149 +1,241 @@
 """
-eSKala — Email Service
-Sends OTP verification emails via Gmail SMTP using Python's built-in smtplib.
-No additional pip packages required.
+eSKala — Email Service (Resend API)
+Sends OTP emails via Resend's HTTPS API — works on Render free tier.
+Raw SMTP (smtplib) is blocked by Render; this uses port 443 instead.
 
-Configuration (backend/.env):
-    EMAIL_HOST_USER=your-gmail@gmail.com
-    EMAIL_HOST_PASSWORD=your-16-char-app-password
+Setup:
+  1. Sign up at https://resend.com (free, 100 emails/day)
+  2. Go to API Keys → Create API Key → copy it
+  3. Add to backend/.env:
+       RESEND_API_KEY=re_xxxxxxxxxxxxxxxx
+  4. Also add to Render Environment Variables (same key/value)
 """
 
-import smtplib
 import os
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
+import resend
 from dotenv import load_dotenv
 
 load_dotenv()
 
-SMTP_HOST = "smtp.gmail.com"
-SMTP_PORT = 587
-EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
-EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+resend.api_key = os.getenv("RESEND_API_KEY", "")
+
+SENDER_FROM = os.getenv("RESEND_FROM_EMAIL", "eSKala <onboarding@resend.dev>")
 
 
 def send_otp_email(to_email: str, otp_code: str, user_name: str = "") -> None:
     """
-    Send a 6-digit OTP verification email to the given address.
+    Send a formal, branded 6-digit OTP verification email via Resend.
 
     Raises:
-        RuntimeError: if EMAIL_HOST_USER / EMAIL_HOST_PASSWORD are not configured,
-                      or if SMTP delivery fails.
+        RuntimeError: if RESEND_API_KEY is missing or the API call fails.
     """
-    if not EMAIL_HOST_USER or not EMAIL_HOST_PASSWORD:
+    if not resend.api_key:
         raise RuntimeError(
-            "Email credentials not configured. "
-            "Set EMAIL_HOST_USER and EMAIL_HOST_PASSWORD in backend/.env"
+            "Email service not configured. "
+            "Set RESEND_API_KEY in backend/.env and in Render Environment Variables."
         )
 
-    greeting = f"Hi {user_name}," if user_name else "Hello,"
+    display_name = user_name.split()[0] if user_name else "Citizen"
+    otp_spaced = "  ".join(list(otp_code))  # e.g. "3  4  2  1  9  7" for readability
 
-    html_body = f"""
-<!DOCTYPE html>
+    html_body = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>eSKala — Email Verification</title>
 </head>
-<body style="margin:0;padding:0;background:#F5F4EE;font-family:'Segoe UI',Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#F5F4EE;padding:32px 0;">
-    <tr>
-      <td align="center">
-        <table width="520" cellpadding="0" cellspacing="0"
-               style="background:#ffffff;border-radius:6px;overflow:hidden;
-                      box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+<body style="margin:0;padding:0;background:#EEEAE0;font-family:'Segoe UI',Helvetica,Arial,sans-serif;">
 
-          <!-- Header -->
-          <tr>
-            <td style="background:#760031;padding:28px 32px;text-align:center;">
-              <span style="font-size:26px;font-weight:900;color:#ffffff;
-                           letter-spacing:-0.5px;">
-                e<span style="color:#FEEC41;">SK</span>ala
-              </span>
-              <p style="margin:6px 0 0;font-size:12px;color:rgba(255,255,255,0.75);
-                        letter-spacing:0.08em;text-transform:uppercase;">
-                City of Santa Rosa · Sangguniang Kabataan
-              </p>
-            </td>
-          </tr>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+         style="background:#EEEAE0;padding:40px 16px;">
+    <tr><td align="center">
 
-          <!-- Body -->
-          <tr>
-            <td style="padding:36px 40px 28px;">
-              <p style="margin:0 0 8px;font-size:15px;color:#1a1a1a;">{greeting}</p>
-              <p style="margin:0 0 24px;font-size:15px;color:#444;line-height:1.6;">
-                You're one step away from joining eSKala. Use the verification
-                code below to complete your citizen account registration.
-              </p>
+      <!-- Card -->
+      <table role="presentation" width="560" cellpadding="0" cellspacing="0"
+             style="max-width:560px;width:100%;background:#ffffff;
+                    border-radius:12px;overflow:hidden;
+                    box-shadow:0 8px 40px rgba(0,0,0,0.10);">
 
-              <!-- OTP Box -->
-              <div style="background:#F5F4EE;border:2px solid #760031;border-radius:6px;
-                          text-align:center;padding:24px 32px;margin:0 0 28px;">
-                <p style="margin:0 0 6px;font-size:11px;font-weight:700;
-                          color:#760031;letter-spacing:0.14em;
-                          text-transform:uppercase;">Your Verification Code</p>
-                <p style="margin:0;font-size:42px;font-weight:900;
-                          letter-spacing:10px;color:#1a1a1a;font-family:monospace;">
-                  {otp_code}
-                </p>
-                <p style="margin:10px 0 0;font-size:12px;color:#888;">
-                  Valid for <strong>5 minutes</strong> · Do not share this code
-                </p>
-              </div>
+        <!-- ── TOP ACCENT BAR ── -->
+        <tr>
+          <td style="height:5px;background:linear-gradient(90deg,#760031 0%,#A8003F 50%,#FEEC41 100%);"></td>
+        </tr>
 
-              <p style="margin:0 0 16px;font-size:13px;color:#666;line-height:1.6;">
-                If you did not request this, you can safely ignore this email.
-                Someone may have entered your address by mistake.
-              </p>
-            </td>
-          </tr>
+        <!-- ── HEADER ── -->
+        <tr>
+          <td style="background:#760031;padding:36px 48px 30px;text-align:center;">
 
-          <!-- Footer -->
-          <tr>
-            <td style="background:#F0EEE6;padding:18px 40px;border-top:1px solid #e0ddd4;">
-              <p style="margin:0;font-size:11px;color:#999;text-align:center;line-height:1.7;">
-                eSKala · City Government of Santa Rosa, Laguna · CYDO<br/>
-                This is an automated message. Please do not reply.
-              </p>
-            </td>
-          </tr>
+            <!-- Logos row -->
+            <table role="presentation" cellpadding="0" cellspacing="0" align="center"
+                   style="margin:0 auto 18px;">
+              <tr>
+                <td style="padding:0 10px;vertical-align:middle;">
+                  <div style="width:44px;height:44px;background:rgba(255,255,255,0.15);
+                              border-radius:50%;display:inline-block;line-height:44px;
+                              text-align:center;font-size:20px;font-weight:900;
+                              color:#FEEC41;">SK</div>
+                </td>
+                <td style="width:1px;background:rgba(255,255,255,0.2);height:36px;
+                           vertical-align:middle;"></td>
+                <td style="padding:0 10px;vertical-align:middle;
+                           font-size:11px;color:rgba(255,255,255,0.6);
+                           text-transform:uppercase;letter-spacing:0.1em;
+                           line-height:1.5;">
+                  City of Santa Rosa<br/>Laguna, Philippines
+                </td>
+              </tr>
+            </table>
 
-        </table>
-      </td>
-    </tr>
+            <!-- Brand name -->
+            <div style="font-size:34px;font-weight:900;color:#ffffff;
+                        letter-spacing:-1px;line-height:1;">
+              e<span style="color:#FEEC41;">SK</span>ala
+            </div>
+            <div style="margin-top:6px;font-size:11px;color:rgba(255,255,255,0.6);
+                        letter-spacing:0.2em;text-transform:uppercase;">
+              SK Transparency Portal
+            </div>
+          </td>
+        </tr>
+
+        <!-- ── BODY ── -->
+        <tr>
+          <td style="padding:44px 48px 36px;">
+
+            <!-- Greeting -->
+            <p style="margin:0 0 6px;font-size:13px;color:#888;
+                      text-transform:uppercase;letter-spacing:0.1em;font-weight:600;">
+              Email Verification
+            </p>
+            <h1 style="margin:0 0 20px;font-size:24px;font-weight:800;
+                       color:#1a1a1a;line-height:1.2;">
+              Good day, {display_name}.
+            </h1>
+
+            <!-- Message -->
+            <p style="margin:0 0 28px;font-size:15px;color:#444;line-height:1.75;">
+              You have initiated a citizen account registration on the
+              <strong style="color:#760031;">eSKala SK Transparency Portal</strong>
+              of the City of Santa Rosa, Laguna. To proceed and secure your account,
+              please use the one-time verification code below.
+            </p>
+
+            <!-- OTP Box -->
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="background:#FBF9F5;border:2px solid #760031;
+                           border-radius:10px;padding:28px 32px;text-align:center;">
+
+                  <div style="font-size:11px;font-weight:700;color:#760031;
+                              letter-spacing:0.18em;text-transform:uppercase;
+                              margin-bottom:14px;">
+                    Your One-Time Verification Code
+                  </div>
+
+                  <!-- OTP digits -->
+                  <div style="font-size:44px;font-weight:900;color:#1a1a1a;
+                              letter-spacing:12px;font-family:'Courier New',monospace;
+                              line-height:1;padding-left:12px;">
+                    {otp_code}
+                  </div>
+
+                  <div style="margin-top:16px;display:inline-block;
+                              background:#760031;border-radius:20px;
+                              padding:5px 16px;">
+                    <span style="font-size:11px;color:#ffffff;font-weight:700;
+                                 letter-spacing:0.1em;text-transform:uppercase;">
+                      Valid for 5 minutes only
+                    </span>
+                  </div>
+                </td>
+              </tr>
+            </table>
+
+            <!-- Instructions -->
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+                   style="margin-top:28px;">
+              <tr>
+                <td style="background:#FFF8E7;border-left:4px solid #FEEC41;
+                           border-radius:0 6px 6px 0;padding:14px 18px;">
+                  <p style="margin:0;font-size:13px;color:#6b4e00;line-height:1.65;">
+                    <strong>How to use this code:</strong><br/>
+                    Return to the eSKala registration page and enter this 6-digit code
+                    in the verification field. Do <em>not</em> share this code with anyone —
+                    eSKala staff will never ask for your OTP.
+                  </p>
+                </td>
+              </tr>
+            </table>
+
+            <!-- Divider -->
+            <hr style="margin:32px 0;border:none;border-top:1px solid #EEEBE3;" />
+
+            <!-- Security notice -->
+            <p style="margin:0;font-size:12px;color:#999;line-height:1.7;">
+              If you did not initiate this request, please disregard this message.
+              No action is required, and no account will be created without completing
+              the verification step. For concerns, contact the City of Santa Rosa CYDO.
+            </p>
+          </td>
+        </tr>
+
+        <!-- ── FOOTER ── -->
+        <tr>
+          <td style="background:#F4F1E8;border-top:1px solid #E0DDD4;
+                     padding:22px 48px;text-align:center;">
+            <p style="margin:0 0 4px;font-size:12px;color:#888;line-height:1.6;">
+              <strong style="color:#555;">eSKala</strong> — Official SK Transparency Portal<br/>
+              City Government of Santa Rosa, Laguna &nbsp;·&nbsp;
+              City Youth Development Office (CYDO)
+            </p>
+            <p style="margin:8px 0 0;font-size:10px;color:#bbb;letter-spacing:0.05em;
+                      text-transform:uppercase;">
+              This is a system-generated message. Please do not reply to this email.
+            </p>
+          </td>
+        </tr>
+
+        <!-- ── BOTTOM ACCENT BAR ── -->
+        <tr>
+          <td style="height:4px;background:linear-gradient(90deg,#FEEC41 0%,#760031 100%);"></td>
+        </tr>
+
+      </table>
+      <!-- end card -->
+
+    </td></tr>
   </table>
+
 </body>
-</html>
-"""
+</html>"""
 
     text_body = (
-        f"{greeting}\n\n"
-        f"Your eSKala verification code is: {otp_code}\n\n"
-        f"This code is valid for 5 minutes.\n\n"
-        f"If you did not request this, ignore this email.\n\n"
-        f"— eSKala Team, City of Santa Rosa"
+        f"eSKala — Email Verification\n"
+        f"City of Santa Rosa, Laguna · CYDO\n"
+        f"{'=' * 48}\n\n"
+        f"Good day, {display_name}.\n\n"
+        f"You have initiated a citizen account registration on the eSKala SK\n"
+        f"Transparency Portal of the City of Santa Rosa, Laguna.\n\n"
+        f"Your One-Time Verification Code:\n\n"
+        f"    {otp_spaced}\n\n"
+        f"This code is valid for 5 minutes only.\n"
+        f"Do NOT share this code with anyone.\n\n"
+        f"If you did not initiate this request, disregard this message.\n"
+        f"No account will be created without completing verification.\n\n"
+        f"{'=' * 48}\n"
+        f"eSKala — City Government of Santa Rosa, Laguna\n"
+        f"This is a system-generated message. Do not reply.\n"
     )
 
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = f"eSKala — Your Verification Code: {otp_code}"
-    msg["From"] = f"eSKala <{EMAIL_HOST_USER}>"
-    msg["To"] = to_email
-
-    msg.attach(MIMEText(text_body, "plain"))
-    msg.attach(MIMEText(html_body, "html"))
-
     try:
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as server:
-            server.ehlo()
-            server.starttls()
-            server.ehlo()
-            server.login(EMAIL_HOST_USER, EMAIL_HOST_PASSWORD)
-            server.sendmail(EMAIL_HOST_USER, to_email, msg.as_string())
-    except smtplib.SMTPAuthenticationError:
-        raise RuntimeError(
-            "Gmail authentication failed. "
-            "Ensure EMAIL_HOST_USER and EMAIL_HOST_PASSWORD (App Password) are correct."
-        )
+        params: resend.Emails.SendParams = {
+            "from": SENDER_FROM,
+            "to": [to_email],
+            "subject": f"[eSKala] Email Verification Code — {otp_code}",
+            "html": html_body,
+            "text": text_body,
+        }
+        resend.Emails.send(params)
     except Exception as exc:
         raise RuntimeError(f"Failed to send OTP email: {exc}") from exc
