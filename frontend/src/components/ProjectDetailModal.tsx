@@ -342,7 +342,7 @@ export default function ProjectDetailModal({
               ? (c.replies || c.responses).map((r: any) => ({
                   id: String(r.commentID || r.id || `CR-${Date.now()}`),
                   author: r.commentName || r.authorName || 'SK Official',
-                  role: r.role || 'SK Official',
+                  role: r.authorRole || r.role || 'SK Official',
                   text: r.commentDetails || r.text || '',
                   date: r.commentTimestamp ? new Date(r.commentTimestamp).toLocaleDateString() : (r.createdAt ? new Date(r.createdAt).toLocaleDateString() : ''),
                 }))
@@ -815,11 +815,11 @@ export default function ProjectDetailModal({
       parentCommentID: Number(id) // Tells the backend this is a reply to an existing comment
     });
 
-    // 2. Format the new reply for the frontend UI
+   // 2. Format the new reply for the frontend UI
     const newReply = {
       id: String(createdReply?.commentID || `CR-${Date.now()}`),
       author: createdReply?.commentName || user?.name || 'SK Official',
-      role: createdReply?.role || user?.skPosition || 'SK Official',
+      role: createdReply?.authorRole || (user?.skPosition ? `SK ${user.skPosition}` : 'SK Official'),
       text: createdReply?.commentDetails || commentReplyText.trim(),
       date: createdReply?.commentTimestamp ? new Date(createdReply.commentTimestamp).toLocaleDateString() : new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
     }

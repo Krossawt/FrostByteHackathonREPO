@@ -268,6 +268,7 @@ class CommentResponse(BaseModel):
     parentCommentID: Optional[int] = None
     authorID: int
     commentName: str
+    authorRole: Optional[str] = None
     commentDetails: str
     commentType: CommentType
     votesCount: int

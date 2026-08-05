@@ -16,23 +16,49 @@ from auth import require_authenticated, get_optional_user, log_action
 
 router = APIRouter(tags=["Comments & Suggestions"])
 
-def _build_comment_tree(comments: List[Comment], voted_comment_ids: set) -> List[CommentResponse]:
+
+# ─── HELPER: Bulletproof Role Formatter ──────────────────────────────
+def _get_formatted_role(user) -> str:
+    if not user:
+        return "SK Official"
+    
+    # Grab the actual database column: userRole (which contains "SK Chairperson", "SK Treasurer", etc.)
+    role_enum_or_str = getattr(user, 'userRole', 'SK Official')
+    
+    # Handle both string and Enum values safely
+    raw_role = getattr(role_enum_or_str, 'value', str(role_enum_or_str))
+    
+    if raw_role and raw_role not in ["System", "Guest", "Citizen", "Super Admin", "SK Official"]:
+        # If it's already an official title like "SK Chairperson", return it as is. 
+        # If it's just "Chairperson", prepend "SK ".
+        return f"SK {raw_role}" if not raw_role.startswith("SK ") else raw_role
+    
+    return raw_role or "SK Official"
+# ─────────────────────────────────────────────────────────────────────
+
+
+def _build_comment_tree(comments: List[Comment], voted_comment_ids: set, role_map: dict) -> List[CommentResponse]:
     """Recursively build a threaded comment tree from a flat list."""
     comment_map = {}
     roots = []
 
     for c in comments:
+        # Force string lookup to prevent int/str type mismatches!
+        safe_id = str(c.authorID) if c.authorID else ""
+        determined_role = role_map.get(safe_id, "SK Official")
+
         resp = CommentResponse(
             commentID=c.commentID,
             commentFor=c.commentFor,
             parentCommentID=c.parentCommentID,
             authorID=c.authorID,
             commentName=c.commentName,
+            authorRole=determined_role, # <--- Perfectly mapped and formatted role!
             commentDetails=c.commentDetails,
             commentType=c.commentType,
             votesCount=c.votesCount,
             commentTimestamp=c.commentTimestamp,
-            hasVoted=(c.commentID in voted_comment_ids), # ADDED: Memory flag for frontend
+            hasVoted=(c.commentID in voted_comment_ids),
             replies=[],
         )
         comment_map[c.commentID] = resp
@@ -57,6 +83,8 @@ def get_comments(
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_optional_user),
 ):
+    from models import Project, Comment, CommentVote, User
+    
     # Verify project exists
     project = db.query(Project).filter(Project.projectID == project_id, Project.isDeleted == False).first()
     if not project:
@@ -69,13 +97,21 @@ def get_comments(
         .all()
     )
     
-    # ADDED: Query the CommentVote table to see what the current user has voted on
     voted_comment_ids = set()
     if current_user:
         user_votes = db.query(CommentVote.commentID).filter(CommentVote.userID == current_user.userID).all()
         voted_comment_ids = {vote[0] for vote in user_votes}
 
-    return _build_comment_tree(comments, voted_comment_ids)
+    # --- FETCH ROLES & FORCE STRING KEYS ---
+    author_ids = [c.authorID for c in comments if c.authorID]
+    users = db.query(User).filter(User.userID.in_(author_ids)).all()
+    
+    role_map = {}
+    for u in users:
+        uid = str(getattr(u, 'userID', getattr(u, 'id', '')))
+        role_map[uid] = _get_formatted_role(u)
+
+    return _build_comment_tree(comments, voted_comment_ids, role_map)
 
 
 @router.post(
@@ -100,8 +136,7 @@ def create_comment(
             Comment.commentFor == project_id
         ).first()
         if not parent:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
-                                detail="Parent comment not found in this project")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Parent comment not found in this project")
 
     comment = Comment(
         commentFor=project_id,
@@ -125,6 +160,7 @@ def create_comment(
         parentCommentID=comment.parentCommentID,
         authorID=comment.authorID,
         commentName=comment.commentName,
+        authorRole=_get_formatted_role(current_user), # Assigned on creation!
         commentDetails=comment.commentDetails,
         commentType=comment.commentType,
         votesCount=comment.votesCount,
@@ -168,6 +204,7 @@ def reply_to_comment(
         parentCommentID=reply.parentCommentID,
         authorID=reply.authorID,
         commentName=reply.commentName,
+        authorRole=_get_formatted_role(current_user), # Assigned on creation!
         commentDetails=reply.commentDetails,
         commentType=reply.commentType,
         votesCount=reply.votesCount,
@@ -190,7 +227,6 @@ def vote_comment(
     if not comment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found")
 
-    # Check if the user already voted
     existing_vote = db.query(CommentVote).filter(
         CommentVote.commentID == comment_id,
         CommentVote.userID == current_user.userID
@@ -198,11 +234,9 @@ def vote_comment(
 
     has_voted = False
     if existing_vote:
-        # User already voted: Remove the vote (Toggle OFF)
         db.delete(existing_vote)
         comment.votesCount = max(0, (comment.votesCount or 0) - 1)
     else:
-        # User hasn't voted: Add the vote (Toggle ON)
         new_vote = CommentVote(commentID=comment_id, userID=current_user.userID)
         db.add(new_vote)
         comment.votesCount = (comment.votesCount or 0) + 1
@@ -210,14 +244,17 @@ def vote_comment(
 
     db.commit()
     db.refresh(comment)
+    
+    # Grab author's role safely for the response
+    author = db.query(User).filter(User.userID == comment.authorID).first()
 
-    # Return the updated comment
     resp = CommentResponse(
         commentID=comment.commentID,
         commentFor=comment.commentFor,
         parentCommentID=comment.parentCommentID,
         authorID=comment.authorID,
         commentName=comment.commentName,
+        authorRole=_get_formatted_role(author),
         commentDetails=comment.commentDetails,
         commentType=comment.commentType,
         votesCount=comment.votesCount,
