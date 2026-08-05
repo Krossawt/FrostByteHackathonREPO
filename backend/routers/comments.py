@@ -5,7 +5,7 @@ POST /api/v1/projects/{project_id}/comments
 POST /api/v1/comments/{comment_id}/reply
 POST /api/v1/comments/{comment_id}/vote
 """
-
+from models import CommentVote
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -16,8 +16,7 @@ from auth import require_authenticated, get_optional_user, log_action
 
 router = APIRouter(tags=["Comments & Suggestions"])
 
-
-def _build_comment_tree(comments: List[Comment]) -> List[CommentResponse]:
+def _build_comment_tree(comments: List[Comment], voted_comment_ids: set) -> List[CommentResponse]:
     """Recursively build a threaded comment tree from a flat list."""
     comment_map = {}
     roots = []
@@ -33,6 +32,7 @@ def _build_comment_tree(comments: List[Comment]) -> List[CommentResponse]:
             commentType=c.commentType,
             votesCount=c.votesCount,
             commentTimestamp=c.commentTimestamp,
+            hasVoted=(c.commentID in voted_comment_ids), # ADDED: Memory flag for frontend
             replies=[],
         )
         comment_map[c.commentID] = resp
@@ -68,7 +68,14 @@ def get_comments(
         .order_by(Comment.commentTimestamp.asc())
         .all()
     )
-    return _build_comment_tree(comments)
+    
+    # ADDED: Query the CommentVote table to see what the current user has voted on
+    voted_comment_ids = set()
+    if current_user:
+        user_votes = db.query(CommentVote.commentID).filter(CommentVote.userID == current_user.userID).all()
+        voted_comment_ids = {vote[0] for vote in user_votes}
+
+    return _build_comment_tree(comments, voted_comment_ids)
 
 
 @router.post(
@@ -172,7 +179,7 @@ def reply_to_comment(
 @router.post(
     "/api/v1/comments/{comment_id}/vote",
     response_model=CommentResponse,
-    summary="Upvote a comment or suggestion",
+    summary="Toggle upvote on a comment",
 )
 def vote_comment(
     comment_id: int,
@@ -183,11 +190,29 @@ def vote_comment(
     if not comment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found")
 
-    comment.votesCount = (comment.votesCount or 0) + 1
+    # Check if the user already voted
+    existing_vote = db.query(CommentVote).filter(
+        CommentVote.commentID == comment_id,
+        CommentVote.userID == current_user.userID
+    ).first()
+
+    has_voted = False
+    if existing_vote:
+        # User already voted: Remove the vote (Toggle OFF)
+        db.delete(existing_vote)
+        comment.votesCount = max(0, (comment.votesCount or 0) - 1)
+    else:
+        # User hasn't voted: Add the vote (Toggle ON)
+        new_vote = CommentVote(commentID=comment_id, userID=current_user.userID)
+        db.add(new_vote)
+        comment.votesCount = (comment.votesCount or 0) + 1
+        has_voted = True
+
     db.commit()
     db.refresh(comment)
 
-    return CommentResponse(
+    # Return the updated comment
+    resp = CommentResponse(
         commentID=comment.commentID,
         commentFor=comment.commentFor,
         parentCommentID=comment.parentCommentID,
@@ -199,3 +224,5 @@ def vote_comment(
         commentTimestamp=comment.commentTimestamp,
         replies=[],
     )
+    resp.hasVoted = has_voted
+    return resp

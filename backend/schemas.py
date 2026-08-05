@@ -262,6 +262,7 @@ class CommentCreate(BaseModel):
 
 
 class CommentResponse(BaseModel):
+    hasVoted: bool = False
     commentID: int
     commentFor: int
     parentCommentID: Optional[int] = None

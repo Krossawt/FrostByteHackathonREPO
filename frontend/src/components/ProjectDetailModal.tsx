@@ -11,7 +11,7 @@ import CameraCaptureModal from './CameraCaptureModal'
 import ConfirmDialog from './ConfirmDialog'
 import Portal from './Portal'
 import DateInput from './DateInput'
-import { fetchCommentsApi, fetchProjectByIdApi, updateProjectApi, postCommentApi, createPurchaseOrderApi, fetchPurchaseOrdersApi, uploadReceiptImageApi, resolveImageUrl, normalizeProjectStatus, isProjectOngoing } from '../services/api'
+import { fetchCommentsApi, fetchProjectByIdApi, updateProjectApi, postCommentApi, createPurchaseOrderApi, fetchPurchaseOrdersApi, uploadReceiptImageApi, resolveImageUrl, normalizeProjectStatus, isProjectOngoing,toggleCommentUpvoteApi } from '../services/api'
 
 const CATEGORY_IMAGES: Record<string, string> = {
   'Education': 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=800&q=80',
@@ -310,27 +310,56 @@ export default function ProjectDetailModal({
       }
     }
 
-    async function loadProjectComments() {
-      try {
-        const pId = Number(project?.id)
-        if (!isNaN(pId)) {
-          const res = await fetchCommentsApi(pId)
-          if (Array.isArray(res)) {
-            setLocalComments(res.map((c: any) => ({
-              id: String(c.commentID || c.id),
-              author: c.authorName || 'Citizen',
-              text: c.commentDetails,
-              type: c.commentType || 'comment',
-              votes: c.votesCount ?? c.votes ?? c.upvotes ?? 0,
-              upvotes: c.votesCount ?? c.votes ?? c.upvotes ?? 0,
-              date: c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'Just now',
-            })))
+   async function loadProjectComments() {
+  try {
+    const pId = Number(project?.id)
+    if (!isNaN(pId)) {
+      const res = await fetchCommentsApi(pId)
+      if (Array.isArray(res)) {
+        
+        // 1. Create a temporary tracker for the votes on load
+        const preVotedIds = new Set<string>()
+
+        setLocalComments(res.map((c: any) => {
+          const stringId = String(c.commentID || c.id)
+          
+          // 2. Read the memory flag from the backend!
+          if (c.hasVoted) {
+            preVotedIds.add(stringId)
           }
-        }
-      } catch (err) {
-        console.warn('API fetch project comments warning:', err)
+
+          return {
+            id: stringId,
+            authorId: String(c.authorID ?? ''),
+            author: c.commentName || c.authorName || 'Citizen',
+            text: c.commentDetails,
+            type: c.commentType || 'comment',
+            votes: c.votesCount ?? c.votes ?? c.upvotes ?? 0,
+            upvotes: c.votesCount ?? c.votes ?? c.upvotes ?? 0,
+            hasVoted: c.hasVoted || false, // Pass the flag into local state
+            
+            replies: Array.isArray(c.replies || c.responses) 
+              ? (c.replies || c.responses).map((r: any) => ({
+                  id: String(r.commentID || r.id || `CR-${Date.now()}`),
+                  author: r.commentName || r.authorName || 'SK Official',
+                  role: r.role || 'SK Official',
+                  text: r.commentDetails || r.text || '',
+                  date: r.commentTimestamp ? new Date(r.commentTimestamp).toLocaleDateString() : (r.createdAt ? new Date(r.createdAt).toLocaleDateString() : ''),
+                }))
+              : [], 
+            
+            date: c.commentTimestamp ? new Date(c.commentTimestamp).toLocaleDateString() : (c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'Just now'),
+          }
+        }))
+        
+        // 3. Update the UI state so your upvote buttons start highlighted!
+        setCommentVotedIds(preVotedIds)
       }
     }
+  } catch (err) {
+    console.warn('API fetch project comments warning:', err)
+  }
+}
     loadProjectDetails()
     loadProjectReceipts()
     loadProjectComments()
@@ -653,14 +682,17 @@ export default function ProjectDetailModal({
           commentDetails: cText.trim(),
           commentType: cType,
         })
-        const newC = {
-          id: String(created?.commentID || Date.now()),
-          author: created?.commentName || user?.name || 'Citizen',
-          text: created?.commentDetails || cText.trim(),
-          type: created?.commentType || cType,
-          upvotes: created?.votesCount || 0,
-          date: created?.commentTimestamp ? new Date(created.commentTimestamp).toLocaleDateString() : 'Just now',
-        }
+            const newC = {
+      id: String(created?.commentID || Date.now()),
+      // ADDED: authorId based on user.id
+      authorId: String(created?.authorID ?? user?.id ?? ''),
+      author: created?.commentName || user?.name || 'Citizen',
+      text: created?.commentDetails || cText.trim(),
+      type: created?.commentType || cType,
+      upvotes: created?.votesCount || 0,
+      // FIXED: uses commentTimestamp
+      date: created?.commentTimestamp ? new Date(created.commentTimestamp).toLocaleDateString() : 'Just now',
+    }
         setLocalComments(prev => [newC, ...prev])
         setFeedback({ type: 'success', message: 'Comment submitted successfully' })
       } else {
@@ -682,23 +714,34 @@ export default function ProjectDetailModal({
     }
   }
 
-  const isMyComment = (c: any) => !!user && c.author === user.name
+  const isMyComment = (c: any) => !!user && !!c.authorId && c.authorId === user.id
 
-  const handleCommentVote = (id: string) => {
-    const alreadyVoted = commentVotedIds.has(id)
-    setLocalComments(prev => prev.map(c => {
-      if (c.id !== id) return c
-      const delta = alreadyVoted ? -1 : 1
-      const nextVal = Math.max(0, (c.votes ?? c.upvotes ?? 0) + delta)
-      return { ...c, votes: nextVal, upvotes: nextVal }
-    }))
-    setCommentVotedIds(prev => {
-      const next = new Set(prev)
-      if (alreadyVoted) next.delete(id)
-      else next.add(id)
-      return next
-    })
+ const handleCommentVote = async (id: string) => {
+  const alreadyVoted = commentVotedIds.has(id)
+  
+  // 1. Instantly update the UI so it feels fast
+  setLocalComments(prev => prev.map(c => {
+    if (c.id !== id) return c
+    const delta = alreadyVoted ? -1 : 1
+    const nextVal = Math.max(0, (c.votes ?? c.upvotes ?? 0) + delta)
+    return { ...c, votes: nextVal, upvotes: nextVal }
+  }))
+  
+  setCommentVotedIds(prev => {
+    const next = new Set(prev)
+    if (alreadyVoted) next.delete(id)
+    else next.add(id)
+    return next
+  })
+
+  // 2. Send the upvote to the backend database
+  try {
+    await toggleCommentUpvoteApi(id)
+  } catch (err: any) {
+    console.error("Failed to sync upvote with server:", err)
+    setFeedback({ type: 'info', message: 'Failed to record upvote' })
   }
+}
 
   const handleStartEditComment = (c: any) => {
     setEditingCommentId(c.id)
@@ -759,24 +802,40 @@ export default function ProjectDetailModal({
   }
 
   const handleSendCommentReply = async (id: string) => {
-    if (!commentReplyText.trim()) return
-    setIsSubmittingCommentReply(true)
-    try {
-      const newReply = {
-        id: `CR-${Date.now()}`,
-        author: user?.name || 'SK Official',
-        role: user?.skPosition || 'SK Official',
-        text: commentReplyText.trim(),
-        date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-      }
-      setLocalComments(prev => prev.map(c => c.id === id ? { ...c, replies: [...(c.replies ?? []), newReply] } : c))
-      setCommentReplyText('')
-      setActiveCommentReplyId(null)
-      setFeedback({ type: 'success', message: 'Response posted' })
-    } finally {
-      setIsSubmittingCommentReply(false)
+  if (!commentReplyText.trim()) return
+  setIsSubmittingCommentReply(true)
+  
+  try {
+    const pId = Number(activeProject.id || (activeProject as any).projectId || (activeProject as any).projectID)
+    
+    // 1. Send the reply using your EXISTING postCommentApi
+    const createdReply = await postCommentApi({
+      commentFor: pId,
+      commentDetails: commentReplyText.trim(),
+      parentCommentID: Number(id) // Tells the backend this is a reply to an existing comment
+    });
+
+    // 2. Format the new reply for the frontend UI
+    const newReply = {
+      id: String(createdReply?.commentID || `CR-${Date.now()}`),
+      author: createdReply?.commentName || user?.name || 'SK Official',
+      role: createdReply?.role || user?.skPosition || 'SK Official',
+      text: createdReply?.commentDetails || commentReplyText.trim(),
+      date: createdReply?.commentTimestamp ? new Date(createdReply.commentTimestamp).toLocaleDateString() : new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
     }
+    
+    // 3. Update the local state to show the reply immediately
+    setLocalComments(prev => prev.map(c => c.id === id ? { ...c, replies: [...(c.replies ?? []), newReply] } : c))
+    setCommentReplyText('')
+    setActiveCommentReplyId(null)
+    setFeedback({ type: 'success', message: 'Response posted' })
+  } catch (err: any) {
+    console.error("Reply failed:", err)
+    setFeedback({ type: 'info', message: 'Failed to post response' })
+  } finally {
+    setIsSubmittingCommentReply(false)
   }
+}
 
   // Pins the current user's own comments to the top, without needing a
   // separate "My Comments" tab. Stable sort preserves newest-first order

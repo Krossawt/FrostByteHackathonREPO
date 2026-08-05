@@ -727,4 +727,9 @@ export async function deleteSuggestionApi(suggestionId: number): Promise<{ messa
   })
 }
 
-
+export async function toggleCommentUpvoteApi(commentId: number | string): Promise<any> {
+  // Changed /upvote to /vote to match your FastAPI backend
+  return request<any>(`/comments/${commentId}/vote`, {
+    method: 'POST', 
+  });
+}

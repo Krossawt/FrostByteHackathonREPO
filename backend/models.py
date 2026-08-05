@@ -306,3 +306,12 @@ class OTPVerification(Base):
     expiresAt           = Column(DateTime, nullable=False)
 
 
+
+from sqlalchemy import Column, Integer, ForeignKey
+# (Make sure you use whatever Base your other models use)
+
+class CommentVote(Base):
+    __tablename__ = "comment_votes"
+    voteID = Column(Integer, primary_key=True, index=True)
+    commentID = Column(Integer, ForeignKey("comments.commentID", ondelete="CASCADE"))
+    userID = Column(Integer, ForeignKey("users.userID", ondelete="CASCADE"))
