@@ -1038,8 +1038,13 @@ select.login-input {
 }
 
 @keyframes gsb-fade-in {
-  from { opacity: 0 }
-  to   { opacity: 1 }
+  from {
+    opacity: 0
+  }
+
+  to {
+    opacity: 1
+  }
 }
 
 /* Modal card */
@@ -1056,8 +1061,15 @@ select.login-input {
 }
 
 @keyframes gsb-slide-in {
-  from { opacity: 0; transform: translateY(-14px) scale(0.97) }
-  to   { opacity: 1; transform: translateY(0)    scale(1) }
+  from {
+    opacity: 0;
+    transform: translateY(-14px) scale(0.97)
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1)
+  }
 }
 
 /* Input row */
@@ -1104,7 +1116,11 @@ select.login-input {
   cursor: pointer;
   transition: background 150ms;
 }
-.gsb-clear:hover { background: rgba(118, 0, 49, 0.14); color: var(--maroon); }
+
+.gsb-clear:hover {
+  background: rgba(118, 0, 49, 0.14);
+  color: var(--maroon);
+}
 
 .gsb-close-btn {
   border: none;
@@ -1261,14 +1277,16 @@ select.login-input {
   margin-right: 0.25rem;
 }
 
-/* Mobile: hide kbd hint on trigger */
-@media (max-width: 768px) {
+/* Mobile: hide kbd hint on trigger*/
+@media (max-width: 530px) {
   .gsb-trigger .gsb-kbd {
     display: none;
   }
+
   .gsb-trigger-label {
     display: none;
   }
+
   .gsb-trigger {
     padding: 0.45rem;
     border-radius: 8px;
@@ -3805,7 +3823,7 @@ tbody tr:last-child td {
   display: flex !important;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 960px) {
   .desktop-only {
     display: none !important;
   }
