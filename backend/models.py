@@ -293,3 +293,16 @@ class SuggestionVote(Base):
     userID              = Column(Integer, ForeignKey("users.userID", ondelete="CASCADE"), nullable=False, index=True)
     createdAt           = Column(DateTime, default=func.now())
 
+
+# ─── TABLE: OTP VERIFICATIONS ──────────────────────────────────────────────────
+
+class OTPVerification(Base):
+    __tablename__ = "otp_verifications"
+
+    email               = Column(String(150), primary_key=True, index=True)
+    otp                 = Column(String(10), nullable=False)
+    userName            = Column(String(100), nullable=True)
+    sentAt              = Column(DateTime, default=func.now())
+    expiresAt           = Column(DateTime, nullable=False)
+
+
