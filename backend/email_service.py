@@ -29,11 +29,7 @@ def send_otp_email(to_email: str, otp_code: str, user_name: str = "") -> None:
     Raises:
         RuntimeError: if RESEND_API_KEY is missing or the API call fails.
     """
-    if not resend.api_key:
-        raise RuntimeError(
-            "Email service not configured. "
-            "Set RESEND_API_KEY in backend/.env and in Render Environment Variables."
-        )
+
 
     display_name = user_name.split()[0] if user_name else "Citizen"
     otp_spaced = "  ".join(list(otp_code))  # e.g. "3  4  2  1  9  7" for readability
@@ -228,6 +224,43 @@ def send_otp_email(to_email: str, otp_code: str, user_name: str = "") -> None:
         f"This is a system-generated message. Do not reply.\n"
     )
 
+    # 1. Try Brevo HTTP API if BREVO_API_KEY is configured (allows sending to ANY recipient email without custom domain verification)
+    brevo_api_key = os.getenv("BREVO_API_KEY", "").strip()
+    sender_email = os.getenv("SENDER_EMAIL", "jamesangelobolano@gmail.com").strip()
+
+    if brevo_api_key:
+        import httpx
+        try:
+            res = httpx.post(
+                "https://api.brevo.com/v3/smtp/email",
+                headers={
+                    "api-key": brevo_api_key,
+                    "content-type": "application/json",
+                    "accept": "application/json",
+                },
+                json={
+                    "sender": {"name": "eSKala Portal", "email": sender_email},
+                    "to": [{"email": to_email}],
+                    "subject": f"[eSKala] Email Verification Code — {otp_code}",
+                    "htmlContent": html_body,
+                    "textContent": text_body,
+                },
+                timeout=12.0,
+            )
+            if res.status_code in (200, 201, 202):
+                return
+            raise RuntimeError(f"Brevo API error ({res.status_code}): {res.text}")
+        except Exception as b_err:
+            if not resend.api_key:
+                raise RuntimeError(f"Failed to send email via Brevo: {b_err}")
+
+    # 2. Try Resend API
+    if not resend.api_key:
+        raise RuntimeError(
+            "Email service not configured. "
+            "Set BREVO_API_KEY or RESEND_API_KEY in backend/.env."
+        )
+
     try:
         params: resend.Emails.SendParams = {
             "from": SENDER_FROM,
@@ -238,4 +271,11 @@ def send_otp_email(to_email: str, otp_code: str, user_name: str = "") -> None:
         }
         resend.Emails.send(params)
     except Exception as exc:
-        raise RuntimeError(f"Failed to send OTP email: {exc}") from exc
+        err_msg = str(exc)
+        if "only send testing emails to your own email address" in err_msg:
+            raise RuntimeError(
+                "Resend test mode limit: Resend's free 'onboarding@resend.dev' sender only permits sending to the account owner (jamesangelobolano@gmail.com). "
+                "To send to any citizen email address, please add BREVO_API_KEY to .env (Brevo allows 300 free emails/day to any recipient)."
+            ) from exc
+        raise RuntimeError(f"Failed to send OTP email: {err_msg}") from exc
+
