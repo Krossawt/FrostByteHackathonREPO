@@ -201,6 +201,18 @@ export default function ProjectDetailModal({
   const [cError, setCError] = useState('')
   const [localComments, setLocalComments] = useState<any[]>([])
 
+  // Comment interactions — upvote, edit/delete (author only), SK replies
+  const [commentVotedIds, setCommentVotedIds] = useState<Set<string>>(new Set())
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null)
+  const [editCommentText, setEditCommentText] = useState('')
+  const [initialEditCommentText, setInitialEditCommentText] = useState('')
+  const [confirmDiscardCommentEdit, setConfirmDiscardCommentEdit] = useState(false)
+  const [confirmDeleteCommentId, setConfirmDeleteCommentId] = useState<string | null>(null)
+  const [activeCommentReplyId, setActiveCommentReplyId] = useState<string | null>(null)
+  const [commentReplyText, setCommentReplyText] = useState('')
+  const [isSubmittingCommentReply, setIsSubmittingCommentReply] = useState(false)
+  const [confirmDiscardCommentReply, setConfirmDiscardCommentReply] = useState(false)
+
   // Auto-dismiss feedback banner after 3 seconds
   useEffect(() => {
     if (!feedback) return
@@ -670,6 +682,107 @@ export default function ProjectDetailModal({
     }
   }
 
+  const isMyComment = (c: any) => !!user && c.author === user.name
+
+  const handleCommentVote = (id: string) => {
+    const alreadyVoted = commentVotedIds.has(id)
+    setLocalComments(prev => prev.map(c => {
+      if (c.id !== id) return c
+      const delta = alreadyVoted ? -1 : 1
+      const nextVal = Math.max(0, (c.votes ?? c.upvotes ?? 0) + delta)
+      return { ...c, votes: nextVal, upvotes: nextVal }
+    }))
+    setCommentVotedIds(prev => {
+      const next = new Set(prev)
+      if (alreadyVoted) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const handleStartEditComment = (c: any) => {
+    setEditingCommentId(c.id)
+    setEditCommentText(c.text)
+    setInitialEditCommentText(c.text)
+  }
+
+  const handleCancelEditComment = () => {
+    if (editCommentText.trim() !== initialEditCommentText.trim()) {
+      setConfirmDiscardCommentEdit(true)
+    } else {
+      setEditingCommentId(null)
+    }
+  }
+
+  const confirmDiscardCommentEditAction = () => {
+    setConfirmDiscardCommentEdit(false)
+    setEditingCommentId(null)
+    setEditCommentText('')
+    setFeedback({ type: 'info', message: 'Changes discarded' })
+  }
+
+  const handleSaveEditComment = (id: string) => {
+    if (!editCommentText.trim()) return
+    setLocalComments(prev => prev.map(c => c.id === id ? { ...c, text: editCommentText.trim() } : c))
+    setEditingCommentId(null)
+    setFeedback({ type: 'success', message: 'Comment updated' })
+  }
+
+  const handleDeleteComment = (id: string) => setConfirmDeleteCommentId(id)
+
+  const confirmDeleteCommentAction = () => {
+    const id = confirmDeleteCommentId
+    setConfirmDeleteCommentId(null)
+    if (!id) return
+    setLocalComments(prev => prev.filter(c => c.id !== id))
+    setFeedback({ type: 'info', message: 'Comment deleted' })
+  }
+
+  const handleToggleCommentReply = (id: string) => {
+    setActiveCommentReplyId(prev => prev === id ? null : id)
+    setCommentReplyText('')
+  }
+
+  const handleCancelCommentReply = () => {
+    if (commentReplyText.trim()) {
+      setConfirmDiscardCommentReply(true)
+    } else {
+      setActiveCommentReplyId(null)
+    }
+  }
+
+  const confirmDiscardCommentReplyAction = () => {
+    setConfirmDiscardCommentReply(false)
+    setCommentReplyText('')
+    setActiveCommentReplyId(null)
+    setFeedback({ type: 'info', message: 'Response discarded' })
+  }
+
+  const handleSendCommentReply = async (id: string) => {
+    if (!commentReplyText.trim()) return
+    setIsSubmittingCommentReply(true)
+    try {
+      const newReply = {
+        id: `CR-${Date.now()}`,
+        author: user?.name || 'SK Official',
+        role: user?.skPosition || 'SK Official',
+        text: commentReplyText.trim(),
+        date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      }
+      setLocalComments(prev => prev.map(c => c.id === id ? { ...c, replies: [...(c.replies ?? []), newReply] } : c))
+      setCommentReplyText('')
+      setActiveCommentReplyId(null)
+      setFeedback({ type: 'success', message: 'Response posted' })
+    } finally {
+      setIsSubmittingCommentReply(false)
+    }
+  }
+
+  // Pins the current user's own comments to the top, without needing a
+  // separate "My Comments" tab. Stable sort preserves newest-first order
+  // within each group since new comments are always prepended.
+  const sortedComments = [...localComments].sort((a, b) => (isMyComment(b) ? 1 : 0) - (isMyComment(a) ? 1 : 0))
+
   return (
     <>
       {/* ── Feedback Banner ── */}
@@ -813,6 +926,24 @@ export default function ProjectDetailModal({
         white-space: normal;
         line-height: 1.4;
       }
+      .sk-reply-header-row {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 0.15rem !important;
+      }
+      .sk-reply-author {
+        font-size: 0.76rem !important;
+      }
+      .sk-reply-author span {
+        font-size: 0.68rem !important;
+      }
+      .sk-reply-date {
+        font-size: 0.66rem !important;
+      }
+    }
+    .upvote-btn:hover {
+      background: rgba(21, 128, 61, 0.14) !important;
+      border-color: #15803d !important;
     }
   `}</style>
 
@@ -1435,26 +1566,198 @@ export default function ProjectDetailModal({
                     </div>
                   )}
 
-                  {localComments.length > 0 ? (
+                  {sortedComments.length > 0 ? (
                     <div style={{ display: 'grid', gap: '0.75rem' }}>
-                      {localComments.map(c => (
-                        <div key={c.id} className="comment-card">
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-                            <span className="comment-author">{c.author}</span>
-                            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                              {c.type && <span className={`badge ${c.type === 'suggestion' ? 'badge-upcoming' : 'badge-ongoing'}`}>{c.type}</span>}
-                              {c.votes !== undefined && (
-                                <span className="comment-votes">
-                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 21 12 17.77 5.82 21 7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
-                                  {c.votes}
-                                </span>
+                      {sortedComments.map(c => {
+                        const mine = isMyComment(c)
+                        const isEditingThis = editingCommentId === c.id
+                        const hasVoted = commentVotedIds.has(c.id)
+                        return (
+                          <div
+                            key={c.id}
+                            className="comment-card"
+                            style={{
+                              border: mine ? '1.5px solid rgba(118,0,49,0.35)' : undefined,
+                              background: mine ? 'rgba(118,0,49,0.035)' : undefined,
+                              borderLeft: mine ? '4px solid var(--maroon)' : undefined,
+                              position: 'relative',
+                            }}
+                          >
+                            {mine && (
+                              <div style={{
+                                fontSize: '0.68rem',
+                                fontWeight: 800,
+                                color: 'var(--maroon)',
+                                fontFamily: 'var(--font-display)',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.06em',
+                                marginBottom: '0.4rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.3rem',
+                              }}>
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" /></svg>
+                                This is your comment
+                              </div>
+                            )}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                <span className="comment-author">{c.author}</span>
+                                {mine && <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#fff', background: 'var(--maroon)', padding: '0.1rem 0.45rem', borderRadius: '4px' }}>YOU</span>}
+                                {c.type && <span className={`badge ${c.type === 'suggestion' ? 'badge-upcoming' : 'badge-ongoing'}`}>{c.type}</span>}
+                              </div>
+                              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                <span className="comment-date">{c.date}</span>
+                                {mine && !isEditingThis && (
+                                  <div style={{ display: 'flex', gap: '0.3rem' }}>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleStartEditComment(c)}
+                                      title="Edit comment"
+                                      style={{ background: 'none', border: '1px solid rgba(0,0,0,0.12)', padding: '0.2rem 0.5rem', borderRadius: '6px', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 600, color: '#3b82f6' }}
+                                    >
+                                      ✏️ Edit
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteComment(c.id)}
+                                      title="Delete comment"
+                                      style={{ background: 'none', border: '1px solid rgba(220,38,38,0.2)', padding: '0.2rem 0.5rem', borderRadius: '6px', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 600, color: '#dc2626' }}
+                                    >
+                                      🗑️ Delete
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {isEditingThis ? (
+                              <div style={{ marginTop: '0.6rem', marginBottom: '0.4rem' }}>
+                                <textarea
+                                  className="form-input"
+                                  rows={2}
+                                  value={editCommentText}
+                                  onChange={e => setEditCommentText(e.target.value)}
+                                  style={{ fontSize: '0.88rem', marginBottom: '0.4rem' }}
+                                />
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                                  {editCommentText.trim() === initialEditCommentText.trim() && (
+                                    <span style={{ fontSize: '0.72rem', color: 'var(--maroon)', fontStyle: 'italic', marginRight: 'auto' }}>
+                                      Edit the text to save changes
+                                    </span>
+                                  )}
+                                  <button type="button" className="btn btn-secondary btn-sm" onClick={handleCancelEditComment} style={{ padding: '0.3rem 0.7rem', fontSize: '0.75rem' }}>
+                                    Cancel
+                                  </button>
+                                  {editCommentText.trim() !== initialEditCommentText.trim() && (
+                                    <button type="button" className="btn btn-primary btn-sm" onClick={() => handleSaveEditComment(c.id)} style={{ padding: '0.3rem 0.9rem', fontSize: '0.75rem' }}>
+                                      Save Changes
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            ) : (
+                              <p className="comment-text">{c.text}</p>
+                            )}
+
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(118,0,49,0.06)', paddingTop: '0.5rem', marginTop: '0.4rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                              <button
+                                type="button"
+                                onClick={() => handleCommentVote(c.id)}
+                                className="link-button"
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.4rem',
+                                  fontSize: '0.76rem',
+                                  color: hasVoted ? '#15803d' : 'var(--maroon)',
+                                  fontWeight: 700,
+                                  fontFamily: 'var(--font-display)',
+                                  lineHeight: 1,
+                                  background: hasVoted ? 'rgba(22, 101, 52, 0.08)' : 'transparent',
+                                  padding: hasVoted ? '0.25rem 0.6rem' : 0,
+                                  borderRadius: hasVoted ? '6px' : 0,
+                                  transition: 'all 0.15s ease',
+                                }}
+                              >
+                                <svg
+                                  width="16" height="16" viewBox="0 0 20 20"
+                                  fill={hasVoted ? '#15803d' : 'none'}
+                                  stroke={hasVoted ? '#15803d' : 'var(--maroon)'}
+                                  strokeWidth="1.5"
+                                  strokeLinejoin="round"
+                                  style={{ display: 'block', flexShrink: 0 }}
+                                >
+                                  <path d="M10 3L17 12H12.5V17H7.5V12H3L10 3Z" />
+                                </svg>
+                                <span style={{ lineHeight: 1 }}>{hasVoted ? 'Upvoted' : 'Upvote'} ({c.votes ?? c.upvotes ?? 0})</span>
+                              </button>
+                              {user?.role === 'sk' && (
+                                <button
+                                  type="button"
+                                  className="link-button"
+                                  onClick={() => handleToggleCommentReply(c.id)}
+                                  style={{ fontSize: '0.76rem', color: 'var(--maroon)', fontWeight: 700, fontFamily: 'var(--font-display)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                                >
+                                  💬 Reply ({c.replies?.length ?? 0})
+                                </button>
                               )}
                             </div>
+
+                            {/* Official SK Replies List */}
+                            {c.replies && c.replies.length > 0 && (
+                              <div style={{ marginTop: '0.75rem', paddingTop: '0.6rem', borderTop: '1px dashed rgba(118,0,49,0.12)', display: 'grid', gap: '0.5rem' }}>
+                                <div style={{ fontSize: '0.72rem', fontFamily: 'var(--font-display)', fontWeight: 800, color: 'var(--maroon)', textTransform: 'uppercase' }}>
+                                  Official SK Council Responses ({c.replies.length})
+                                </div>
+                                {c.replies.map((r: any) => (
+                                  <div key={r.id} style={{ background: 'rgba(118,0,49,0.04)', borderLeft: '3px solid var(--maroon)', padding: '0.6rem 0.85rem', borderRadius: '0 6px 6px 0' }}>
+                                    <div className="sk-reply-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem', flexWrap: 'wrap' }}>
+                                      <span className="sk-reply-author" style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '0.8rem', color: 'var(--ink)', minWidth: 0, wordBreak: 'break-word' }}>
+                                        {r.author} <span style={{ fontSize: '0.72rem', color: 'var(--maroon)', fontWeight: 600 }}>({r.role})</span>
+                                      </span>
+                                      <span className="sk-reply-date" style={{ fontSize: '0.7rem', color: 'var(--muted)', fontFamily: 'var(--font-display)', flexShrink: 0 }}>{r.date}</span>
+                                    </div>
+                                    <p style={{ margin: 0, fontSize: '0.83rem', color: 'var(--ink-2)', lineHeight: 1.5 }}>{r.text}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Inline Reply Form — SK accounts only */}
+                            {activeCommentReplyId === c.id && (
+                              <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(118,0,49,0.1)', background: 'rgba(118,0,49,0.02)', padding: '0.75rem', borderRadius: '6px' }}>
+                                <div style={{ fontSize: '0.78rem', fontFamily: 'var(--font-display)', fontWeight: 800, color: 'var(--maroon)', marginBottom: '0.4rem' }}>
+                                  Post Official SK Council Response
+                                </div>
+                                <textarea
+                                  className="form-input"
+                                  rows={2}
+                                  value={commentReplyText}
+                                  onChange={e => setCommentReplyText(e.target.value)}
+                                  placeholder="Type official response to this comment…"
+                                  style={{ resize: 'vertical', fontSize: '0.84rem' }}
+                                />
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                                  {!commentReplyText.trim() && (
+                                    <span style={{ fontSize: '0.72rem', color: 'var(--maroon)', fontStyle: 'italic' }}>Type a response to submit</span>
+                                  )}
+                                  <div style={{ display: 'flex', gap: '0.5rem', marginLeft: 'auto' }}>
+                                    <button type="button" className="btn btn-secondary btn-sm" onClick={handleCancelCommentReply} disabled={isSubmittingCommentReply}>
+                                      Cancel
+                                    </button>
+                                    {commentReplyText.trim() && (
+                                      <button type="button" className="btn btn-primary btn-sm" disabled={isSubmittingCommentReply} onClick={() => handleSendCommentReply(c.id)}>
+                                        {isSubmittingCommentReply ? 'Posting...' : 'Submit Response'}
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                           </div>
-                          <span className="comment-date">{c.date}</span>
-                          <p className="comment-text">{c.text}</p>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   ) : (
                     <div className="card" style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--muted)' }}>
@@ -1608,7 +1911,6 @@ export default function ProjectDetailModal({
       )}
 
       {/* ── Discard Changes Confirmation (Attach Receipt form) ── */}
-      {/* ── Discard Changes Confirmation (Attach Receipt form) ── */}
       <ConfirmDialog
         isOpen={confirmAction === 'cancelReceipt'}
         title="Discard Changes"
@@ -1655,6 +1957,42 @@ export default function ProjectDetailModal({
           }
         }}
         onCancel={() => setPendingStatusConfirm(null)}
+      />
+
+      {/* ── Discard Changes Confirmation (Comment edit) ── */}
+      <ConfirmDialog
+        isOpen={confirmDiscardCommentEdit}
+        title="Discard Changes"
+        message="Any unsaved edits to your comment will be lost. Discard them?"
+        confirmLabel="Discard"
+        cancelLabel="Keep Editing"
+        variant="danger"
+        onConfirm={confirmDiscardCommentEditAction}
+        onCancel={() => setConfirmDiscardCommentEdit(false)}
+      />
+
+      {/* ── Delete Comment Confirmation ── */}
+      <ConfirmDialog
+        isOpen={confirmDeleteCommentId !== null}
+        title="Delete Comment"
+        message="This will permanently delete your comment. Are you sure?"
+        confirmLabel="Delete"
+        cancelLabel="Keep It"
+        variant="danger"
+        onConfirm={confirmDeleteCommentAction}
+        onCancel={() => setConfirmDeleteCommentId(null)}
+      />
+
+      {/* ── Discard Changes Confirmation (Comment reply) ── */}
+      <ConfirmDialog
+        isOpen={confirmDiscardCommentReply}
+        title="Discard Response"
+        message="Your response hasn't been posted yet. Discard it?"
+        confirmLabel="Discard"
+        cancelLabel="Keep Writing"
+        variant="danger"
+        onConfirm={confirmDiscardCommentReplyAction}
+        onCancel={() => setConfirmDiscardCommentReply(false)}
       />
     </>
   )
