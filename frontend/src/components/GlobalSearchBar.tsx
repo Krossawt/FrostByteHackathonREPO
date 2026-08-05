@@ -96,9 +96,23 @@ export default function GlobalSearchBar({ role, skPosition }: GlobalSearchBarPro
     }
   }
 
+  // Smooth scroll handler for page sections / hashes
   const handleSelect = (entry: SearchEntry) => {
     closeModal()
-    navigate(entry.path)
+
+    if (entry.path.includes('#')) {
+      const [pathname, hash] = entry.path.split('#')
+      navigate(pathname + '#' + hash)
+
+      setTimeout(() => {
+        const targetElement = document.getElementById(hash)
+        if (targetElement) {
+          targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }
+      }, 100)
+    } else {
+      navigate(entry.path)
+    }
   }
 
   // Scroll active item into view
@@ -157,52 +171,50 @@ export default function GlobalSearchBar({ role, skPosition }: GlobalSearchBarPro
               </button>
             </div>
 
-            {/* Results */}
-            {query && (
-              <div className="gsb-results-wrap">
-                {results.length === 0 ? (
-                  <div className="gsb-empty">
-                    <div className="gsb-empty-icon"><Search size={28} strokeWidth={1.5} /></div>
-                    <p className="gsb-empty-title">No results for &ldquo;{query}&rdquo;</p>
-                    <p className="gsb-empty-sub">Try a different keyword, like "projects" or "budget".</p>
-                  </div>
-                ) : (
-                  <ul className="gsb-list" ref={listRef} role="listbox">
-                    {results.map((entry, i) => {
-                      const accent = CATEGORY_ACCENT[entry.category] ?? 'var(--maroon)'
-                      return (
-                        <li
-                          key={`${entry.path}-${entry.label}`}
-                          className={`gsb-item${i === active ? ' gsb-item--active' : ''}`}
-                          role="option"
-                          aria-selected={i === active}
-                          onMouseEnter={() => setActive(i)}
-                          onClick={() => handleSelect(entry)}
-                        >
-                          {/* Icon chip */}
-                          <span className="gsb-item-icon" style={{ background: `${accent}14`, color: accent }}>
-                            <IconComponent name={entry.icon} />
-                          </span>
+            {/* Always show results/shortcuts */}
+            <div className="gsb-results-wrap">
+              {results.length === 0 ? (
+                <div className="gsb-empty">
+                  <div className="gsb-empty-icon"><Search size={28} strokeWidth={1.5} /></div>
+                  <p className="gsb-empty-title">No results for &ldquo;{query}&rdquo;</p>
+                  <p className="gsb-empty-sub">Try a different keyword, like "projects" or "budget".</p>
+                </div>
+              ) : (
+                <ul className="gsb-list" ref={listRef} role="listbox">
+                  {results.map((entry, i) => {
+                    const accent = CATEGORY_ACCENT[entry.category] ?? 'var(--maroon)'
+                    return (
+                      <li
+                        key={`${entry.path}-${entry.label}`}
+                        className={`gsb-item${i === active ? ' gsb-item--active' : ''}`}
+                        role="option"
+                        aria-selected={i === active}
+                        onMouseEnter={() => setActive(i)}
+                        onClick={() => handleSelect(entry)}
+                      >
+                        {/* Icon chip */}
+                        <span className="gsb-item-icon" style={{ background: `${accent}14`, color: accent }}>
+                          <IconComponent name={entry.icon} />
+                        </span>
 
-                          {/* Label + category */}
-                          <span className="gsb-item-text">
-                            <span className="gsb-item-label">{entry.label}</span>
-                          </span>
+                        {/* Label + category */}
+                        <span className="gsb-item-text">
+                          <span className="gsb-item-label">{entry.label}</span>
+                        </span>
 
-                          {/* Category tag */}
-                          <span className="gsb-item-tag" style={{ color: accent, background: `${accent}12`, borderColor: `${accent}28` }}>
-                            {entry.category}
-                          </span>
+                        {/* Category tag */}
+                        <span className="gsb-item-tag" style={{ color: accent, background: `${accent}12`, borderColor: `${accent}28` }}>
+                          {entry.category}
+                        </span>
 
-                          {/* Arrow */}
-                          <span className="gsb-item-arrow">↵</span>
-                        </li>
-                      )
-                    })}
-                  </ul>
-                )}
-              </div>
-            )}
+                        {/* Arrow */}
+                        <span className="gsb-item-arrow">↵</span>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </div>
 
             {/* Footer hint */}
             <div className="gsb-footer">

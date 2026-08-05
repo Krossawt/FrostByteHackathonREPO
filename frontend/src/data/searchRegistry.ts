@@ -32,11 +32,11 @@ const CITIZEN_ENTRIES: SearchEntry[] = [
     keywords: ['dashboard', 'home', 'overview', 'main'],
   },
   {
-    label: 'Budget Overview',
-    category: 'Finance',
-    icon: 'PieChart',
-    path: '/citizen/home',
-    keywords: ['budget', 'spending', 'finance', 'funds', 'money', 'allocated'],
+    label: 'Submit Suggestion',
+    category: 'Community',
+    icon: 'MessageSquarePlus',
+    path: '/citizen/home#submit-suggestion',
+    keywords: ['suggest', 'suggestion', 'feedback', 'comment', 'leave feedback', 'idea'],
   },
   {
     label: 'Projects',
@@ -49,29 +49,29 @@ const CITIZEN_ENTRIES: SearchEntry[] = [
     label: 'News & Announcements',
     category: 'News',
     icon: 'Newspaper',
-    path: '/citizen/home',
+    path: '/citizen/home#news',
     keywords: ['news', 'announcements', 'updates', 'bulletin', 'latest'],
-  },
-  {
-    label: 'Submit Suggestion',
-    category: 'Community',
-    icon: 'MessageSquarePlus',
-    path: '/citizen/home',
-    keywords: ['suggest', 'suggestion', 'feedback', 'comment', 'leave feedback', 'idea'],
   },
   {
     label: 'Community Suggestions',
     category: 'Community',
     icon: 'Users',
-    path: '/citizen/home',
+    path: '/citizen/home#suggestions',
     keywords: ['community', 'all suggestions', 'citizen feedback', 'forum', 'discussion'],
   },
   {
     label: 'Barangay Transactions',
     category: 'Finance',
     icon: 'Receipt',
-    path: '/citizen/home',
+    path: '/citizen/home#transactions',
     keywords: ['transactions', 'receipts', 'expenses', 'disbursement', 'spending details'],
+  },
+  {
+    label: 'Budget Overview',
+    category: 'Finance',
+    icon: 'PieChart',
+    path: '/citizen/home#budget',
+    keywords: ['budget', 'spending', 'finance', 'funds', 'money', 'allocated'],
   },
   {
     label: 'My SK Officials',
@@ -102,7 +102,7 @@ const SK_ENTRIES: SearchEntry[] = [
     label: 'Budget Report',
     category: 'Finance',
     icon: 'PieChart',
-    path: '/sk/home',
+    path: '/sk/home#budget',
     keywords: ['budget', 'finance', 'spending', 'funds', 'breakdown', 'allocation'],
   },
   {
@@ -124,28 +124,28 @@ const SK_ENTRIES: SearchEntry[] = [
     label: 'Transactions & Receipts',
     category: 'Finance',
     icon: 'Receipt',
-    path: '/sk/home',
+    path: '/sk/home#transactions',
     keywords: ['transactions', 'receipts', 'purchase orders', 'expenses', 'vouchers'],
   },
   {
     label: 'Citizen Suggestions',
     category: 'Community',
     icon: 'MessageSquare',
-    path: '/sk/home',
+    path: '/sk/home#suggestions',
     keywords: ['suggestions', 'citizen feedback', 'community feedback', 'comments'],
   },
   {
     label: 'News & Announcements',
     category: 'News',
     icon: 'Newspaper',
-    path: '/sk/home',
+    path: '/sk/home#news',
     keywords: ['news', 'announcements', 'updates', 'bulletin'],
   },
   {
     label: 'Export PDF Report',
     category: 'Reports',
     icon: 'FileDown',
-    path: '/sk/home',
+    path: '/sk/home#reports',
     keywords: ['export', 'pdf', 'download', 'report', 'print', 'generate report'],
   },
   {
@@ -170,14 +170,14 @@ const SUPERADMIN_ENTRIES: SearchEntry[] = [
     label: 'City Budget Summary',
     category: 'Finance',
     icon: 'PieChart',
-    path: '/superadmin/home',
+    path: '/superadmin/home#budget',
     keywords: ['budget', 'city budget', 'executive summary', 'finance', 'funds'],
   },
   {
     label: 'All City Projects',
     category: 'Projects',
     icon: 'FolderOpen',
-    path: '/superadmin/home',
+    path: '/superadmin/home#projects',
     keywords: ['projects', 'all projects', 'city projects', 'programs'],
   },
   {
@@ -219,14 +219,14 @@ const SUPERADMIN_ENTRIES: SearchEntry[] = [
     label: 'Filter by Barangay',
     category: 'Filters',
     icon: 'MapPin',
-    path: '/superadmin/home',
+    path: '/superadmin/home#barangay-filter',
     keywords: ['barangay', 'filter', 'select barangay', 'location filter'],
   },
   {
     label: 'Export PDF Report',
     category: 'Reports',
     icon: 'FileDown',
-    path: '/superadmin/home',
+    path: '/superadmin/home#reports',
     keywords: ['export', 'pdf', 'download', 'print', 'report', 'generate'],
   },
   {
@@ -263,9 +263,13 @@ export function searchEntries(
   maxResults = 6
 ): SearchEntry[] {
   const q = query.trim().toLowerCase()
-  if (!q) return []
-
   const entries = getSearchEntries(role, skPosition)
+
+  // Show top default shortcuts when query is empty
+  if (!q) {
+    return entries.slice(0, maxResults)
+  }
+
   const scored: Array<{ entry: SearchEntry; score: number }> = []
 
   for (const entry of entries) {

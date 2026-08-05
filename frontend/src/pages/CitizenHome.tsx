@@ -478,7 +478,7 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
             >
               View Community Feed ↓
             </a>
-            <div className="header-action-row">
+           <div id="transactions" className="header-action-row">
               <button
                 className="btn btn-sm view-report-btn"
                 onClick={() => setShowReportModal(true)}
@@ -506,7 +506,7 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
         </div>
 
         {/* ── Financial Stat Cards ── */}
-        <div className="card-grid card-grid-4" style={{ marginBottom: '1.5rem' }}>
+        <div id="budget" className="card-grid card-grid-4" style={{ marginBottom: '1.5rem' }}>
           <div className="stat-card card-accent">
             <div className="stat-value">{formatCurrency(budget)}</div>
             <div className="stat-label">Annual Budget</div>
@@ -649,7 +649,7 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
                   Suggestion posted to the Barangay {barangay} SK feed! Thank you for participating.
                 </div>
               ) : (
-                <form onSubmit={handleComment} style={{ display: 'grid', gap: '0.85rem' }}>
+                <form id="submit-suggestion" onSubmit={handleComment} style={{ display: 'grid', gap: '0.85rem' }}>
                   <textarea
                     className="form-input"
                     rows={3}
@@ -685,8 +685,8 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
                 </form>
               )}
 
-              {/* Feed of Recent Citizen Suggestion Posts */}
-              <div style={{ marginTop: '1.8rem', borderTop: '1px solid rgba(118,0,49,0.08)', paddingTop: '1.2rem', display: 'grid', gap: '0.9rem' }}>
+             {/* Feed of Recent Citizen Suggestion Posts */}
+              <div id="suggestions" style={{ marginTop: '1.8rem', borderTop: '1px solid rgba(118,0,49,0.08)', paddingTop: '1.2rem', display: 'grid', gap: '0.9rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
                   <div className="page-kicker" style={{ margin: 0 }}>Barangay {barangay} Community Posts</div>
 
@@ -891,8 +891,8 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
 
           </div>
 
-          {/* Right Column — Latest News Sidebar */}
-          <div style={{ display: 'grid', gap: '1.5rem', alignContent: 'start' }}>
+         {/* Right Column — Latest News Sidebar */}
+          <div id="news" style={{ display: 'grid', gap: '1.5rem', alignContent: 'start' }}>
             <SingleNewsCarousel items={news} />
           </div>
 
