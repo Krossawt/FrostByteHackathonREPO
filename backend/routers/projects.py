@@ -5,7 +5,7 @@ GET    /api/v1/projects
 GET    /api/v1/projects/{id}
 POST   /api/v1/projects          (Chairperson or Secretary — creates Incoming immediately)
 PATCH  /api/v1/projects/{id}     (Chairperson or Secretary — edit + set status directly)
-DELETE /api/v1/projects/{id}     (Chairperson only — soft delete)
+DELETE /api/v1/projects/{id}     (Chairperson or Secretary — soft delete)
 
 Status values: Incoming | In Progress | Completed
 """
@@ -189,11 +189,11 @@ def update_project(
     return ProjectResponse.model_validate(project)
 
 
-@router.delete("/{project_id}", response_model=MessageResponse, summary="Soft-delete a project (Chairperson)")
+@router.delete("/{project_id}", response_model=MessageResponse, summary="Soft-delete a project (Chairperson or Secretary)")
 def delete_project(
     project_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_chairperson),
+    current_user: User = Depends(require_chairperson_or_secretary),
 ):
     project = _project_or_404(db, project_id)
     project.isDeleted = True
