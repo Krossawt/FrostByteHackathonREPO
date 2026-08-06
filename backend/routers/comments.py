@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import User, Comment, Project, ProjectStatus
 from schemas import CommentCreate, CommentResponse
+from moderation import check_text
 from auth import require_authenticated, get_optional_user, log_action
 
 router = APIRouter(tags=["Comments & Suggestions"])
@@ -135,8 +136,13 @@ def create_comment(
             Comment.commentID == payload.parentCommentID,
             Comment.commentFor == project_id
         ).first()
-        if not parent:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Parent comment not found in this project")
+    if payload.commentDetails and payload.commentDetails.strip():
+        is_flagged, _ = check_text(payload.commentDetails)
+        if is_flagged:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Your comment violates our community guidelines. Please refrain from using inappropriate languages and try again.",
+            )
 
     comment = Comment(
         commentFor=project_id,
@@ -184,6 +190,14 @@ def reply_to_comment(
     parent = db.query(Comment).filter(Comment.commentID == comment_id).first()
     if not parent:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found")
+
+    if payload.commentDetails and payload.commentDetails.strip():
+        is_flagged, _ = check_text(payload.commentDetails)
+        if is_flagged:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Your reply violates our community guidelines. Please refrain from using inappropriate languages and try again.",
+            )
 
     reply = Comment(
         commentFor=parent.commentFor,
