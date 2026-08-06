@@ -11,7 +11,7 @@ import CameraCaptureModal from './CameraCaptureModal'
 import ConfirmDialog from './ConfirmDialog'
 import Portal from './Portal'
 import DateInput from './DateInput'
-import { fetchCommentsApi, fetchProjectByIdApi, updateProjectApi, postCommentApi, createPurchaseOrderApi, fetchPurchaseOrdersApi, uploadReceiptImageApi, resolveImageUrl, normalizeProjectStatus, isProjectOngoing,toggleCommentUpvoteApi } from '../services/api'
+import { fetchCommentsApi, fetchProjectByIdApi, updateProjectApi, postCommentApi, createPurchaseOrderApi, fetchPurchaseOrdersApi, uploadReceiptImageApi, resolveImageUrl, normalizeProjectStatus, isProjectOngoing, toggleCommentUpvoteApi } from '../services/api'
 
 const CATEGORY_IMAGES: Record<string, string> = {
   'Education': 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=800&q=80',
@@ -213,6 +213,13 @@ export default function ProjectDetailModal({
   const [isSubmittingCommentReply, setIsSubmittingCommentReply] = useState(false)
   const [confirmDiscardCommentReply, setConfirmDiscardCommentReply] = useState(false)
 
+  // Editing/deleting an SK Council reply attached to a comment
+  const [editingReply, setEditingReply] = useState<{ commentId: string; replyId: string } | null>(null)
+  const [editReplyText, setEditReplyText] = useState('')
+  const [initialEditReplyText, setInitialEditReplyText] = useState('')
+  const [confirmDiscardEditReply, setConfirmDiscardEditReply] = useState(false)
+  const [deleteReplyTarget, setDeleteReplyTarget] = useState<{ commentId: string; replyId: string } | null>(null)
+
   // Auto-dismiss feedback banner after 3 seconds
   useEffect(() => {
     if (!feedback) return
@@ -310,56 +317,57 @@ export default function ProjectDetailModal({
       }
     }
 
-   async function loadProjectComments() {
-  try {
-    const pId = Number(project?.id)
-    if (!isNaN(pId)) {
-      const res = await fetchCommentsApi(pId)
-      if (Array.isArray(res)) {
-        
-        // 1. Create a temporary tracker for the votes on load
-        const preVotedIds = new Set<string>()
+    async function loadProjectComments() {
+      try {
+        const pId = Number(project?.id)
+        if (!isNaN(pId)) {
+          const res = await fetchCommentsApi(pId)
+          if (Array.isArray(res)) {
 
-        setLocalComments(res.map((c: any) => {
-          const stringId = String(c.commentID || c.id)
-          
-          // 2. Read the memory flag from the backend!
-          if (c.hasVoted) {
-            preVotedIds.add(stringId)
-          }
+            // 1. Create a temporary tracker for the votes on load
+            const preVotedIds = new Set<string>()
 
-          return {
-            id: stringId,
-            authorId: String(c.authorID ?? ''),
-            author: c.commentName || c.authorName || 'Citizen',
-            text: c.commentDetails,
-            type: c.commentType || 'comment',
-            votes: c.votesCount ?? c.votes ?? c.upvotes ?? 0,
-            upvotes: c.votesCount ?? c.votes ?? c.upvotes ?? 0,
-            hasVoted: c.hasVoted || false, // Pass the flag into local state
-            
-            replies: Array.isArray(c.replies || c.responses) 
-              ? (c.replies || c.responses).map((r: any) => ({
-                  id: String(r.commentID || r.id || `CR-${Date.now()}`),
-                  author: r.commentName || r.authorName || 'SK Official',
-                  role: r.authorRole || r.role || 'SK Official',
-                  text: r.commentDetails || r.text || '',
-                  date: r.commentTimestamp ? new Date(r.commentTimestamp).toLocaleDateString() : (r.createdAt ? new Date(r.createdAt).toLocaleDateString() : ''),
-                }))
-              : [], 
-            
-            date: c.commentTimestamp ? new Date(c.commentTimestamp).toLocaleDateString() : (c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'Just now'),
+            setLocalComments(res.map((c: any) => {
+              const stringId = String(c.commentID || c.id)
+
+              // 2. Read the memory flag from the backend!
+              if (c.hasVoted) {
+                preVotedIds.add(stringId)
+              }
+
+              return {
+                id: stringId,
+                authorId: String(c.authorID ?? ''),
+                author: c.commentName || c.authorName || 'Citizen',
+                text: c.commentDetails,
+                type: c.commentType || 'comment',
+                votes: c.votesCount ?? c.votes ?? c.upvotes ?? 0,
+                upvotes: c.votesCount ?? c.votes ?? c.upvotes ?? 0,
+                hasVoted: c.hasVoted || false, // Pass the flag into local state
+
+                replies: Array.isArray(c.replies || c.responses)
+                  ? (c.replies || c.responses).map((r: any) => ({
+                    id: String(r.commentID || r.id || `CR-${Date.now()}`),
+                    authorId: String(r.authorID ?? r.authorId ?? ''),
+                    author: r.commentName || r.authorName || 'SK Official',
+                    role: r.authorRole || r.role || 'SK Official',
+                    text: r.commentDetails || r.text || '',
+                    date: r.commentTimestamp ? new Date(r.commentTimestamp).toLocaleDateString() : (r.createdAt ? new Date(r.createdAt).toLocaleDateString() : ''),
+                  }))
+                  : [],
+
+                date: c.commentTimestamp ? new Date(c.commentTimestamp).toLocaleDateString() : (c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'Just now'),
+              }
+            }))
+
+            // 3. Update the UI state so your upvote buttons start highlighted!
+            setCommentVotedIds(preVotedIds)
           }
-        }))
-        
-        // 3. Update the UI state so your upvote buttons start highlighted!
-        setCommentVotedIds(preVotedIds)
+        }
+      } catch (err) {
+        console.warn('API fetch project comments warning:', err)
       }
     }
-  } catch (err) {
-    console.warn('API fetch project comments warning:', err)
-  }
-}
     loadProjectDetails()
     loadProjectReceipts()
     loadProjectComments()
@@ -682,17 +690,17 @@ export default function ProjectDetailModal({
           commentDetails: cText.trim(),
           commentType: cType,
         })
-            const newC = {
-      id: String(created?.commentID || Date.now()),
-      // ADDED: authorId based on user.id
-      authorId: String(created?.authorID ?? user?.id ?? ''),
-      author: created?.commentName || user?.name || 'Citizen',
-      text: created?.commentDetails || cText.trim(),
-      type: created?.commentType || cType,
-      upvotes: created?.votesCount || 0,
-      // FIXED: uses commentTimestamp
-      date: created?.commentTimestamp ? new Date(created.commentTimestamp).toLocaleDateString() : 'Just now',
-    }
+        const newC = {
+          id: String(created?.commentID || Date.now()),
+          // ADDED: authorId based on user.id
+          authorId: String(created?.authorID ?? user?.id ?? ''),
+          author: created?.commentName || user?.name || 'Citizen',
+          text: created?.commentDetails || cText.trim(),
+          type: created?.commentType || cType,
+          upvotes: created?.votesCount || 0,
+          // FIXED: uses commentTimestamp
+          date: created?.commentTimestamp ? new Date(created.commentTimestamp).toLocaleDateString() : 'Just now',
+        }
         setLocalComments(prev => [newC, ...prev])
         setFeedback({ type: 'success', message: 'Comment submitted successfully' })
       } else {
@@ -716,32 +724,32 @@ export default function ProjectDetailModal({
 
   const isMyComment = (c: any) => !!user && !!c.authorId && c.authorId === user.id
 
- const handleCommentVote = async (id: string) => {
-  const alreadyVoted = commentVotedIds.has(id)
-  
-  // 1. Instantly update the UI so it feels fast
-  setLocalComments(prev => prev.map(c => {
-    if (c.id !== id) return c
-    const delta = alreadyVoted ? -1 : 1
-    const nextVal = Math.max(0, (c.votes ?? c.upvotes ?? 0) + delta)
-    return { ...c, votes: nextVal, upvotes: nextVal }
-  }))
-  
-  setCommentVotedIds(prev => {
-    const next = new Set(prev)
-    if (alreadyVoted) next.delete(id)
-    else next.add(id)
-    return next
-  })
+  const handleCommentVote = async (id: string) => {
+    const alreadyVoted = commentVotedIds.has(id)
 
-  // 2. Send the upvote to the backend database
-  try {
-    await toggleCommentUpvoteApi(id)
-  } catch (err: any) {
-    console.error("Failed to sync upvote with server:", err)
-    setFeedback({ type: 'info', message: 'Failed to record upvote' })
+    // 1. Instantly update the UI so it feels fast
+    setLocalComments(prev => prev.map(c => {
+      if (c.id !== id) return c
+      const delta = alreadyVoted ? -1 : 1
+      const nextVal = Math.max(0, (c.votes ?? c.upvotes ?? 0) + delta)
+      return { ...c, votes: nextVal, upvotes: nextVal }
+    }))
+
+    setCommentVotedIds(prev => {
+      const next = new Set(prev)
+      if (alreadyVoted) next.delete(id)
+      else next.add(id)
+      return next
+    })
+
+    // 2. Send the upvote to the backend database
+    try {
+      await toggleCommentUpvoteApi(id)
+    } catch (err: any) {
+      console.error("Failed to sync upvote with server:", err)
+      setFeedback({ type: 'info', message: 'Failed to record upvote' })
+    }
   }
-}
 
   const handleStartEditComment = (c: any) => {
     setEditingCommentId(c.id)
@@ -801,41 +809,92 @@ export default function ProjectDetailModal({
     setFeedback({ type: 'info', message: 'Response discarded' })
   }
 
-  const handleSendCommentReply = async (id: string) => {
-  if (!commentReplyText.trim()) return
-  setIsSubmittingCommentReply(true)
-  
-  try {
-    const pId = Number(activeProject.id || (activeProject as any).projectId || (activeProject as any).projectID)
-    
-    // 1. Send the reply using your EXISTING postCommentApi
-    const createdReply = await postCommentApi({
-      commentFor: pId,
-      commentDetails: commentReplyText.trim(),
-      parentCommentID: Number(id) // Tells the backend this is a reply to an existing comment
-    });
-
-   // 2. Format the new reply for the frontend UI
-    const newReply = {
-      id: String(createdReply?.commentID || `CR-${Date.now()}`),
-      author: createdReply?.commentName || user?.name || 'SK Official',
-      role: createdReply?.authorRole || (user?.skPosition ? `SK ${user.skPosition}` : 'SK Official'),
-      text: createdReply?.commentDetails || commentReplyText.trim(),
-      date: createdReply?.commentTimestamp ? new Date(createdReply.commentTimestamp).toLocaleDateString() : new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-    }
-    
-    // 3. Update the local state to show the reply immediately
-    setLocalComments(prev => prev.map(c => c.id === id ? { ...c, replies: [...(c.replies ?? []), newReply] } : c))
-    setCommentReplyText('')
-    setActiveCommentReplyId(null)
-    setFeedback({ type: 'success', message: 'Response posted' })
-  } catch (err: any) {
-    console.error("Reply failed:", err)
-    setFeedback({ type: 'info', message: 'Failed to post response' })
-  } finally {
-    setIsSubmittingCommentReply(false)
+  const handleStartEditReply = (commentId: string, r: any) => {
+    setEditingReply({ commentId, replyId: r.id })
+    setEditReplyText(r.text)
+    setInitialEditReplyText(r.text)
   }
-}
+
+  const handleCancelEditReply = () => {
+    if (editReplyText.trim() !== initialEditReplyText.trim()) {
+      setConfirmDiscardEditReply(true)
+    } else {
+      setEditingReply(null)
+    }
+  }
+
+  const confirmDiscardEditReplyAction = () => {
+    setConfirmDiscardEditReply(false)
+    setEditingReply(null)
+    setEditReplyText('')
+    setFeedback({ type: 'info', message: 'Changes discarded' })
+  }
+
+  const handleSaveEditReply = () => {
+    if (!editingReply || !editReplyText.trim()) return
+    const { commentId, replyId } = editingReply
+    setLocalComments(prev => prev.map(c => {
+      if (c.id !== commentId) return c
+      return {
+        ...c,
+        replies: (c.replies ?? []).map((r: any) => r.id === replyId ? { ...r, text: editReplyText.trim() } : r),
+      }
+    }))
+    setEditingReply(null)
+    setFeedback({ type: 'success', message: 'Response updated' })
+  }
+
+  const handleDeleteReply = (commentId: string, replyId: string) => {
+    setDeleteReplyTarget({ commentId, replyId })
+  }
+
+  const confirmDeleteReplyAction = () => {
+    if (!deleteReplyTarget) return
+    const { commentId, replyId } = deleteReplyTarget
+    setLocalComments(prev => prev.map(c => {
+      if (c.id !== commentId) return c
+      return { ...c, replies: (c.replies ?? []).filter((r: any) => r.id !== replyId) }
+    }))
+    setDeleteReplyTarget(null)
+    setFeedback({ type: 'info', message: 'Response deleted' })
+  }
+
+  const handleSendCommentReply = async (id: string) => {
+    if (!commentReplyText.trim()) return
+    setIsSubmittingCommentReply(true)
+
+    try {
+      const pId = Number(activeProject.id || (activeProject as any).projectId || (activeProject as any).projectID)
+
+      // 1. Send the reply using your EXISTING postCommentApi
+      const createdReply = await postCommentApi({
+        commentFor: pId,
+        commentDetails: commentReplyText.trim(),
+        parentCommentID: Number(id) // Tells the backend this is a reply to an existing comment
+      });
+
+      // 2. Format the new reply for the frontend UI
+      const newReply = {
+        id: String(createdReply?.commentID || `CR-${Date.now()}`),
+        authorId: String(createdReply?.authorID ?? user?.id ?? ''),
+        author: createdReply?.commentName || user?.name || 'SK Official',
+        role: createdReply?.authorRole || (user?.skPosition ? `SK ${user.skPosition}` : 'SK Official'),
+        text: createdReply?.commentDetails || commentReplyText.trim(),
+        date: createdReply?.commentTimestamp ? new Date(createdReply.commentTimestamp).toLocaleDateString() : new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      }
+
+      // 3. Update the local state to show the reply immediately
+      setLocalComments(prev => prev.map(c => c.id === id ? { ...c, replies: [...(c.replies ?? []), newReply] } : c))
+      setCommentReplyText('')
+      setActiveCommentReplyId(null)
+      setFeedback({ type: 'success', message: 'Response posted' })
+    } catch (err: any) {
+      console.error("Reply failed:", err)
+      setFeedback({ type: 'info', message: 'Failed to post response' })
+    } finally {
+      setIsSubmittingCommentReply(false)
+    }
+  }
 
   // Pins the current user's own comments to the top, without needing a
   // separate "My Comments" tab. Stable sort preserves newest-first order
@@ -1769,17 +1828,99 @@ export default function ProjectDetailModal({
                                 <div style={{ fontSize: '0.72rem', fontFamily: 'var(--font-display)', fontWeight: 800, color: 'var(--maroon)', textTransform: 'uppercase' }}>
                                   Official SK Council Responses ({c.replies.length})
                                 </div>
-                                {c.replies.map((r: any) => (
-                                  <div key={r.id} style={{ background: 'rgba(118,0,49,0.04)', borderLeft: '3px solid var(--maroon)', padding: '0.6rem 0.85rem', borderRadius: '0 6px 6px 0' }}>
-                                    <div className="sk-reply-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem', flexWrap: 'wrap' }}>
-                                      <span className="sk-reply-author" style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '0.8rem', color: 'var(--ink)', minWidth: 0, wordBreak: 'break-word' }}>
-                                        {r.author} <span style={{ fontSize: '0.72rem', color: 'var(--maroon)', fontWeight: 600 }}>({r.role})</span>
-                                      </span>
-                                      <span className="sk-reply-date" style={{ fontSize: '0.7rem', color: 'var(--muted)', fontFamily: 'var(--font-display)', flexShrink: 0 }}>{r.date}</span>
+                                {c.replies.map((r: any) => {
+                                  const isEditingThisReply = editingReply?.commentId === c.id && editingReply?.replyId === r.id
+                                  const isMyReply = user?.role === 'sk' && !!user?.id && r.authorId === String(user.id)
+                                  return (
+                                    <div key={r.id} style={{ background: 'rgba(118,0,49,0.04)', borderLeft: '3px solid var(--maroon)', padding: '0.6rem 0.85rem', borderRadius: '0 6px 6px 0' }}>
+                                      {isMyReply && (
+                                        <div style={{
+                                          fontSize: '0.66rem',
+                                          fontWeight: 800,
+                                          color: 'var(--maroon)',
+                                          fontFamily: 'var(--font-display)',
+                                          textTransform: 'uppercase',
+                                          letterSpacing: '0.06em',
+                                          marginBottom: '0.35rem',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          gap: '0.3rem',
+                                        }}>
+                                          <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" /></svg>
+                                          This is your response
+                                        </div>
+                                      )}
+                                      <div className="sk-reply-header-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem', flexWrap: 'wrap' }}>
+                                        <span className="sk-reply-author" style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '0.8rem', color: 'var(--ink)', minWidth: 0, wordBreak: 'break-word' }}>
+                                          {r.author} <span style={{ fontSize: '0.72rem', color: 'var(--maroon)', fontWeight: 600 }}>({r.role})</span>
+                                          {isMyReply && <span style={{ marginLeft: '0.35rem', fontSize: '0.68rem', fontWeight: 800, color: '#fff', background: 'var(--maroon)', padding: '0.08rem 0.4rem', borderRadius: '4px' }}>YOU</span>}
+                                        </span>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+                                          <span className="sk-reply-date" style={{ fontSize: '0.7rem', color: 'var(--muted)', fontFamily: 'var(--font-display)' }}>{r.date}</span>
+                                          {isMyReply && !isEditingThisReply && (
+                                            <div style={{ display: 'flex', gap: '0.3rem' }}>
+                                              <button
+                                                type="button"
+                                                onClick={() => handleStartEditReply(c.id, r)}
+                                                title="Edit response"
+                                                style={{ background: 'none', border: '1px solid rgba(0,0,0,0.12)', padding: '0.2rem 0.5rem', borderRadius: '6px', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 600, color: '#3b82f6' }}
+                                              >
+                                                ✏️ Edit
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={() => handleDeleteReply(c.id, r.id)}
+                                                title="Delete response"
+                                                style={{ background: 'none', border: '1px solid rgba(220,38,38,0.2)', padding: '0.2rem 0.5rem', borderRadius: '6px', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 600, color: '#dc2626' }}
+                                              >
+                                                🗑️ Delete
+                                              </button>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      {isEditingThisReply ? (
+                                        <div style={{ marginTop: '0.4rem' }}>
+                                          <textarea
+                                            className="form-input"
+                                            rows={2}
+                                            value={editReplyText}
+                                            onChange={e => setEditReplyText(e.target.value)}
+                                            style={{ fontSize: '0.85rem', marginBottom: '0.4rem' }}
+                                          />
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                                            {editReplyText.trim() === initialEditReplyText.trim() && (
+                                              <span style={{ fontSize: '0.72rem', color: 'var(--muted)', fontStyle: 'italic', marginRight: 'auto' }}>
+                                                Edit the text to save changes
+                                              </span>
+                                            )}
+                                            <button
+                                              type="button"
+                                              className="btn btn-secondary btn-sm"
+                                              onClick={handleCancelEditReply}
+                                              style={{ padding: '0.3rem 0.7rem', fontSize: '0.75rem' }}
+                                            >
+                                              Cancel
+                                            </button>
+                                            {editReplyText.trim() !== initialEditReplyText.trim() && (
+                                              <button
+                                                type="button"
+                                                className="btn btn-primary btn-sm"
+                                                onClick={handleSaveEditReply}
+                                                style={{ padding: '0.3rem 0.9rem', fontSize: '0.75rem' }}
+                                              >
+                                                Save Changes
+                                              </button>
+                                            )}
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <p style={{ margin: 0, fontSize: '0.83rem', color: 'var(--ink-2)', lineHeight: 1.5 }}>{r.text}</p>
+                                      )}
                                     </div>
-                                    <p style={{ margin: 0, fontSize: '0.83rem', color: 'var(--ink-2)', lineHeight: 1.5 }}>{r.text}</p>
-                                  </div>
-                                ))}
+                                  )
+                                })}
                               </div>
                             )}
 
@@ -2052,6 +2193,30 @@ export default function ProjectDetailModal({
         variant="danger"
         onConfirm={confirmDiscardCommentReplyAction}
         onCancel={() => setConfirmDiscardCommentReply(false)}
+      />
+
+      {/* ── Discard Changes Confirmation (Editing an SK reply) ── */}
+      <ConfirmDialog
+        isOpen={confirmDiscardEditReply}
+        title="Discard Changes"
+        message="Any unsaved edits to your response will be lost. Discard them?"
+        confirmLabel="Discard"
+        cancelLabel="Keep Editing"
+        variant="danger"
+        onConfirm={confirmDiscardEditReplyAction}
+        onCancel={() => setConfirmDiscardEditReply(false)}
+      />
+
+      {/* ── Delete SK Reply Confirmation ── */}
+      <ConfirmDialog
+        isOpen={deleteReplyTarget !== null}
+        title="Delete Response"
+        message="This will permanently delete this official response. Are you sure?"
+        confirmLabel="Delete"
+        cancelLabel="Keep It"
+        variant="danger"
+        onConfirm={confirmDeleteReplyAction}
+        onCancel={() => setDeleteReplyTarget(null)}
       />
     </>
   )
