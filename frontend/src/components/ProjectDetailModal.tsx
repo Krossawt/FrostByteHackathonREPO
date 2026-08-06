@@ -998,6 +998,37 @@ export default function ProjectDetailModal({
       box-sizing: border-box;
     }
 
+    .project-modal .badge-ongoing,
+.project-modal .badge-upcoming,
+.project-modal .badge-completed,
+.project-modal .badge-cancelled {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  white-space: nowrap;
+  padding: 0.28rem 0.65rem;
+  border: none;
+}
+
+.project-modal .badge-ongoing {
+  background: var(--maroon);
+  color: #fff;
+}
+
+.project-modal .badge-upcoming {
+  background: #2563eb;
+  color: #fff;
+}
+
+.project-modal .badge-completed {
+  background: #166534;
+  color: #fff;
+}
+
+.project-modal .badge-cancelled {
+  background: #4b5563;
+  color: #fff;
+}
     @media (max-width: 400px) {
       .status-section-header {
         flex-direction: column;
