@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react'
 
+// VITE_API_URL is baked into the build at compile time — always the deployed Render backend URL
+const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'https://frostbytehackathonrepo.onrender.com/api/v1'
+
 interface Newsletter {
   newsletterID: number
   title: string
@@ -13,36 +16,63 @@ interface Newsletter {
 export default function NewsTicker() {
   const [tickerItems, setTickerItems] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchNewsletters = async () => {
       try {
         setLoading(true)
-        setError(null)
-        
-        // Fetch from your backend API (full URL for cross-port requests)
-        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
-        const response = await fetch(`${API_URL}/newsletter?limit=20`)
-        
+
+        const response = await fetch(`${API_BASE_URL}/newsletter?limit=20`)
+
         if (!response.ok) {
-          throw new Error(`Failed to fetch newsletters: ${response.statusText}`)
+          console.warn(`[NewsTicker] Newsletter fetch returned ${response.status}`)
+          setTickerItems([])
+          return
         }
-        
-        const newsletters: Newsletter[] = await response.json()
-        
-        // Extract titles and create ticker items
-        const titles = newsletters.map(n => n.title)
-        setTickerItems(titles)
-        
-        // If fewer than 3 items, duplicate them to ensure smooth scrolling
+
+        // Safely parse — guard against empty response body
+        const text = await response.text()
+        if (!text || !text.trim()) {
+          setTickerItems([])
+          return
+        }
+
+        let data: any
+        try {
+          data = JSON.parse(text)
+        } catch {
+          setTickerItems([])
+          return
+        }
+
+        // Handle both array responses and object-wrapped responses
+        let newsletters: Newsletter[] = []
+        if (Array.isArray(data)) {
+          newsletters = data
+        } else if (data && Array.isArray(data.items)) {
+          newsletters = data.items
+        } else if (data && Array.isArray(data.data)) {
+          newsletters = data.data
+        } else if (data && Array.isArray(data.newsletters)) {
+          newsletters = data.newsletters
+        }
+
+        const titles = newsletters.map(n => n.title).filter(Boolean)
+
+        if (titles.length === 0) {
+          setTickerItems([])
+          return
+        }
+
+        // Ensure enough items for smooth infinite scrolling animation
         if (titles.length < 3) {
           setTickerItems([...titles, ...titles, ...titles])
+        } else {
+          setTickerItems(titles)
         }
       } catch (err) {
-        console.error('Error fetching newsletters:', err)
-        setError(err instanceof Error ? err.message : 'Failed to load news')
-        // Fallback to empty state - ticker won't show if no data
+        // Silently fail — do not show ticker if backend is unreachable
+        console.warn('[NewsTicker] Could not load headlines:', err)
         setTickerItems([])
       } finally {
         setLoading(false)
@@ -50,13 +80,13 @@ export default function NewsTicker() {
     }
 
     fetchNewsletters()
-    
-    // Optional: Refresh every 5 minutes
+
+    // Refresh every 5 minutes
     const interval = setInterval(fetchNewsletters, 5 * 60 * 1000)
     return () => clearInterval(interval)
   }, [])
 
-  // Don't render ticker if empty or loading
+  // Don't render ticker if empty or still loading
   if (loading || tickerItems.length === 0) {
     return null
   }
