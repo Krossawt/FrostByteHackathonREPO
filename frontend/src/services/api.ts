@@ -274,9 +274,20 @@ export async function fetchProjectByIdApi(projectId: number | string): Promise<a
 }
 
 export async function updateProjectApi(projectId: number | string, payload: UpdateProjectPayload): Promise<any> {
+  const body: any = { ...payload }
+  if (body.projectStatus) {
+    const s = String(body.projectStatus).trim().toLowerCase()
+    if (s === 'ongoing' || s === 'in progress' || s === 'in-progress' || s === 'active') {
+      body.projectStatus = 'In Progress'
+    } else if (s === 'incoming' || s === 'upcoming' || s === 'drafted') {
+      body.projectStatus = 'Incoming'
+    } else if (s === 'completed' || s === 'posted' || s === 'done') {
+      body.projectStatus = 'Completed'
+    }
+  }
   return request<any>(`/projects/${projectId}`, {
     method: 'PATCH',
-    body: JSON.stringify(payload),
+    body: JSON.stringify(body),
   })
 }
 

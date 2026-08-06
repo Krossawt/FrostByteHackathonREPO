@@ -155,6 +155,19 @@ class ProjectUpdate(BaseModel):
     def clean_project_update_fields(cls, v: Optional[str]) -> Optional[str]:
         return sanitize_str(v)
 
+    @field_validator("projectStatus", mode="before")
+    @classmethod
+    def normalize_project_status_input(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            s = v.strip().lower()
+            if s in ("ongoing", "in progress", "in-progress", "active"):
+                return ProjectStatus.IN_PROGRESS
+            if s in ("incoming", "upcoming", "drafted"):
+                return ProjectStatus.INCOMING
+            if s in ("completed", "posted", "done"):
+                return ProjectStatus.COMPLETED
+        return v
+
 
 class ProjectBreakdownUpdate(BaseModel):
     projectBreakdown: float = Field(..., ge=0, le=1_000_000_000, description="Total financial breakdown filled by Treasurer")

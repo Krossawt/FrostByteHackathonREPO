@@ -28,6 +28,7 @@ class UserRole(str, enum.Enum):
 class ProjectStatus(str, enum.Enum):
     INCOMING       = "Incoming"
     IN_PROGRESS    = "In Progress"
+    ONGOING        = "Ongoing"
     COMPLETED      = "Completed"
     # Legacy fallbacks for database backward compatibility
     DRAFTED        = "Drafted"
