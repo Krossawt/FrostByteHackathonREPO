@@ -11,9 +11,9 @@ POST /api/v1/suggestions/{id}/reply       — Reply to a suggestion (SK official
 from moderation import check_text
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from database import get_db
-from models import User, Suggestion, SuggestionReply, SuggestionVote, UserRole
+from models import User, Suggestion, SuggestionReply, SuggestionVote, SuggestionAcknowledgement, UserRole
 from schemas import SuggestionCreate, SuggestionResponse, SuggestionReplyCreate, SuggestionReplyResponse
 from auth import require_authenticated, log_action
 
@@ -34,13 +34,32 @@ def list_suggestions(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_authenticated),
 ):
-    query = db.query(Suggestion)
+    query = db.query(Suggestion).options(joinedload(Suggestion.acknowledgements).joinedload(SuggestionAcknowledgement.user))
     if barangay and barangay.strip() and barangay.strip().lower() not in {"all", "santa rosa city"}:
         query = query.filter(Suggestion.barangay == barangay)
     items = query.order_by(Suggestion.createdAt.desc()).offset(skip).limit(limit).all()
+
+    if items:
+        acked_ids = {
+            ack.suggestionID
+            for ack in db.query(SuggestionAcknowledgement)
+                        .filter(SuggestionAcknowledgement.userID == current_user.userID,
+                                SuggestionAcknowledgement.suggestionID.in_([s.suggestionID for s in items]))
+                        .all()
+        }
+    else:
+        acked_ids = set()
+
     for s in items:
         if s.votesCount is None:
             s.votesCount = 0
+        for ack in s.acknowledgements:
+            if ack.user:
+                ack.userRole = str(getattr(ack.user.userRole, 'value', ack.user.userRole))
+            else:
+                ack.userRole = None
+        s.hasVoted = s.suggestionID in acked_ids
+
     return [SuggestionResponse.model_validate(s) for s in items]
 
 
@@ -94,32 +113,48 @@ def vote_suggestion(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_authenticated),
 ):
+    return acknowledge_suggestion(suggestion_id, db=db, current_user=current_user)
+
+
+@router.post("/{suggestion_id}/acknowledge", response_model=SuggestionResponse,
+             summary="Toggle Agree / Helpful on a suggestion")
+def acknowledge_suggestion(
+    suggestion_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_authenticated),
+):
     suggestion = db.query(Suggestion).filter(Suggestion.suggestionID == suggestion_id).first()
     if not suggestion:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Suggestion not found")
 
-    existing_vote = db.query(SuggestionVote).filter(
-        SuggestionVote.suggestionID == suggestion_id,
-        SuggestionVote.userID == current_user.userID
+    from models import SuggestionAcknowledgement
+    
+    existing_ack = db.query(SuggestionAcknowledgement).filter(
+        SuggestionAcknowledgement.suggestionID == suggestion_id,
+        SuggestionAcknowledgement.userID == current_user.userID
     ).first()
 
-    if existing_vote:
-        # User already voted — UNDO / UNCHECK / UNVOTE
-        db.delete(existing_vote)
-        suggestion.votesCount = max(0, (suggestion.votesCount or 0) - 1)
-        db.commit()
-        db.refresh(suggestion)
-        return SuggestionResponse.model_validate(suggestion)
+    if existing_ack:
+        db.delete(existing_ack)
+        new_has_voted = False
+    else:
+        ack = SuggestionAcknowledgement(
+            suggestionID=suggestion_id,
+            userID=current_user.userID,
+            userName=current_user.userName
+        )
+        db.add(ack)
+        new_has_voted = True
 
-    vote = SuggestionVote(
-        suggestionID=suggestion_id,
-        userID=current_user.userID,
-    )
-    db.add(vote)
-    suggestion.votesCount = (suggestion.votesCount or 0) + 1
+    db.commit()
+
+    ack_count = db.query(SuggestionAcknowledgement).filter(
+        SuggestionAcknowledgement.suggestionID == suggestion_id
+    ).count()
+    suggestion.votesCount = ack_count
+    suggestion.hasVoted = new_has_voted
     db.commit()
     db.refresh(suggestion)
-
     return SuggestionResponse.model_validate(suggestion)
 
 

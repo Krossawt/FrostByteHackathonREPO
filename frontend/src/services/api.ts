@@ -719,6 +719,12 @@ export interface SuggestionReplyItem {
   createdAt: string
 }
 
+export interface SuggestionAcknowledgerItem {
+  userID: number
+  userName: string
+  userRole?: string
+}
+
 export interface SuggestionItem {
   suggestionID: number
   barangay: string
@@ -729,13 +735,20 @@ export interface SuggestionItem {
   votesCount: number
   createdAt: string
   replies?: SuggestionReplyItem[]
+  hasVoted: boolean
+  acknowledgements?: SuggestionAcknowledgerItem[]
 }
 
 export async function fetchSuggestionsApi(barangay?: string): Promise<SuggestionItem[]> {
   try {
     const params = barangay ? `?barangay=${encodeURIComponent(barangay)}` : ''
-    const res = await request<SuggestionItem[]>(`/suggestions${params}`)
-    return Array.isArray(res) ? res : []
+    const res = await request<any[]>(`/suggestions${params}`)
+    if (!Array.isArray(res)) return []
+    return res.map((n: any) => ({
+      ...n,
+      hasVoted: n.hasVoted ?? false,
+      acknowledgements: Array.isArray(n.acknowledgements) ? n.acknowledgements : [],
+    }))
   } catch (err) {
     console.warn('fetchSuggestionsApi error:', err)
     return []
@@ -753,8 +766,9 @@ export async function postSuggestionApi(payload: {
 }
 
 export async function voteSuggestionApi(suggestionId: number): Promise<SuggestionItem> {
-  return request<SuggestionItem>(`/suggestions/${suggestionId}/vote`, {
+  return request<SuggestionItem>(`/suggestions/${suggestionId}/acknowledge`, {
     method: 'POST',
+    body: JSON.stringify({}), // Explicitly passing an empty JSON object fixes header drop issues on some fetch configurations
   })
 }
 

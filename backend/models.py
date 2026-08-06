@@ -263,6 +263,9 @@ class Suggestion(Base):
     # Relationships
     author              = relationship("User")
     replies             = relationship("SuggestionReply", back_populates="suggestion", cascade="all, delete-orphan", order_by="SuggestionReply.createdAt.asc()")
+    
+    # ── ADD THIS RELATIONSHIP ──
+    acknowledgements    = relationship("SuggestionAcknowledgement", backref="suggestion", cascade="all, delete-orphan")
 
 
 # ─── TABLE: SUGGESTION REPLIES ─────────────────────────────────────────────
@@ -282,7 +285,6 @@ class SuggestionReply(Base):
     suggestion          = relationship("Suggestion", back_populates="replies")
     author              = relationship("User")
 
-
 # ─── TABLE: SUGGESTION VOTES ───────────────────────────────────────────────
 
 class SuggestionVote(Base):
@@ -292,6 +294,18 @@ class SuggestionVote(Base):
     suggestionID        = Column(Integer, ForeignKey("suggestions.suggestionID", ondelete="CASCADE"), nullable=False, index=True)
     userID              = Column(Integer, ForeignKey("users.userID", ondelete="CASCADE"), nullable=False, index=True)
     createdAt           = Column(DateTime, default=func.now())
+
+
+class SuggestionAcknowledgement(Base):
+    __tablename__ = "suggestion_acknowledgements"
+
+    ackID               = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    suggestionID        = Column(Integer, ForeignKey("suggestions.suggestionID", ondelete="CASCADE"), nullable=False, index=True)
+    userID              = Column(Integer, ForeignKey("users.userID", ondelete="CASCADE"), nullable=False, index=True)
+    userName            = Column(String, nullable=True)
+    createdAt           = Column(DateTime, default=func.now())
+
+    user                = relationship("User")
 
 
 # ─── TABLE: OTP VERIFICATIONS ──────────────────────────────────────────────────

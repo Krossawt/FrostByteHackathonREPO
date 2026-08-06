@@ -152,6 +152,7 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
         // Load suggestions from backend
         if (Array.isArray(suggRes) && suggRes.length > 0) {
           setLocalComments(suggRes)
+          setVotedIds(new Set(suggRes.filter((c: any) => c.hasVoted).map((c: any) => c.suggestionID)))
         }
       } catch (err) {
         console.warn('API load warning:', err)
@@ -826,6 +827,9 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
                             type="button"
                             onClick={() => handleVote(c.suggestionID)}
                             className="link-button"
+                            title={(c.acknowledgements?.filter((a: any) => a.userRole?.toLowerCase().startsWith('sk ')) ?? []).length
+                              ? `Acknowledged by ${(c.acknowledgements ?? []).filter((a: any) => a.userRole?.toLowerCase().startsWith('sk ')).map((a: any) => a.userName).join(', ')}`
+                              : 'No SK official acknowledgements yet'}
                             style={{
                               display: 'flex',
                               alignItems: 'center',
@@ -859,6 +863,22 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
                             Barangay {barangay} Feed
                           </span>
                         </div>
+                        {((c.acknowledgements ?? []).filter((a: any) => a.userRole?.toLowerCase().startsWith('sk '))).length > 0 && (
+                          <details style={{ marginTop: '0.45rem', padding: '0.9rem 1rem', border: '1px solid rgba(118,0,49,0.14)', borderRadius: '12px', background: 'rgba(255,255,255,0.98)', boxShadow: '0 10px 20px rgba(118,0,49,0.06)' }}>
+                            <summary style={{ cursor: 'pointer', fontSize: '0.86rem', fontWeight: 700, color: 'var(--maroon)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', listStyle: 'none', outline: 'none' }}>
+                              <span>☆ Official SK Acknowledgements ({(c.acknowledgements ?? []).filter((a: any) => a.userRole?.toLowerCase().startsWith('sk ')).length})</span>
+                              <span style={{ marginLeft: '0.8rem', fontSize: '0.84rem', color: 'var(--muted)' }}>▾</span>
+                            </summary>
+                            <div style={{ marginTop: '0.75rem', display: 'grid', gap: '0.4rem', paddingLeft: '0.25rem' }}>
+                              {(c.acknowledgements ?? []).filter((a: any) => a.userRole?.toLowerCase().startsWith('sk ')).map((a: any, idx: number) => (
+                                <div key={`${a.userID}-${idx}`} style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', padding: '0.55rem 0.75rem', background: 'rgba(118,0,49,0.04)', borderRadius: '10px', fontSize: '0.84rem', color: 'var(--ink)' }}>
+                                  <span>{a.userName}</span>
+                                  <span style={{ color: 'var(--muted)', fontWeight: 600 }}>{a.userRole ?? 'SK Official'}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </details>
+                        )}
 
                         {/* SK Council Responses */}
                         {c.replies && c.replies.length > 0 && (

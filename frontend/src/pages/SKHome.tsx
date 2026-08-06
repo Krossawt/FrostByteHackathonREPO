@@ -165,6 +165,7 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
         // Load citizen suggestions for this barangay
         if (Array.isArray(suggRes)) {
           setLocalComments(suggRes)
+          setVotedIds(new Set(suggRes.filter((c: any) => c.hasVoted).map((c: any) => c.suggestionID)))
         }
       } catch (err) {
         console.warn('API load warning:', err)
@@ -239,30 +240,19 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
     return () => clearTimeout(timer)
   }, [feedback])
 
-  const handleVote = async (id: number) => {
-    const alreadyVoted = votedIds.has(id)
+ const handleVote = async (id: number) => {
     try {
       const updated = await voteSuggestionApi(id)
       setLocalComments((prev) => prev.map((c) => c.suggestionID === id ? updated : c))
       setVotedIds(prev => {
         const next = new Set(prev)
-        if (alreadyVoted) next.delete(id)
-        else next.add(id)
+        if (updated.hasVoted) next.add(id)
+        else next.delete(id)
         return next
       })
-      setFeedback({ type: 'success', message: alreadyVoted ? 'Acknowledgment removed' : 'Suggestion acknowledged' })
-    } catch {
-      setLocalComments((prev) => prev.map((c) => {
-        if (c.suggestionID !== id) return c
-        const delta = alreadyVoted ? -1 : 1
-        return { ...c, votesCount: Math.max(0, (c.votesCount || 0) + delta) }
-      }))
-      setVotedIds(prev => {
-        const next = new Set(prev)
-        if (alreadyVoted) next.delete(id)
-        else next.add(id)
-        return next
-      })
+      setFeedback({ type: 'success', message: updated.hasVoted ? 'Suggestion acknowledged' : 'Acknowledgement removed' })
+    } catch (err: any) {
+      setFeedback({ type: 'error', message: err?.message || 'Failed to update acknowledgment' })
     }
   }
 
@@ -682,8 +672,7 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
                           type="button"
                           onClick={() => handleVote(c.suggestionID)}
                           className="link-button"
-                          disabled={votedIds.has(c.suggestionID)}
-                          title={votedIds.has(c.suggestionID) ? 'Already acknowledged' : 'Acknowledge as important'}
+                          title={votedIds.has(c.suggestionID) ? 'Remove your agreement' : 'Agree with this suggestion'}
                           style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -693,7 +682,7 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
                             fontWeight: 500,
                             fontFamily: 'var(--font-display)',
                             lineHeight: 1,
-                            opacity: votedIds.has(c.suggestionID) ? 0.6 : 1,
+                            opacity: 1,
                             transition: 'opacity 0.15s ease',
                           }}
                         >
@@ -707,7 +696,7 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
                           >
                             <path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 21 12 17.77 5.82 21 7 14.14 2 9.27l6.91-1.01L12 2z" />
                           </svg>
-                          <span style={{ lineHeight: 1 }}>Acknowledge ({c.votesCount ?? 0})</span>
+                          <span style={{ lineHeight: 1 }}>{votedIds.has(c.suggestionID) ? '✓ Agreed / Helpful' : 'Agree / Helpful'} ({c.votesCount ?? 0})</span>
                         </button>
                         <button
                           type="button"

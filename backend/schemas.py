@@ -433,6 +433,14 @@ class SuggestionCreate(BaseModel):
         return sanitize_str(v)
 
 
+class SuggestionAcknowledger(BaseModel):
+    userID: int
+    userName: str
+    userRole: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
 class SuggestionResponse(BaseModel):
     suggestionID: int
     barangay: str
@@ -443,7 +451,8 @@ class SuggestionResponse(BaseModel):
     votesCount: int
     createdAt: datetime
     replies: List[SuggestionReplyResponse] = []
+    hasVoted: bool = False
+    acknowledgements: List[SuggestionAcknowledger] = []
 
     model_config = {"from_attributes": True}
-
 
