@@ -11,6 +11,7 @@ import CameraCaptureModal from './CameraCaptureModal'
 import ConfirmDialog from './ConfirmDialog'
 import Portal from './Portal'
 import DateInput from './DateInput'
+import { formatCurrency } from '../utils/formatCurrency'
 import { fetchCommentsApi, fetchProjectByIdApi, updateProjectApi, postCommentApi, createPurchaseOrderApi, fetchPurchaseOrdersApi, uploadReceiptImageApi, resolveImageUrl, normalizeProjectStatus, isProjectOngoing, toggleCommentUpvoteApi } from '../services/api'
 
 const CATEGORY_IMAGES: Record<string, string> = {
@@ -1114,15 +1115,15 @@ export default function ProjectDetailModal({
                       <div className="project-modal-stat-label">Completion</div>
                     </div>
                     <div className="project-modal-stat-item">
-                      <div className="project-modal-stat-val">₱{(activeProject.proposedBudget / 1000).toFixed(0)}K</div>
+                      <div className="project-modal-stat-val">{formatCurrency(activeProject.proposedBudget)}</div>
                       <div className="project-modal-stat-label">Proposed Budget</div>
                     </div>
                     <div className="project-modal-stat-item">
-                      <div className="project-modal-stat-val" style={{ color: '#b45309' }}>₱{(activeProject.spent / 1000).toFixed(0)}K</div>
+                      <div className="project-modal-stat-val" style={{ color: '#b45309' }}>{formatCurrency(activeProject.spent)}</div>
                       <div className="project-modal-stat-label">Disbursed</div>
                     </div>
                     <div className="project-modal-stat-item">
-                      <div className="project-modal-stat-val" style={{ color: '#166534' }}>₱{((activeProject.proposedBudget - activeProject.spent) / 1000).toFixed(0)}K</div>
+                      <div className="project-modal-stat-val" style={{ color: '#166534' }}>{formatCurrency(activeProject.proposedBudget - activeProject.spent)}</div>
                       <div className="project-modal-stat-label">Remaining</div>
                     </div>
                   </div>

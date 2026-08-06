@@ -3,6 +3,7 @@ import type { UserAccount } from '../types'
 import ProjectDetailModal from '../components/ProjectDetailModal'
 import type { ReportProject } from '../types'
 import { fetchProjectsApi, normalizeProjectStatus } from '../services/api'
+import { formatCurrency } from '../utils/formatCurrency'
 
 interface CitizenProjectsProps { user?: UserAccount | null }
 
@@ -186,11 +187,11 @@ export default function CitizenProjects({ user }: CitizenProjectsProps) {
 
                   <div className="v-card-footer">
                     <div>
-                      <div className="v-card-budget">₱{(p.proposedBudget / 1000).toFixed(0)}K</div>
+                      <div className="v-card-budget">{formatCurrency(p.proposedBudget)}</div>
                       <div className="v-card-budget-label">Proposed Budget</div>
                     </div>
                     <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.82rem', color: '#b45309' }}>₱{(p.spent / 1000).toFixed(0)}K</div>
+                      <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.82rem', color: '#b45309' }}>{formatCurrency(p.spent)}</div>
                       <div className="v-card-budget-label">Disbursed</div>
                     </div>
                   </div>

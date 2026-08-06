@@ -618,7 +618,7 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
 
                       <div className="v-card-footer" style={{ paddingTop: '0.65rem' }}>
                         <div>
-                          <div className="v-card-budget" style={{ fontSize: '0.95rem' }}>₱{(p.proposedBudget / 1000).toFixed(0)}K</div>
+                          <div className="v-card-budget" style={{ fontSize: '0.95rem' }}>{formatCurrency(p.proposedBudget)}</div>
                           <div className="v-card-budget-label">Proposed Budget</div>
                         </div>
                         <div style={{ fontSize: '0.76rem', color: 'var(--maroon)', fontFamily: 'var(--font-display)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.2rem' }}>

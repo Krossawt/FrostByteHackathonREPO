@@ -534,7 +534,7 @@ export default function SKProjects({ user }: SKProjectsProps) {
 
                   <div className="v-card-footer">
                     <div>
-                      <div className="v-card-budget">₱{(p.proposedBudget / 1000).toFixed(0)}K</div>
+                      <div className="v-card-budget">{formatCurrency(p.proposedBudget)}</div>
                       <div className="v-card-budget-label">Budget</div>
                     </div>
                     {/* SK actions — gated by role: Chairperson sees all three,

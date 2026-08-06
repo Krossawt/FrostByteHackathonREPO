@@ -5,6 +5,7 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import type { ReportProject } from '../types'
 import Portal from '../components/Portal'
 import { fetchProjectsApi, fetchExecutiveSummaryApi, fetchAuditLogsApi, fetchNewsApi, postApprovedAbyipApi, createNewsletterApi, normalizeProjectStatus } from '../services/api'
+import { formatCurrency } from '../utils/formatCurrency'
 import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
 
@@ -755,11 +756,11 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
 
                           <div className="v-card-footer">
                             <div>
-                              <div className="v-card-budget">₱{(p.proposedBudget / 1000).toFixed(0)}K</div>
+                              <div className="v-card-budget">{formatCurrency(p.proposedBudget)}</div>
                               <div className="v-card-budget-label">Budget</div>
                             </div>
                             <div style={{ textAlign: 'right', fontSize: '0.72rem', color: 'var(--muted)', fontFamily: 'var(--font-display)' }}>
-                              <div>Spent: <strong style={{ color: '#b45309' }}>₱{(p.spent / 1000).toFixed(0)}K</strong></div>
+                              <div>Spent: <strong style={{ color: '#b45309' }}>{formatCurrency(p.spent)}</strong></div>
                             </div>
                           </div>
                         </div>

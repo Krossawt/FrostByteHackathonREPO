@@ -20,9 +20,12 @@ export function formatCurrency(value: number): string {
 
   let formatted: string;
   if (absValue >= 999_500) {
-    formatted = `₱${(absValue / 1_000_000).toFixed(2)}M`;
+    const formattedM = (absValue / 1_000_000).toFixed(2).replace(/\.00$/, '');
+    formatted = `₱${formattedM}M`;
   } else if (absValue >= 1_000) {
-    formatted = `₱${(absValue / 1_000).toFixed(1)}K`;
+    const inK = absValue / 1_000;
+    const formattedK = inK.toFixed(1).replace(/\.0$/, '');
+    formatted = `₱${formattedK}K`;
   } else {
     formatted = `₱${absValue.toLocaleString()}`;
   }
