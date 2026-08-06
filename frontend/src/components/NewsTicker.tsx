@@ -22,7 +22,7 @@ export default function NewsTicker() {
         setError(null)
         
         // Fetch from your backend API (full URL for cross-port requests)
-        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
+      const API_URL = import.meta.env.VITE_API_URL || 'https://frostbytehackathonrepo.onrender.com/api/v1'
         const response = await fetch(`${API_URL}/newsletter?limit=20`)
         
         if (!response.ok) {
