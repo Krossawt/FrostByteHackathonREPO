@@ -5,6 +5,8 @@
 
 import type { UserAccount, ReportProject, NewsItem } from '../types'
 
+// VITE_API_URL is baked into the build at compile time by Vite from frontend/.env
+// Always points to the deployed Render backend: https://frostbytehackathonrepo.onrender.com/api/v1
 const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'https://frostbytehackathonrepo.onrender.com/api/v1'
 const TOKEN_KEY = 'eskala_access_token'
 
@@ -22,7 +24,7 @@ export function setStoredToken(token: string | null, _remember = true): void {
   }
 }
 
-const IS_DEV = true
+const IS_DEV = (import.meta as any).env?.DEV === true
 
 import { sanitizeText } from '../utils/sanitize'
 
@@ -87,9 +89,12 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     if (!response.ok) {
       let errorDetail = `HTTP ${response.status}: ${response.statusText}`
       try {
-        const errJson = await response.json()
-        if (errJson.detail) {
-          errorDetail = typeof errJson.detail === 'string' ? errJson.detail : JSON.stringify(errJson.detail)
+        const text = await response.text()
+        if (text) {
+          const errJson = JSON.parse(text)
+          if (errJson.detail) {
+            errorDetail = typeof errJson.detail === 'string' ? errJson.detail : JSON.stringify(errJson.detail)
+          }
         }
       } catch {
         // fallback to HTTP status
@@ -104,7 +109,53 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
       throw new Error(errorDetail)
     }
 
-    const data = await response.json()
+    // Safely parse JSON — guard against empty bodies (204 No Content, etc.)
+    const contentType = response.headers.get('content-type') || ''
+    const text = await response.text()
+    if (!text || !text.trim()) {
+      return null as unknown as T
+    }
+    if (!contentType.includes('application/json') && !contentType.includes('text/json')) {
+      // If content-type is not JSON but we got text, try parsing anyway
+      try {
+        const data = JSON.parse(text)
+        if (IS_DEV) {
+          console.log(
+            `%c[API SUCCESS] %c${method} ${endpoint}`,
+            'background: #166534; color: #fff; font-weight: bold; padding: 2px 6px; border-radius: 3px;',
+            'color: #15803d;',
+            data
+          )
+        }
+        return data as T
+      } catch {
+        return text as unknown as T
+      }
+    }
+    // Guard against HTML error pages (e.g., Render sleeping/503 returns <!DOCTYPE html>)
+    if (text.trimStart().startsWith('<')) {
+      console.error(
+        `%c[API PARSE ERROR] %c${method} ${endpoint}`,
+        'background: #92400e; color: #fff; font-weight: bold; padding: 2px 6px; border-radius: 3px;',
+        'color: #78350f; font-weight: bold;',
+        'Server returned HTML instead of JSON — backend may be sleeping or URL is wrong.',
+        text.slice(0, 200)
+      )
+      throw new Error('Server is temporarily unavailable. Please try again in a moment.')
+    }
+    let data: T
+    try {
+      data = JSON.parse(text)
+    } catch (parseErr) {
+      console.error(
+        `%c[API PARSE ERROR] %c${method} ${endpoint}`,
+        'background: #92400e; color: #fff; font-weight: bold; padding: 2px 6px; border-radius: 3px;',
+        'color: #78350f; font-weight: bold;',
+        'Invalid JSON response from server:',
+        text.slice(0, 300)
+      )
+      throw new Error('Received an invalid response from the server. Please try again.')
+    }
     if (IS_DEV) {
       console.log(
         `%c[API SUCCESS] %c${method} ${endpoint}`,
@@ -113,7 +164,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
         data
       )
     }
-    return data as T
+    return data
   } catch (err: any) {
     if (err.name === 'TypeError' || err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError') || err.message?.includes('failed with status')) {
       console.error(
