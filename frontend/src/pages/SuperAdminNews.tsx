@@ -148,14 +148,13 @@ export default function SuperAdminNews() {
     const isEditing = !!editTarget
     setIsSaving(true)
 
-    try {
-      let finalImg = imageUrl
-      if (imageFile && !finalImg) {
-        setUploading(true)
-        const uploaded = await uploadNewsImageApi(imageFile)
-        finalImg = uploaded.imageURL
-      }
-
+  try {
+  let finalImg = imageUrl
+  if (imageFile) {
+    setUploading(true)
+    const uploaded = await uploadNewsImageApi(imageFile)
+    finalImg = uploaded.imageURL
+  }
       const payload = {
         title: formTitle.trim(),
         summary: formSummary.trim(),
