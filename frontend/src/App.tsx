@@ -294,7 +294,7 @@ function App() {
             </div>
 
             {/* Mobile Actions + Hamburger */}
-            <div className="mobile-only" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <div className="mobile-only" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
               {user && (
                 <GlobalSearchBar role={user.role} skPosition={user.skPosition} />
               )}

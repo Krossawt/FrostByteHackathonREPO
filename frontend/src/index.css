@@ -865,19 +865,25 @@ select.login-input {
   align-items: center;
   gap: 1.25rem;
   padding: 0.6rem 0;
+  min-width: 0;
+  overflow: visible;
 }
 
 .brand-block {
   display: flex;
-  align-items: center;
-  gap: 0.85rem;
-  flex-shrink: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.18rem;
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .brand-logos {
   display: flex;
   align-items: center;
   gap: 0.55rem;
+  flex-shrink: 0;
 }
 
 .brand-logo-img {
@@ -898,14 +904,17 @@ select.login-input {
 }
 
 .brand-text {
-  display: grid;
-  gap: 1px;
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  min-width: 0;
+  overflow: hidden;
 }
 
-/* ── SuperAdmin only: stack brand text BELOW logos to free nav space ───────── */
+/* ── SuperAdmin only: extra overrides if needed ───────── */
 .site-header--superadmin .brand-block {
-  flex-direction: column;
-  align-items: flex-start;
   gap: 0.18rem;
 }
 
@@ -939,6 +948,9 @@ select.login-input {
   color: var(--muted);
   font-weight: 500;
   letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .main-nav {
@@ -3999,20 +4011,25 @@ tbody tr:last-child td {
 
 @media (max-width: 1171px) {
   .header-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     flex-wrap: nowrap;
     min-width: 0;
+    gap: 0.5rem;
   }
 
   .brand-block {
     min-width: 0;
     flex-shrink: 1;
     max-width: 55%;
+    overflow: hidden;
   }
 
   .brand-tagline {
-    white-space: normal;
-    word-break: break-word;
-    overflow-wrap: break-word;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     max-width: 100%;
   }
 
@@ -4027,7 +4044,7 @@ tbody tr:last-child td {
   }
 }
 
-@media (max-width: 1171px) {
+@media (max-width: 960px) {
   .site-header {
     padding: 0.5rem 0;
   }
@@ -4040,14 +4057,23 @@ tbody tr:last-child td {
     gap: 0.5rem;
   }
 
-  /* Brand: already column from base — just cap width on mobile */
+  /* Brand: cap width on mobile so right-side controls don't overlap */
   .brand-block {
-    max-width: 50%;
+    max-width: 55%;
     gap: 0.2rem;
+    overflow: hidden;
   }
 
   .brand-logos {
     gap: 0.4rem;
+  }
+
+  .brand-logo-img {
+    height: 30px;
+  }
+
+  .brand-logo-img.logo-main {
+    height: 34px;
   }
 
   /* Superadmin only: stack name above tagline on narrow screens */
@@ -4063,11 +4089,13 @@ tbody tr:last-child td {
 
   .brand-tagline {
     font-size: 0.6rem;
-    white-space: normal;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     color: var(--muted, #6b6b6b);
   }
 
-  /* Mobile actions row */
+  /* Mobile actions row — never shrink or wrap */
   .mobile-only[style] {
     flex-shrink: 0;
   }
