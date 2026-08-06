@@ -316,12 +316,18 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
     if (!editText.trim()) return
     try {
       const updated = await updateSuggestionApi(id, editText.trim())
+      // The server returns the censored version — always use the server's text
       setLocalComments(prev => prev.map(c => c.suggestionID === id ? { ...c, suggestionText: updated.suggestionText } : c))
       setEditingSuggestionId(null)
-      setFeedback({ type: 'success', message: 'Suggestion updated' })
-    } catch (err) {
-      console.warn('Failed to update suggestion:', err)
-      setLocalComments(prev => prev.map(c => c.suggestionID === id ? { ...c, suggestionText: editText.trim() } : c))
+      if (updated.suggestionText !== editText.trim()) {
+        setFeedback({ type: 'info', message: 'Suggestion saved — some language was auto-censored.' })
+      } else {
+        setFeedback({ type: 'success', message: 'Suggestion updated' })
+      }
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail || err?.message || 'Failed to update suggestion. Please try again.'
+      setFeedback({ type: 'error', message: msg })
+      // Do NOT update local state with raw text on error — cancel the edit
       setEditingSuggestionId(null)
     }
   }

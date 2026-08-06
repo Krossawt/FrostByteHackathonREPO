@@ -175,13 +175,10 @@ def update_suggestion(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only edit your own suggestions.")
 
     if payload.suggestionText and payload.suggestionText.strip():
-        is_flagged, _ = check_text(payload.suggestionText)
-        if is_flagged:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Your suggestion contains inappropriate language. Please rephrase and try again.",
-            )
-        suggestion.suggestionText = payload.suggestionText.strip()
+        is_flagged, censored_text = check_text(payload.suggestionText)
+        # Always save the censored version — profanity is replaced with ***
+        # rather than blocking the edit entirely.
+        suggestion.suggestionText = censored_text.strip() if is_flagged else payload.suggestionText.strip()
     if payload.category:
         suggestion.category = payload.category
 

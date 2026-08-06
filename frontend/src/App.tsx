@@ -213,7 +213,7 @@ function App() {
       {!isLanding && <div className="scroll-layer" />}
 
       {!isLanding && (
-        <header className="site-header">
+        <header className={`site-header${user?.role === 'superadmin' ? ' site-header--superadmin' : ''}`}>
           <div className="container header-inner">
             {/* Brand (Clicking logo redirects to active session home) */}
             <Link to={userHomePath(user)} className="brand-block" style={{ textDecoration: 'none', cursor: 'default' }}>
