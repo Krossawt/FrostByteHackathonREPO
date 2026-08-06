@@ -1165,7 +1165,7 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11.5px' }}>
                   <thead>
                     <tr style={{ background: '#faf4eb' }}>
-                      {['Title', 'Category', 'Status', 'Budget', 'Spent', 'Progress'].map(h => (
+                      {['Title', 'Category', 'Status', 'Budget', 'Spent'].map(h => (
                         <th key={h} style={{ textAlign: 'left', padding: '10px 10px', borderBottom: '2px solid #760031', color: '#760031', fontWeight: 700, textTransform: 'uppercase', fontSize: '9.5px', letterSpacing: '0.05em' }}>
                           {h}
                         </th>
@@ -1180,11 +1180,10 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
                         <td style={{ padding: '10px 10px', textTransform: 'capitalize', color: '#555' }}>{p.status}</td>
                         <td style={{ padding: '10px 10px' }}>{formatPeso(p.proposedBudget)}</td>
                         <td style={{ padding: '10px 10px', color: '#b45309' }}>{formatPeso(p.spent)}</td>
-                        <td style={{ padding: '10px 10px' }}>{p.progress}%</td>
                       </tr>
                     )) : (
                       <tr>
-                        <td colSpan={6} style={{ padding: '20px 10px', textAlign: 'center', color: '#999' }}>
+                        <td colSpan={5} style={{ padding: '20px 10px', textAlign: 'center', color: '#999' }}>
                           No projects recorded for this barangay.
                         </td>
                       </tr>

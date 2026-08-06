@@ -1155,7 +1155,7 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
                       {[
                         'Title',
                         ...(selectedBarangay ? [] : ['Barangay']),
-                        'Category', 'Status', 'Budget', 'Spent', 'Progress',
+                        'Category', 'Status', 'Budget', 'Spent',
                       ].map(h => (
                         <th key={h} style={{ textAlign: 'left', padding: '10px 10px', borderBottom: '2px solid #760031', color: '#760031', fontWeight: 700, textTransform: 'uppercase', fontSize: '9.5px', letterSpacing: '0.05em' }}>
                           {h}
@@ -1172,11 +1172,10 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
                         <td style={{ padding: '10px 10px', textTransform: 'capitalize', color: '#555' }}>{p.status}</td>
                         <td style={{ padding: '10px 10px' }}>{formatPeso(p.proposedBudget)}</td>
                         <td style={{ padding: '10px 10px', color: '#b45309' }}>{formatPeso(p.spent)}</td>
-                        <td style={{ padding: '10px 10px' }}>{p.progress}%</td>
                       </tr>
                     )) : (
                       <tr>
-                        <td colSpan={selectedBarangay ? 6 : 7} style={{ padding: '20px 10px', textAlign: 'center', color: '#999' }}>
+                        <td colSpan={selectedBarangay ? 5 : 6} style={{ padding: '20px 10px', textAlign: 'center', color: '#999' }}>
                           No projects recorded.
                         </td>
                       </tr>

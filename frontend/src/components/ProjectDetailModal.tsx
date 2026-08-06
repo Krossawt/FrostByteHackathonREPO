@@ -1111,10 +1111,6 @@ export default function ProjectDetailModal({
 
                   <div className="project-modal-stats">
                     <div className="project-modal-stat-item">
-                      <div className="project-modal-stat-val" style={{ color: 'var(--maroon)' }}>{activeProject.progress}%</div>
-                      <div className="project-modal-stat-label">Completion</div>
-                    </div>
-                    <div className="project-modal-stat-item">
                       <div className="project-modal-stat-val">{formatCurrency(activeProject.proposedBudget)}</div>
                       <div className="project-modal-stat-label">Proposed Budget</div>
                     </div>
