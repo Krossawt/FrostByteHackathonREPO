@@ -231,7 +231,7 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
   const [replyInputText, setReplyInputText] = useState('')
   const [isSubmittingReply, setIsSubmittingReply] = useState(false)
   const [confirmDiscardReply, setConfirmDiscardReply] = useState(false)
-  const [feedback, setFeedback] = useState<{ type: 'success' | 'info'; message: string } | null>(null)
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'info' | 'error'; message: string } | null>(null)
 
   useEffect(() => {
     if (!feedback) return
@@ -276,7 +276,8 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
       setActiveReplyId(null)
       setFeedback({ type: 'success', message: 'Response posted successfully' })
     } catch (err: any) {
-      console.warn('API error sending reply:', err)
+      const msg = err?.message || 'Failed to post reply. Please try again.'
+      setFeedback({ type: 'error', message: msg })
     } finally {
       setIsSubmittingReply(false)
     }
@@ -838,19 +839,31 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '0.6rem',
-                background: feedback.type === 'success' ? 'rgba(22, 101, 52, 0.22)' : 'rgba(118, 0, 49, 0.18)',
+                background: feedback.type === 'success'
+                  ? 'rgba(22, 101, 52, 0.22)'
+                  : feedback.type === 'error'
+                    ? 'rgba(185, 28, 28, 0.18)'
+                    : 'rgba(118, 0, 49, 0.18)',
                 backdropFilter: 'blur(16px) saturate(1.6)',
                 WebkitBackdropFilter: 'blur(16px) saturate(1.6)',
-                color: feedback.type === 'success' ? '#0d3d20' : '#5c0026',
+                color: feedback.type === 'success'
+                  ? '#0d3d20'
+                  : feedback.type === 'error'
+                    ? '#7f1d1d'
+                    : '#5c0026',
                 fontFamily: 'var(--font-display)',
                 fontWeight: 700,
                 fontSize: '0.9rem',
                 padding: '0.9rem 1.4rem',
                 borderRadius: '14px',
-                border: '1.5px solid rgba(255, 255, 255, 0.35)',
+                border: feedback.type === 'error'
+                  ? '1.5px solid rgba(185,28,28,0.4)'
+                  : '1.5px solid rgba(255, 255, 255, 0.35)',
                 boxShadow: feedback.type === 'success'
                   ? '0 12px 32px rgba(22,101,52,0.25), inset 0 1px 0 rgba(255,255,255,0.4)'
-                  : '0 12px 32px rgba(118,0,49,0.18), inset 0 1px 0 rgba(255,255,255,0.4)',
+                  : feedback.type === 'error'
+                    ? '0 12px 32px rgba(185,28,28,0.25), inset 0 1px 0 rgba(255,255,255,0.4)'
+                    : '0 12px 32px rgba(118,0,49,0.18), inset 0 1px 0 rgba(255,255,255,0.4)',
                 maxWidth: '90vw',
                 animation: 'toastPop 220ms ease-out',
               }}
