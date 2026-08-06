@@ -1302,8 +1302,27 @@ export default function ProjectDetailModal({
                         </div>
                         <div className="form-group">
                           <label className="form-label">Barangay</label>
-                          <input className="form-input" value={editBarangay} onChange={e => setEditBarangay(e.target.value)} />
+                          <div
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.5rem',
+                              padding: '0.6rem 0.85rem',
+                              borderRadius: '8px',
+                              background: '#f3f4f6',
+                              color: '#6b7280',
+                              border: '1px solid #d1d5db',
+                              fontFamily: 'var(--font-body)',
+                              fontSize: '0.9rem',
+                              cursor: 'not-allowed',
+                            }}
+                            title="Barangay cannot be changed"
+                          >
+                            <span aria-hidden="true">🔒</span>
+                            <span>{editBarangay}</span>
+                          </div>
                         </div>
+                        {/* ── Status Progression (3 horizontally aligned buttons) ── */}
                         {/* ── Status Progression (3 horizontally aligned buttons) ── */}
                         <div className="form-group" style={{ marginBottom: '1.25rem' }}>
                           <label className="form-label" style={{ fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.5rem' }}>
