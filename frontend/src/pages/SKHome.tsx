@@ -288,6 +288,63 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
     setFeedback({ type: 'info', message: 'Response discarded' })
   }
 
+  // Editing/deleting an SK Council reply attached to a citizen suggestion
+  const [editingReply, setEditingReply] = useState<{ suggestionId: number; replyId: any } | null>(null)
+  const [editReplyText, setEditReplyText] = useState('')
+  const [initialEditReplyText, setInitialEditReplyText] = useState('')
+  const [confirmDiscardEditReply, setConfirmDiscardEditReply] = useState(false)
+  const [deleteReplyTarget, setDeleteReplyTarget] = useState<{ suggestionId: number; replyId: any } | null>(null)
+
+  const handleStartEditReply = (suggestionId: number, r: any) => {
+    setEditingReply({ suggestionId, replyId: r.replyID })
+    setEditReplyText(r.replyText)
+    setInitialEditReplyText(r.replyText)
+  }
+
+  const handleCancelEditReply = () => {
+    if (editReplyText.trim() !== initialEditReplyText.trim()) {
+      setConfirmDiscardEditReply(true)
+    } else {
+      setEditingReply(null)
+    }
+  }
+
+  const confirmDiscardEditReplyAction = () => {
+    setConfirmDiscardEditReply(false)
+    setEditingReply(null)
+    setEditReplyText('')
+    setFeedback({ type: 'info', message: 'Changes discarded' })
+  }
+
+  const handleSaveEditReply = () => {
+    if (!editingReply || !editReplyText.trim()) return
+    const { suggestionId, replyId } = editingReply
+    setLocalComments(prev => prev.map(c => {
+      if (c.suggestionID !== suggestionId) return c
+      return {
+        ...c,
+        replies: (c.replies ?? []).map((r: any) => r.replyID === replyId ? { ...r, replyText: editReplyText.trim() } : r),
+      }
+    }))
+    setEditingReply(null)
+    setFeedback({ type: 'success', message: 'Response updated' })
+  }
+
+  const handleDeleteReply = (suggestionId: number, replyId: any) => {
+    setDeleteReplyTarget({ suggestionId, replyId })
+  }
+
+  const confirmDeleteReplyAction = () => {
+    if (!deleteReplyTarget) return
+    const { suggestionId, replyId } = deleteReplyTarget
+    setLocalComments(prev => prev.map(c => {
+      if (c.suggestionID !== suggestionId) return c
+      return { ...c, replies: (c.replies ?? []).filter((r: any) => r.replyID !== replyId) }
+    }))
+    setDeleteReplyTarget(null)
+    setFeedback({ type: 'info', message: 'Response deleted' })
+  }
+
   return (
     <section className="section">
       <div className="container">
@@ -638,6 +695,7 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
                 </div>
               </div>
 
+
               {/* Feed of Citizen Suggestions */}
               <div style={{ display: 'grid', gap: '0.9rem' }}>
                 <div className="page-kicker">Barangay {barangay} Citizen Feed ({localComments.length} suggestion{localComments.length !== 1 ? 's' : ''})</div>
@@ -730,21 +788,103 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
                         <div style={{ fontSize: '0.72rem', fontFamily: 'var(--font-display)', fontWeight: 800, color: 'var(--maroon)', textTransform: 'uppercase' }}>
                           Official SK Council Responses ({c.replies.length})
                         </div>
-                        {c.replies.map((r) => (
-                          <div key={r.replyID} style={{ background: 'rgba(118,0,49,0.04)', borderLeft: '3px solid var(--maroon)', padding: '0.6rem 0.85rem', borderRadius: '0 6px 6px 0' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
-                              <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '0.8rem', color: 'var(--ink)' }}>
-                                {r.authorName} <span style={{ fontSize: '0.72rem', color: 'var(--maroon)', fontWeight: 600 }}>({r.authorRole})</span>
-                              </span>
-                              <span style={{ fontSize: '0.7rem', color: 'var(--muted)', fontFamily: 'var(--font-display)' }}>
-                                {r.createdAt ? new Date(r.createdAt).toLocaleDateString() : 'Today'}
-                              </span>
+                        {c.replies.map((r: any) => {
+                          const isMyReply = !!user?.id && String(r.authorID ?? '') === String(user.id)
+                          const isEditingThisReply = editingReply?.suggestionId === c.suggestionID && editingReply?.replyId === r.replyID
+                          return (
+                            <div key={r.replyID} style={{ background: 'rgba(118,0,49,0.04)', borderLeft: '3px solid var(--maroon)', padding: '0.6rem 0.85rem', borderRadius: '0 6px 6px 0' }}>
+                              {isMyReply && (
+                                <div style={{
+                                  fontSize: '0.66rem',
+                                  fontWeight: 800,
+                                  color: 'var(--maroon)',
+                                  fontFamily: 'var(--font-display)',
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.06em',
+                                  marginBottom: '0.35rem',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '0.3rem',
+                                }}>
+                                  <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" /></svg>
+                                  This is your response
+                                </div>
+                              )}
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem', flexWrap: 'wrap' }}>
+                                <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '0.8rem', color: 'var(--ink)' }}>
+                                  {r.authorName} <span style={{ fontSize: '0.72rem', color: 'var(--maroon)', fontWeight: 600 }}>({r.authorRole})</span>
+                                  {isMyReply && <span style={{ marginLeft: '0.35rem', fontSize: '0.68rem', fontWeight: 800, color: '#fff', background: 'var(--maroon)', padding: '0.08rem 0.4rem', borderRadius: '4px' }}>YOU</span>}
+                                </span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                  <span style={{ fontSize: '0.7rem', color: 'var(--muted)', fontFamily: 'var(--font-display)' }}>
+                                    {r.createdAt ? new Date(r.createdAt).toLocaleDateString() : 'Today'}
+                                  </span>
+                                  {isMyReply && !isEditingThisReply && (
+                                    <div style={{ display: 'flex', gap: '0.3rem' }}>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleStartEditReply(c.suggestionID, r)}
+                                        title="Edit response"
+                                        style={{ background: 'none', border: '1px solid rgba(0,0,0,0.12)', padding: '0.2rem 0.5rem', borderRadius: '6px', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 600, color: '#3b82f6' }}
+                                      >
+                                        ✏️ Edit
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDeleteReply(c.suggestionID, r.replyID)}
+                                        title="Delete response"
+                                        style={{ background: 'none', border: '1px solid rgba(220,38,38,0.2)', padding: '0.2rem 0.5rem', borderRadius: '6px', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 600, color: '#dc2626' }}
+                                      >
+                                        🗑️ Delete
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {isEditingThisReply ? (
+                                <div style={{ marginTop: '0.4rem' }}>
+                                  <textarea
+                                    className="form-input"
+                                    rows={2}
+                                    value={editReplyText}
+                                    onChange={e => setEditReplyText(e.target.value)}
+                                    style={{ fontSize: '0.85rem', marginBottom: '0.4rem' }}
+                                  />
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                                    {editReplyText.trim() === initialEditReplyText.trim() && (
+                                      <span style={{ fontSize: '0.72rem', color: 'var(--muted)', fontStyle: 'italic', marginRight: 'auto' }}>
+                                        Edit the text to save changes
+                                      </span>
+                                    )}
+                                    <button
+                                      type="button"
+                                      className="btn btn-secondary btn-sm"
+                                      onClick={handleCancelEditReply}
+                                      style={{ padding: '0.3rem 0.7rem', fontSize: '0.75rem' }}
+                                    >
+                                      Cancel
+                                    </button>
+                                    {editReplyText.trim() !== initialEditReplyText.trim() && (
+                                      <button
+                                        type="button"
+                                        className="btn btn-primary btn-sm"
+                                        onClick={handleSaveEditReply}
+                                        style={{ padding: '0.3rem 0.9rem', fontSize: '0.75rem' }}
+                                      >
+                                        Save Changes
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              ) : (
+                                <p style={{ margin: 0, fontSize: '0.83rem', color: 'var(--ink-2)', lineHeight: 1.5 }}>
+                                  {r.replyText}
+                                </p>
+                              )}
                             </div>
-                            <p style={{ margin: 0, fontSize: '0.83rem', color: 'var(--ink-2)', lineHeight: 1.5 }}>
-                              {r.replyText}
-                            </p>
-                          </div>
-                        ))}
+                          )
+                        })}
                       </div>
                     )}
 
@@ -814,6 +954,28 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
           variant="danger"
           onConfirm={confirmDiscardReplyAction}
           onCancel={() => setConfirmDiscardReply(false)}
+        />
+
+        <ConfirmDialog
+          isOpen={confirmDiscardEditReply}
+          title="Discard Changes"
+          message="Any unsaved edits to your response will be lost. Discard them?"
+          confirmLabel="Discard"
+          cancelLabel="Keep Editing"
+          variant="danger"
+          onConfirm={confirmDiscardEditReplyAction}
+          onCancel={() => setConfirmDiscardEditReply(false)}
+        />
+
+        <ConfirmDialog
+          isOpen={deleteReplyTarget !== null}
+          title="Delete Response"
+          message="This will permanently delete this official response. Are you sure?"
+          confirmLabel="Delete"
+          cancelLabel="Keep It"
+          variant="danger"
+          onConfirm={confirmDeleteReplyAction}
+          onCancel={() => setDeleteReplyTarget(null)}
         />
 
         {feedback && (
