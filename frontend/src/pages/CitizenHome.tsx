@@ -256,6 +256,8 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
   const [confirmDiscardEdit, setConfirmDiscardEdit] = useState(false)
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null)
   const [feedback, setFeedback] = useState<{ type: 'success' | 'info' | 'error'; message: string } | null>(null)
+  // SK Acknowledgements popup
+  const [ackPopup, setAckPopup] = useState<{ suggestionID: number; officials: any[] } | null>(null)
 
   useEffect(() => {
     if (!feedback) return
@@ -822,63 +824,90 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
                           </p>
                         )}
 
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(118,0,49,0.06)', paddingTop: '0.5rem', marginTop: '0.4rem' }}>
-                          <button
-                            type="button"
-                            onClick={() => handleVote(c.suggestionID)}
-                            className="link-button"
-                            title={(c.acknowledgements?.filter((a: any) => a.userRole?.toLowerCase().startsWith('sk ')) ?? []).length
-                              ? `Acknowledged by ${(c.acknowledgements ?? []).filter((a: any) => a.userRole?.toLowerCase().startsWith('sk ')).map((a: any) => a.userName).join(', ')}`
-                              : 'No SK official acknowledgements yet'}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.4rem',
-                              fontSize: '0.76rem',
-                              color: votedIds.has(c.suggestionID) ? '#15803d' : 'var(--maroon)',
-                              fontWeight: 700,
-                              fontFamily: 'var(--font-display)',
-                              lineHeight: 1,
-                              background: votedIds.has(c.suggestionID) ? 'rgba(22, 101, 52, 0.08)' : 'transparent',
-                              padding: votedIds.has(c.suggestionID) ? '0.25rem 0.6rem' : 0,
-                              borderRadius: votedIds.has(c.suggestionID) ? '6px' : 0,
-                              transition: 'all 0.15s ease',
-                            }}
-                          >
-                            <svg
-                              width="16" height="16" viewBox="0 0 24 24"
-                              fill={votedIds.has(c.suggestionID) ? '#15803d' : 'none'}
-                              stroke={votedIds.has(c.suggestionID) ? '#15803d' : 'var(--maroon)'}
-                              strokeWidth="2"
-                              strokeLinejoin="round"
-                              style={{ display: 'block', flexShrink: 0 }}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid rgba(118,0,49,0.06)', paddingTop: '0.5rem', marginTop: '0.4rem', flexWrap: 'wrap', gap: '0.4rem' }}>
+                          {/* Left side: Agree button + SK acknowledgement chip */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', flexWrap: 'wrap' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleVote(c.suggestionID)}
+                              className="link-button"
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.4rem',
+                                fontSize: '0.76rem',
+                                color: votedIds.has(c.suggestionID) ? '#15803d' : 'var(--maroon)',
+                                fontWeight: 700,
+                                fontFamily: 'var(--font-display)',
+                                lineHeight: 1,
+                                background: votedIds.has(c.suggestionID) ? 'rgba(22, 101, 52, 0.08)' : 'transparent',
+                                padding: votedIds.has(c.suggestionID) ? '0.25rem 0.6rem' : 0,
+                                borderRadius: votedIds.has(c.suggestionID) ? '6px' : 0,
+                                transition: 'all 0.15s ease',
+                              }}
                             >
-                              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 21 12 17.77 5.82 21 7 14.14 2 9.27l6.91-1.01L12 2z" />
-                            </svg>
-                            <span style={{ lineHeight: 1 }}>
-                              {votedIds.has(c.suggestionID) ? '✓ Agreed / Helpful' : 'Agree / Helpful'} ({c.votesCount ?? 0})
-                            </span>
-                          </button>
+                              <svg
+                                width="16" height="16" viewBox="0 0 24 24"
+                                fill={votedIds.has(c.suggestionID) ? '#15803d' : 'none'}
+                                stroke={votedIds.has(c.suggestionID) ? '#15803d' : 'var(--maroon)'}
+                                strokeWidth="2"
+                                strokeLinejoin="round"
+                                style={{ display: 'block', flexShrink: 0 }}
+                              >
+                                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 21 12 17.77 5.82 21 7 14.14 2 9.27l6.91-1.01L12 2z" />
+                              </svg>
+                              <span style={{ lineHeight: 1 }}>
+                                {votedIds.has(c.suggestionID) ? '✓ Agreed / Helpful' : 'Agree / Helpful'} ({c.votesCount ?? 0})
+                              </span>
+                            </button>
+
+                            {/* Facebook-style SK acknowledgement chip — only shown when ≥1 SK agreed */}
+                            {(() => {
+                              const skAcks = (c.acknowledgements ?? []).filter((a: any) => a.userRole?.toLowerCase().startsWith('sk '))
+                              if (skAcks.length === 0) return null
+                              const first = skAcks[0]
+                              const rest = skAcks.length - 1
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={() => setAckPopup({ suggestionID: c.suggestionID, officials: skAcks })}
+                                  style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    padding: 0,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.3rem',
+                                    fontSize: '0.73rem',
+                                    color: 'var(--maroon)',
+                                    fontFamily: 'var(--font-display)',
+                                    fontWeight: 600,
+                                    opacity: 0.85,
+                                    transition: 'opacity 0.15s',
+                                  }}
+                                  onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+                                  onMouseLeave={e => (e.currentTarget.style.opacity = '0.85')}
+                                  title="View SK officials who acknowledged this suggestion"
+                                >
+                                  {/* Badge icon */}
+                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="var(--maroon)" style={{ flexShrink: 0, opacity: 0.8 }}>
+                                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 21 12 17.77 5.82 21 7 14.14 2 9.27l6.91-1.01L12 2z" />
+                                  </svg>
+                                  <span>
+                                    Acknowledged by{' '}
+                                    <strong>{first.userName}</strong>
+                                    {rest > 0 && <> and <strong>{rest} other{rest > 1 ? 's' : ''}</strong></>}
+                                  </span>
+                                </button>
+                              )
+                            })()}
+                          </div>
+
                           <span style={{ fontSize: '0.72rem', color: 'var(--muted)', fontFamily: 'var(--font-display)' }}>
                             Barangay {barangay} Feed
                           </span>
                         </div>
-                        {((c.acknowledgements ?? []).filter((a: any) => a.userRole?.toLowerCase().startsWith('sk '))).length > 0 && (
-                          <details style={{ marginTop: '0.45rem', padding: '0.9rem 1rem', border: '1px solid rgba(118,0,49,0.14)', borderRadius: '12px', background: 'rgba(255,255,255,0.98)', boxShadow: '0 10px 20px rgba(118,0,49,0.06)' }}>
-                            <summary style={{ cursor: 'pointer', fontSize: '0.86rem', fontWeight: 700, color: 'var(--maroon)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', listStyle: 'none', outline: 'none' }}>
-                              <span>☆ Official SK Acknowledgements ({(c.acknowledgements ?? []).filter((a: any) => a.userRole?.toLowerCase().startsWith('sk ')).length})</span>
-                              <span style={{ marginLeft: '0.8rem', fontSize: '0.84rem', color: 'var(--muted)' }}>▾</span>
-                            </summary>
-                            <div style={{ marginTop: '0.75rem', display: 'grid', gap: '0.4rem', paddingLeft: '0.25rem' }}>
-                              {(c.acknowledgements ?? []).filter((a: any) => a.userRole?.toLowerCase().startsWith('sk ')).map((a: any, idx: number) => (
-                                <div key={`${a.userID}-${idx}`} style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', padding: '0.55rem 0.75rem', background: 'rgba(118,0,49,0.04)', borderRadius: '10px', fontSize: '0.84rem', color: 'var(--ink)' }}>
-                                  <span>{a.userName}</span>
-                                  <span style={{ color: 'var(--muted)', fontWeight: 600 }}>{a.userRole ?? 'SK Official'}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </details>
-                        )}
 
                         {/* SK Council Responses */}
                         {c.replies && c.replies.length > 0 && (
@@ -917,6 +946,114 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
           </div>
 
         </div>
+
+        {/* ─── SK Acknowledgements Popup Modal ─────────────────────── */}
+        {ackPopup && (
+          <Portal>
+            {/* Backdrop */}
+            <div
+              onClick={() => setAckPopup(null)}
+              style={{
+                position: 'fixed', inset: 0, zIndex: 9000,
+                background: 'rgba(20,0,10,0.45)',
+                backdropFilter: 'blur(4px)',
+                WebkitBackdropFilter: 'blur(4px)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                padding: '1rem',
+                animation: 'fadeIn 0.18s ease',
+              }}
+            >
+              {/* Panel */}
+              <div
+                onClick={e => e.stopPropagation()}
+                style={{
+                  background: 'linear-gradient(145deg,#fff 0%,#fdf5f7 100%)',
+                  borderRadius: '18px',
+                  boxShadow: '0 24px 60px rgba(118,0,49,0.22), 0 4px 16px rgba(0,0,0,0.1)',
+                  width: '100%', maxWidth: '380px',
+                  overflow: 'hidden',
+                  animation: 'slideUp 0.22s cubic-bezier(0.34,1.56,0.64,1)',
+                }}
+              >
+                {/* Header */}
+                <div style={{
+                  background: 'linear-gradient(135deg,#760031,#9a0040)',
+                  padding: '1rem 1.2rem 0.9rem',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="#fff" style={{ opacity: 0.9 }}>
+                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 21 12 17.77 5.82 21 7 14.14 2 9.27l6.91-1.01L12 2z" />
+                    </svg>
+                    <span style={{ color: '#fff', fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '0.95rem', letterSpacing: '0.01em' }}>
+                      SK Official Acknowledgements
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setAckPopup(null)}
+                    style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '50%', width: '28px', height: '28px', cursor: 'pointer', color: '#fff', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1, transition: 'background 0.15s' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.28)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.15)')}
+                    aria-label="Close"
+                  >×</button>
+                </div>
+
+                {/* Sub-header note */}
+                <div style={{ padding: '0.55rem 1.2rem', background: 'rgba(118,0,49,0.05)', borderBottom: '1px solid rgba(118,0,49,0.08)', fontSize: '0.72rem', color: 'var(--muted)', fontFamily: 'var(--font-display)', fontStyle: 'italic' }}>
+                  Only SK officials are listed here. Citizens can also agree but are not shown.
+                </div>
+
+                {/* List */}
+                <div style={{ padding: '0.85rem 1.1rem', display: 'grid', gap: '0.55rem', maxHeight: '340px', overflowY: 'auto' }}>
+                  {ackPopup.officials.map((a: any, idx: number) => (
+                    <div
+                      key={`${a.userID}-${idx}`}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '0.7rem',
+                        padding: '0.55rem 0.75rem',
+                        background: '#fff',
+                        borderRadius: '12px',
+                        boxShadow: '0 2px 8px rgba(118,0,49,0.06)',
+                        border: '1px solid rgba(118,0,49,0.07)',
+                        animation: `fadeIn 0.18s ease ${idx * 0.05}s both`,
+                      }}
+                    >
+                      {/* Avatar with initials */}
+                      <div style={{
+                        width: '36px', height: '36px', flexShrink: 0,
+                        borderRadius: '50%',
+                        background: 'linear-gradient(135deg,#760031,#c0004e)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: '#fff', fontWeight: 800, fontSize: '0.82rem',
+                        fontFamily: 'var(--font-display)',
+                        boxShadow: '0 2px 6px rgba(118,0,49,0.25)',
+                      }}>
+                        {(a.userName || 'SK').split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.84rem', color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.userName}</div>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--maroon)', fontWeight: 600, opacity: 0.8, marginTop: '0.1rem' }}>{a.userRole ?? 'SK Official'}</div>
+                      </div>
+                      {/* Check badge */}
+                      <div style={{ background: 'rgba(22,101,52,0.1)', borderRadius: '50%', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#15803d" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Footer */}
+                <div style={{ padding: '0.7rem 1.2rem', borderTop: '1px solid rgba(118,0,49,0.08)', textAlign: 'center' }}>
+                  <span style={{ fontSize: '0.72rem', color: 'var(--muted)', fontFamily: 'var(--font-display)' }}>
+                    {ackPopup.officials.length} SK official{ackPopup.officials.length !== 1 ? 's' : ''} acknowledged this suggestion
+                  </span>
+                </div>
+              </div>
+            </div>
+          </Portal>
+        )}
 
         <ConfirmDialog
           isOpen={confirmDiscardEdit}
