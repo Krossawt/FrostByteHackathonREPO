@@ -4049,6 +4049,24 @@ tbody tr:last-child td {
     padding: 0.5rem 0;
   }
 
+  .barangay-select-header {
+    font-family: var(--font-display);
+    font-weight: 700;
+    border: 1.5px solid rgba(118, 0, 49, 0.18);
+    padding: 0.4rem 1.6rem 0.4rem 0.5rem;
+    /* extra right padding for the arrow */
+    background: #fff;
+    color: #7A0C2E;
+
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M0 0l5 6 5-6z' fill='%237A0C2E'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 0.5rem center;
+    background-size: 9px 5px;
+  }
+
   .header-inner {
     display: flex;
     align-items: center;

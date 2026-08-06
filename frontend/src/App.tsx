@@ -214,6 +214,128 @@ function App() {
 
       {!isLanding && (
         <header className={`site-header${user?.role === 'superadmin' ? ' site-header--superadmin' : ''}`}>
+          <style>{`
+            @media (max-width: 1255px) {
+              .site-header--superadmin .brand-logo-img {
+                height: 26px !important;
+              }
+              .site-header--superadmin .brand-logo-img.logo-main {
+                height: 30px !important;
+              }
+              .site-header--superadmin .brand-divider {
+                height: 18px !important;
+              }
+              .site-header--superadmin .brand-logos {
+                gap: 0.3rem !important;
+              }
+              .site-header--superadmin .brand-block {
+                flex-direction: column !important;
+                align-items: flex-start !important;
+                gap: 0.2rem !important;
+              }
+              .site-header--superadmin .brand-text {
+                white-space: normal !important;
+              }
+              .site-header--superadmin .brand-name {
+                font-size: 0.95rem !important;
+              }
+              .site-header--superadmin .brand-tagline {
+                font-size: 0.6rem !important;
+                white-space: normal !important;
+              }
+            }
+
+            @media (max-width: 1080px) {
+              .site-header--superadmin .desktop-only {
+                display: none !important;
+              }
+              .site-header--superadmin .mobile-only {
+                display: flex !important;
+              }
+
+              .site-header--superadmin .landing-menu-toggle {
+                color: #7A0C2E;
+                background: none;
+                border: none;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 0.5rem;
+                transition: color var(--transition);
+              }
+              .site-header--superadmin .landing-menu-toggle:hover {
+                color: #580820;
+              }
+
+              .site-header--superadmin .landing-mobile-dropdown {
+                display: flex;
+                flex-direction: column;
+                gap: 1.2rem;
+                background: var(--panel-strong);
+                border: 1.5px solid rgba(118, 0, 49, 0.12);
+                box-shadow: 0 10px 30px rgba(118, 0, 49, 0.1);
+                padding: 1.5rem;
+                margin-top: 0.5rem;
+                width: 100%;
+                box-sizing: border-box;
+                max-height: 0;
+                opacity: 0;
+                overflow: hidden;
+                transition: max-height 0.25s ease-out, opacity 0.25s ease-out,
+                  padding 0.25s ease-out, border-color 0.25s ease-out;
+                padding-top: 0;
+                padding-bottom: 0;
+                border-color: transparent;
+              }
+              .site-header--superadmin .landing-mobile-dropdown.open {
+                max-height: 400px;
+                opacity: 1;
+                padding-top: 1.5rem;
+                padding-bottom: 1.5rem;
+                border-color: rgba(118, 0, 49, 0.12);
+              }
+
+              .site-header--superadmin .landing-mobile-nav-links {
+                display: flex;
+                flex-direction: column;
+                gap: 1rem;
+              }
+              .site-header--superadmin .landing-mobile-nav-link {
+                font-family: var(--font-display);
+                font-weight: 800;
+                font-size: 1rem;
+                color: #7A0C2E;
+                text-transform: uppercase;
+                letter-spacing: 0.04em;
+                padding: 0.25rem 0;
+              }
+              .site-header--superadmin .landing-mobile-nav-link:hover {
+                color: #580820;
+              }
+              .site-header--superadmin .barangay-select-header {
+                font-family: var(--font-display);
+                font-weight: 700;
+                font-size: 0.8rem;
+                color: var(--maroon);
+                border: 1.5px solid rgba(118, 0, 49, 0.18);
+                background-color: rgba(255, 255, 255, 0.9);
+                padding: 0.42rem 1.8rem 0.42rem 0.75rem;
+                cursor: pointer;
+                appearance: none;
+                -webkit-appearance: none;
+                -moz-appearance: none;
+                background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23760031' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+                background-repeat: no-repeat;
+                background-position: right 0.5rem center;
+                outline: none;
+                max-width: 160px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+              }
+            }
+          `}</style>
           <div className="container header-inner">
             {/* Brand (Clicking logo redirects to active session home) */}
             <Link to={userHomePath(user)} className="brand-block" style={{ textDecoration: 'none', cursor: 'default' }}>
