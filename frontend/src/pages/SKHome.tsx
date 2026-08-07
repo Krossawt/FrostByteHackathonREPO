@@ -6,7 +6,7 @@ import BarangayTransactionsModal from '../components/BarangayTransactionsModal'
 import { DonutChart } from '../components/MiniChart'
 import SingleNewsCarousel from '../components/SingleNewsCarousel'
 import ConfirmDialog from '../components/ConfirmDialog'
-import { fetchProjectsApi, fetchBarangayReportApi, fetchNewsApi, fetchSuggestionsApi, voteSuggestionApi, replySuggestionApi, normalizeProjectStatus } from '../services/api'
+import { fetchProjectsApi, fetchBarangayReportApi, fetchNewsApi, fetchSuggestionsApi, voteSuggestionApi, replySuggestionApi, editSuggestionReplyApi, deleteSuggestionReplyApi, normalizeProjectStatus } from '../services/api'
 import type { SuggestionItem } from '../services/api'
 import Portal from '../components/Portal'
 import html2canvas from 'html2canvas'
@@ -316,33 +316,51 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
     setFeedback({ type: 'info', message: 'Changes discarded' })
   }
 
-  const handleSaveEditReply = () => {
+  const handleSaveEditReply = async () => {
     if (!editingReply || !editReplyText.trim()) return
     const { suggestionId, replyId } = editingReply
-    setLocalComments(prev => prev.map(c => {
-      if (c.suggestionID !== suggestionId) return c
-      return {
-        ...c,
-        replies: (c.replies ?? []).map((r: any) => r.replyID === replyId ? { ...r, replyText: editReplyText.trim() } : r),
-      }
-    }))
-    setEditingReply(null)
-    setFeedback({ type: 'success', message: 'Response updated' })
+    try {
+      const updated = await editSuggestionReplyApi(suggestionId, replyId, editReplyText.trim())
+      setLocalComments(prev => prev.map(c => {
+        if (c.suggestionID !== suggestionId) return c
+        return {
+          ...c,
+          replies: (c.replies ?? []).map((r: any) =>
+            r.replyID === replyId ? { ...r, replyText: updated.replyText } : r
+          ),
+        }
+      }))
+      setEditingReply(null)
+      setFeedback({ type: 'success', message: 'Response updated' })
+    } catch (err: any) {
+      const msg = err?.message || 'Failed to update reply. Please try again.'
+      setFeedback({ type: 'info', message: msg })
+      setEditingReply(null)
+    }
   }
 
   const handleDeleteReply = (suggestionId: number, replyId: any) => {
     setDeleteReplyTarget({ suggestionId, replyId })
   }
 
-  const confirmDeleteReplyAction = () => {
+  const confirmDeleteReplyAction = async () => {
     if (!deleteReplyTarget) return
     const { suggestionId, replyId } = deleteReplyTarget
+    // Optimistically remove from local state first for instant feedback
     setLocalComments(prev => prev.map(c => {
       if (c.suggestionID !== suggestionId) return c
       return { ...c, replies: (c.replies ?? []).filter((r: any) => r.replyID !== replyId) }
     }))
     setDeleteReplyTarget(null)
     setFeedback({ type: 'info', message: 'Response deleted' })
+    try {
+      await deleteSuggestionReplyApi(suggestionId, replyId)
+    } catch (err: any) {
+      // If the API call fails, reload suggestions to restore accurate state
+      const msg = err?.message || 'Failed to delete reply.'
+      console.warn('[SKHome] Delete reply API error:', msg)
+      setFeedback({ type: 'info', message: msg })
+    }
   }
 
   return (

@@ -803,6 +803,19 @@ export async function deleteSuggestionApi(suggestionId: number): Promise<{ messa
   })
 }
 
+export async function editSuggestionReplyApi(suggestionId: number, replyId: number, replyText: string): Promise<SuggestionReplyItem> {
+  return request<SuggestionReplyItem>(`/suggestions/${suggestionId}/replies/${replyId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ replyText }),
+  })
+}
+
+export async function deleteSuggestionReplyApi(suggestionId: number, replyId: number): Promise<{ message: string }> {
+  return request<{ message: string }>(`/suggestions/${suggestionId}/replies/${replyId}`, {
+    method: 'DELETE',
+  })
+}
+
 export async function toggleCommentUpvoteApi(commentId: number | string): Promise<any> {
   // Changed /upvote to /vote to match your FastAPI backend
   return request<any>(`/comments/${commentId}/vote`, {

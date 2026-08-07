@@ -251,3 +251,78 @@ def reply_suggestion(
     )
 
     return SuggestionResponse.model_validate(suggestion)
+
+
+@router.patch("/{suggestion_id}/replies/{reply_id}", response_model=SuggestionReplyResponse,
+              summary="Edit a suggestion reply (Author or Super Admin)")
+def update_suggestion_reply(
+    suggestion_id: int,
+    reply_id: int,
+    payload: SuggestionReplyCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_authenticated),
+):
+    reply = db.query(SuggestionReply).filter(
+        SuggestionReply.replyID == reply_id,
+        SuggestionReply.suggestionID == suggestion_id,
+    ).first()
+    if not reply:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Reply not found")
+
+    role_str = str(getattr(current_user.userRole, 'value', current_user.userRole)).lower()
+    if reply.authorID != current_user.userID and role_str != 'superadmin':
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only edit your own replies.")
+
+    is_flagged, _ = check_text(payload.replyText)
+    if is_flagged:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Your reply contains inappropriate language. Please rephrase and try again.",
+        )
+
+    reply.replyText = payload.replyText.strip()
+    db.commit()
+    db.refresh(reply)
+
+    log_action(
+        db, current_user,
+        "Suggestion Reply Edited",
+        "suggestion_replies",
+        str(reply_id),
+        f"{current_user.userName} edited reply #{reply_id} on suggestion #{suggestion_id}",
+    )
+
+    return SuggestionReplyResponse.model_validate(reply)
+
+
+@router.delete("/{suggestion_id}/replies/{reply_id}",
+               summary="Delete a suggestion reply (Author or Super Admin)")
+def delete_suggestion_reply(
+    suggestion_id: int,
+    reply_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_authenticated),
+):
+    reply = db.query(SuggestionReply).filter(
+        SuggestionReply.replyID == reply_id,
+        SuggestionReply.suggestionID == suggestion_id,
+    ).first()
+    if not reply:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Reply not found")
+
+    role_str = str(getattr(current_user.userRole, 'value', current_user.userRole)).lower()
+    if reply.authorID != current_user.userID and role_str != 'superadmin':
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only delete your own replies.")
+
+    db.delete(reply)
+    db.commit()
+
+    log_action(
+        db, current_user,
+        "Suggestion Reply Deleted",
+        "suggestion_replies",
+        str(reply_id),
+        f"{current_user.userName} deleted reply #{reply_id} from suggestion #{suggestion_id}",
+    )
+
+    return {"message": "Reply deleted successfully"}
