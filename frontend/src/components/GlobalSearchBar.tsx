@@ -216,19 +216,7 @@ export default function GlobalSearchBar({ role, skPosition }: GlobalSearchBarPro
           flex-shrink: 0;
         }
 
-        /* Narrow phones: give the trigger a bit more horizontal room so the
-           "Search" label stays visible instead of collapsing to icon-only. 
-        @media (max-width: 500px) {
-          .gsb-trigger {
-            padding: 8px 12px;
-            min-width: 108px;
-            gap: 6px;
-          }
-          .gsb-trigger-label {
-            display: inline;
-            font-size: 13px;
-          }
-        }*/
+      
       `}</style>
 
       {/* ── Trigger button (in header) ── */}

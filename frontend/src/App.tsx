@@ -245,7 +245,7 @@ function App() {
               }
             }
 
-            @media (max-width: 1080px) {
+            @media (max-width: 1125px) {
               .site-header--superadmin .desktop-only {
                 display: none !important;
               }
@@ -405,7 +405,7 @@ function App() {
                   )}
                   <div className="user-chip">
                     <span className="user-chip-dot" style={{ background: posColor }} />
-                    <span>{user.name.split(' ')[0]}</span>
+                    <span>{user.role === 'superadmin' ? 'Super Admin' : user.name.split(' ')[0]}</span>
                     {user.skPosition && (
                       <span style={{ fontSize: '0.72rem', opacity: 0.75, fontWeight: 500 }}>· {user.skPosition}</span>
                     )}
