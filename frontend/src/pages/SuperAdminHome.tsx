@@ -358,6 +358,16 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
             box-shadow: 0 8px 20px rgba(220, 38, 38, 0.18), inset 0 1px 0 rgba(255,255,255,0.3);
           }
 
+          .barangay-card {
+            transition: background 180ms ease, border-color 180ms ease, box-shadow 180ms ease, transform 150ms ease;
+          }
+          .barangay-card:hover {
+            background: rgba(244, 207, 223, 0.32);
+            border-color: rgba(118, 0, 49, 0.55);
+            box-shadow: 0 8px 20px rgba(118, 0, 49, 0.2), inset 0 1px 0 rgba(255,255,255,0.3);
+            transform: translateY(-1px);
+          }
+
           /* Print doesn't make sense as a tap target on tablet/mobile —
              hide it there and keep Download as the primary export action. */
           @media (max-width: 1024px) {
@@ -572,7 +582,7 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
                   {barangayList.map(b => {
                     const pct = b.annualBudget > 0 ? Math.round((b.spent / b.annualBudget) * 100) : 0
                     return (
-                      <div key={b.barangay} className="card" style={{ padding: '1rem 1.1rem', cursor: 'pointer' }}
+                      <div key={b.barangay} className="card barangay-card" style={{ padding: '1rem 1.1rem', cursor: 'pointer' }}
                         onClick={() => { setSelectedBarangay(b.barangay); setView('barangay') }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem', gap: '0.5rem' }}>
                           <div>

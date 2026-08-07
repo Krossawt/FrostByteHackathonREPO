@@ -108,7 +108,7 @@ function App() {
   const [user, setUser] = useState<UserAccount | null>(() => getStoredUser())
   const [cursor, setCursor] = useState({ x: 0.5, y: 0.5 })
   const [scrollY, setScrollY] = useState(0)
-  const [selectedBarangay, setSelectedBarangay] = useState<string>('Balibago')
+  const [selectedBarangay, setSelectedBarangay] = useState<string>('')
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const [navOpen, setNavOpen] = useState(false)
   const isLanding = isLandingPath(location.pathname)
