@@ -5,7 +5,7 @@ All request/response models matching frontend TypeScript interfaces in types.ts.
 
 from __future__ import annotations
 from datetime import datetime, date
-from typing import Optional, List
+from typing import Optional, List, Any
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from models import UserRole, ProjectStatus, OrderType, CommentType
 
