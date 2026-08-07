@@ -391,16 +391,70 @@ export default function ProjectDetailModal({
     (user?.skPosition === 'Chairperson' || user?.skPosition === 'Secretary' || user?.role === 'superadmin') &&
     (user?.barangay === activeProject.barangay || user?.role === 'superadmin')
 
-  // Real Tesseract.js OCR scan of uploaded receipt image
+  // ── Receipt image preprocessor ───────────────────────────────────────────
+  // Upscales small images and stretches contrast so Tesseract gets sharper text.
+  const preprocessReceiptImage = (file: File): Promise<File> =>
+    new Promise((resolve) => {
+      if (!file.type.startsWith('image/')) { resolve(file); return }
+      const img = new Image()
+      const url = URL.createObjectURL(file)
+      img.onload = () => {
+        try {
+          // Scale up so the shortest side is at least 1 200 px (better OCR on small photos)
+          const longest = Math.max(img.width, img.height)
+          const scale = longest < 1200 ? Math.min(3, 1200 / longest) : 1
+          const canvas = document.createElement('canvas')
+          canvas.width = Math.round(img.width * scale)
+          canvas.height = Math.round(img.height * scale)
+          const ctx = canvas.getContext('2d')!
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+
+          // Grayscale + contrast stretching (histogram normalisation)
+          const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+          const d = imgData.data
+          let minG = 255, maxG = 0
+          for (let i = 0; i < d.length; i += 4) {
+            const g = Math.round(0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2])
+            if (g < minG) minG = g
+            if (g > maxG) maxG = g
+          }
+          const range = maxG - minG || 1
+          for (let i = 0; i < d.length; i += 4) {
+            const g = Math.round(0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2])
+            const enhanced = Math.min(255, Math.round(((g - minG) / range) * 255))
+            d[i] = d[i + 1] = d[i + 2] = enhanced
+          }
+          ctx.putImageData(imgData, 0, 0)
+
+          canvas.toBlob((blob) => {
+            URL.revokeObjectURL(url)
+            resolve(blob ? new File([blob], 'receipt_preprocessed.png', { type: 'image/png' }) : file)
+          }, 'image/png')
+        } catch {
+          URL.revokeObjectURL(url)
+          resolve(file)
+        }
+      }
+      img.onerror = () => { URL.revokeObjectURL(url); resolve(file) }
+      img.src = url
+    })
+
+  // ── Real Tesseract.js OCR scan with zone-based, multi-strategy extraction ──
   const runOcrScan = async (targetFile?: File) => {
     const file = targetFile || uploadedFile
     if (!file) return
     setScanningOcr(true)
-    setOcrMsg('🔍 Initialising Tesseract OCR engine…')
 
     try {
-      setOcrMsg('📄 Reading receipt image with Tesseract OCR…')
-      const { data: { text } } = await Tesseract.recognize(file, 'eng', {
+      // Step 1 — preprocess image for sharper text
+      let scanFile = file
+      if (file.type.startsWith('image/')) {
+        setOcrMsg('🔧 Enhancing receipt image quality…')
+        try { scanFile = await preprocessReceiptImage(file) } catch { /* keep original */ }
+      }
+
+      setOcrMsg('🔍 Initialising Tesseract OCR engine…')
+      const { data: { text } } = await Tesseract.recognize(scanFile, 'eng', {
         logger: (m: any) => {
           if (m.status === 'recognizing text') {
             const pct = Math.round((m.progress ?? 0) * 100)
@@ -409,43 +463,72 @@ export default function ProjectDetailModal({
         },
       })
 
-      const lines = text.split('\n').map((l: string) => l.trim()).filter(Boolean)
+      // Step 2 — split OCR text into zones
+      // Philippine BIR receipts: top ~35 % = header (store info),
+      // middle ~40 % = item body, bottom ~25 % = totals / tax summary
+      const allLines = text.split('\n').map((l: string) => l.trim()).filter(Boolean)
+      const hEnd    = Math.max(4, Math.floor(allLines.length * 0.35))
+      const fStart  = Math.max(hEnd + 2, Math.floor(allLines.length * 0.68))
+      const headerLines = allLines.slice(0, hEnd)
+      const bodyLines   = allLines.slice(hEnd, fStart)
+      const footerLines = allLines.slice(fStart)
+      const footerText  = footerLines.join('\n')
+      const bodyText    = bodyLines.join('\n')
 
-      // ── Amount: find ₱, PHP, TOTAL, AMOUNT patterns ────────────────────
+      // ── Step 3: AMOUNT — search footer first, then body, then full text ──
       let extractedAmount = ''
-      const amountPatterns = [
-        /(?:total|amount|grand\s*total|subtotal|total\s*due)[\s:=₱PHP]*([\d,]+(?:\.\d{1,2})?)/i,
-        /₱\s*([\d,]+(?:\.\d{1,2})?)/i,
-        /PHP\s*([\d,]+(?:\.\d{1,2})?)/i,
-        /([\d,]{3,}(?:\.\d{1,2})?)\s*(?:php|pesos?)/i,
+      const amountStrategies: Array<{ src: string; pat: RegExp }> = [
+        // Most-specific total labels → footer
+        { src: footerText, pat: /(?:other\s*total|grand\s*total|total\s*due|total\s*amount|net\s*total|total\s*sale)[^\d]*([\d,]+(?:\.\d{1,2})?)/i },
+        { src: footerText, pat: /(?:^|\s)total[^\d]*([\d,]+(?:\.\d{1,2})?)/im },
+        { src: footerText, pat: /(?:amount\s*due|due\s*amount)[^\d]*([\d,]+(?:\.\d{1,2})?)/i },
+        // Currency symbols anywhere in footer
+        { src: footerText, pat: /₱\s*([\d,]+(?:\.\d{1,2})?)/ },
+        { src: footerText, pat: /PHP\s*([\d,]+(?:\.\d{1,2})?)/i },
+        // Widen to body
+        { src: bodyText,   pat: /(?:other\s*total|grand\s*total|total)[^\d]*([\d,]+(?:\.\d{1,2})?)/i },
+        // Full text fallback
+        { src: text,       pat: /(?:total|amount)[^\d]*([\d,]+(?:\.\d{1,2})?)/i },
+        { src: text,       pat: /₱\s*([\d,]+(?:\.\d{1,2})?)/ },
       ]
-      for (const pat of amountPatterns) {
-        const m = text.match(pat)
+      for (const { src, pat } of amountStrategies) {
+        const m = src.match(pat)
         if (m) { extractedAmount = m[1].replace(/,/g, ''); break }
       }
+      // Last resort — highest numeric value in footer (likely the grand total)
+      if (!extractedAmount) {
+        let maxVal = 0
+        for (const line of footerLines) {
+          for (const n of [...line.matchAll(/([\d,]+\.\d{2})/g)]) {
+            const v = parseFloat(n[1].replace(/,/g, ''))
+            if (v > maxVal) { maxVal = v; extractedAmount = n[1].replace(/,/g, '') }
+          }
+        }
+      }
 
-      // ── Date: support MM/DD/YYYY, YYYY-MM-DD, DD-MM-YYYY, month names ──
+      // ── Step 4: DATE — prefer explicit "Date:" label, then first date pattern ──
       let extractedDate = ''
-      const datePatterns = [
-        /(\d{4}[-/]\d{2}[-/]\d{2})/,
-        /(\d{2}[-/]\d{2}[-/]\d{4})/,
-        /(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})/,
+      const datePatterns: Array<RegExp> = [
+        /(?:date[:\s]+)(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i,
+        /(\d{4}[-\/]\d{2}[-\/]\d{2})/,
+        /(\d{2}[-\/]\d{2}[-\/]\d{4})/,
+        /(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4})/,
         /(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{1,2},?\s+\d{4}/i,
         /\d{1,2}\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{4}/i,
       ]
       for (const pat of datePatterns) {
         const m = text.match(pat)
         if (m) {
-          const parsed = new Date(m[0])
+          const raw = m[1] ?? m[0]
+          const parsed = new Date(raw)
           if (!isNaN(parsed.getTime())) {
             extractedDate = parsed.toISOString().slice(0, 10)
           } else {
-            // Try rearranging DD/MM/YYYY → YYYY-MM-DD
-            const parts = m[0].split(/[-/]/)
+            const parts = raw.split(/[-\/]/)
             if (parts.length === 3) {
               const attempt = parts[2].length === 4
                 ? `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`
-                : m[0]
+                : raw
               const p2 = new Date(attempt)
               if (!isNaN(p2.getTime())) extractedDate = p2.toISOString().slice(0, 10)
             }
@@ -454,41 +537,78 @@ export default function ProjectDetailModal({
         }
       }
 
-      // ── Vendor: first non-empty, non-numeric line (usually store name) ──
+      // ── Step 5: CASHIER — look for cashier name label, then fall back to a name-like line ──
+      // Lines that should NEVER be picked as the cashier name
+      const cashierSkip = /^(\*+|credit\s*sale|mobile\s*order|official\s*receipt|your\s*order|order\s*(number|no\.?)|receipt\s*(no\.?|#)|invoice|date[:\s]|time[:\s]|total|amount|php|₱|change|vat|thank|please|tell\s*us|visit|survey|write|www\.|http|#\d|terminal|hardware|serial|mtn|crew|qty|item|price|sold|supplier|no\.?\s*\d|\d{5,})/i
       let extractedVendor = ''
-      const skipPrefixes = /^(date|receipt|invoice|official|no\.|#|total|amount|php|₱|\d)/i
-      for (const line of lines) {
-        if (line.length > 3 && !skipPrefixes.test(line) && /[a-zA-Z]/.test(line)) {
-          extractedVendor = line.replace(/[^\w\s&.,'-]/g, '').trim()
-          if (extractedVendor.length > 2) break
+      // 1. Explicit cashier keyword label (highest priority)
+      const cashierKw = text.match(/(?:cashier(?:\s*name)?|served\s*by|operator|clerk|attended\s*by|teller)[:\s]+([^\n]+)/i)
+      if (cashierKw) {
+        extractedVendor = cashierKw[1].trim().replace(/[^\w\s.,'\-]/g, '').trim()
+      }
+      // 2. Fallback — any plausible person-name line in the receipt
+      if (!extractedVendor) {
+        for (const line of allLines) {
+          if (line.length < 3 || cashierSkip.test(line) || !/[a-zA-Z]/.test(line)) continue
+          const cleaned = line.replace(/[^\w\s.,'\-]/g, '').trim()
+          // Prefer lines that look like a personal name (2+ words, no long digit runs)
+          if (cleaned.length > 2 && cleaned.split(/\s+/).length >= 2 && !/\d{4,}/.test(cleaned)) {
+            extractedVendor = cleaned; break
+          }
         }
       }
-      // Also check for "sold to", "merchant", "cashier", "store" keywords
-      const vendorKeywordMatch = text.match(/(?:merchant|store name|sold to|vendor)[:\s]+([^\n]+)/i)
-      if (vendorKeywordMatch) extractedVendor = vendorKeywordMatch[1].trim()
 
-      // ── Description: line after "purpose", "particulars", "item" ────────
+      // ── Step 6: DESCRIPTION — extract item lines from body zone ──────────
+      // Philippine receipt item format: QTY [modifier] ITEM_NAME   PRICE [TOTAL]
+      // e.g. "1 pc Chicken  92.00  92.00"  |  "1 +GRAB Deliver  0.00  0.00"
       let extractedDesc = ''
-      const descKeywordMatch = text.match(/(?:purpose|particulars?|description|items?)[:\s]+([^\n]+)/i)
-      if (descKeywordMatch) {
-        extractedDesc = descKeywordMatch[1].trim()
+      const itemPatterns: RegExp[] = [
+        /^(\d+)\s*(?:pcs?\.?|x|\+)?\s+(.+?)\s+([\d,]+\.\d{2})(?:\s+[\d,]+\.\d{2})?$/i,  // with modifier
+        /^(\d+)\s+(.+?)\s+([\d,]+\.\d{2})(?:\s+[\d,]+\.\d{2})?$/i,                         // without modifier
+      ]
+      const parsedItems: string[] = []
+      for (const line of [...bodyLines, ...headerLines]) {
+        for (const pat of itemPatterns) {
+          const im = line.match(pat)
+          if (im) {
+            // Groups: [full, qty, (modifier?), name, price] — name is second-to-last, price is last
+            const groups = im.slice(1).filter(Boolean)
+            const itemPrice = groups[groups.length - 1]
+            const itemName  = groups[groups.length - 2]?.trim()
+            if (itemName && itemPrice && parseFloat(itemPrice.replace(/,/g, '')) >= 0) {
+              parsedItems.push(`${itemName} (₱${itemPrice})`)
+            }
+            break
+          }
+        }
+      }
+      if (parsedItems.length > 0) {
+        extractedDesc = parsedItems.join(', ')
       } else {
-        // Fallback: second content line that's not the vendor
-        const candidates = lines.filter((l: string) => l !== extractedVendor && l.length > 5 && /[a-zA-Z]/.test(l))
-        if (candidates[1]) extractedDesc = candidates[1].substring(0, 80)
+        // Fallback 1 — keyword-labelled description
+        const descKw = text.match(/(?:purpose|particulars?|description)[:\s]+([^\n]+)/i)
+        if (descKw) {
+          extractedDesc = descKw[1].trim()
+        } else {
+          // Fallback 2 — first non-cashier, non-header content line
+          const candidates = allLines.filter((l: string) =>
+            l !== extractedVendor && l.length > 5 && /[a-zA-Z]/.test(l) && !cashierSkip.test(l)
+          )
+          if (candidates[0]) extractedDesc = candidates[0].substring(0, 120)
+        }
       }
 
-      // ── Apply extracted values to form ─────────────────────────────────
+      // ── Step 7: Apply to form fields ────────────────────────────────────
       if (extractedVendor) setRVendor(extractedVendor)
       if (extractedAmount) setRAmount(extractedAmount)
-      if (extractedDate) setRDate(extractedDate)
-      if (extractedDesc) setRDesc(extractedDesc)
+      if (extractedDate)   setRDate(extractedDate)
+      if (extractedDesc)   setRDesc(extractedDesc)
 
       const found: string[] = []
-      if (extractedVendor) found.push(`Vendor: "${extractedVendor}"`)
+      if (extractedVendor) found.push(`Cashier: "${extractedVendor}"`)
       if (extractedAmount) found.push(`Amount: ₱${Number(extractedAmount).toLocaleString()}`)
-      if (extractedDate) found.push(`Date: ${extractedDate}`)
-      if (extractedDesc) found.push(`Description: "${extractedDesc}"`)
+      if (extractedDate)   found.push(`Date: ${extractedDate}`)
+      if (extractedDesc)   found.push(`Items: "${extractedDesc.substring(0, 60)}${extractedDesc.length > 60 ? '\u2026' : ''}"`)
 
       if (found.length > 0) {
         setOcrMsg(`✅ OCR Complete! Extracted — ${found.join(' · ')}. Please review and correct if needed.`)
@@ -1552,7 +1672,10 @@ export default function ProjectDetailModal({
                                 style={{ display: 'none' }}
                                 onChange={e => {
                                   if (e.target.files && e.target.files[0]) {
-                                    setUploadedFile(e.target.files[0])
+                                    const f = e.target.files[0]
+                                    setUploadedFile(f)
+                                    setOcrMsg('📎 File attached — starting OCR auto-scan…')
+                                    setTimeout(() => runOcrScan(f), 200)
                                   }
                                 }}
                               />
@@ -1574,7 +1697,10 @@ export default function ProjectDetailModal({
                                   style={{ display: 'none' }}
                                   onChange={e => {
                                     if (e.target.files && e.target.files[0]) {
-                                      setUploadedFile(e.target.files[0])
+                                      const f = e.target.files[0]
+                                      setUploadedFile(f)
+                                      setOcrMsg('📎 File attached — starting OCR auto-scan…')
+                                      setTimeout(() => runOcrScan(f), 200)
                                     }
                                   }}
                                 />
@@ -1603,8 +1729,8 @@ export default function ProjectDetailModal({
 
                       <div className="form-row-2">
                         <div className="form-group">
-                          <label className="form-label">Vendor / Payee *</label>
-                          <input className="form-input" value={rVendor} onChange={e => setRVendor(e.target.value)} placeholder="e.g. SM Santa Rosa Hardware" />
+                          <label className="form-label">Cashier Name *</label>
+                          <input className="form-input" value={rVendor} onChange={e => setRVendor(e.target.value)} placeholder="e.g. Juan dela Cruz" />
                         </div>
                         <div className="form-group">
                           <label className="form-label">Amount (₱) *</label>
