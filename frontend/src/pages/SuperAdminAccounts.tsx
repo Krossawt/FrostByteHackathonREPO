@@ -55,6 +55,12 @@ export default function SuperAdminAccounts({ selectedBarangay }: SuperAdminAccou
           const mapped: UserAccount[] = res.map((u: any) => {
             const roleStr = String(u.userRole || '').toLowerCase()
             const role: Role = roleStr.includes('admin') ? 'superadmin' : roleStr.includes('sk') ? 'sk' : 'citizen'
+            const rawRole: string = u.userRole || ''
+            const skPosition = rawRole.includes('Chairperson') ? 'Chairperson'
+              : rawRole.includes('Secretary') ? 'Secretary'
+              : rawRole.includes('Treasurer') ? 'Treasurer'
+              : rawRole.includes('Kagawad') ? 'Kagawad'
+              : undefined
             return {
               id: String(u.userID),
               name: u.userName,
@@ -62,7 +68,7 @@ export default function SuperAdminAccounts({ selectedBarangay }: SuperAdminAccou
               username: u.userName.toLowerCase().replace(/\s+/g, ''),
               role,
               barangay: u.userLocation || 'Santa Rosa City',
-              skPosition: u.userRole.includes('Chairperson') ? 'Chairperson' : u.userRole.includes('Secretary') ? 'Secretary' : u.userRole.includes('Treasurer') ? 'Treasurer' : 'Kagawad',
+              skPosition: skPosition as any,
               isStaRosa: u.userIsStaRosa,
               isActive: u.userIsActive,
             }

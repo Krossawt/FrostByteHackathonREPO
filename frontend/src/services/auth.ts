@@ -58,10 +58,11 @@ export async function loginAsync(emailOrUsername: string, password: string, reme
     const userRoleStr = rawRole.toLowerCase()
     const isKagawad = rawRole.includes('Kagawad')
 
-    // SK Kagawads operate with Citizen functions while retaining their Kagawad title & Super Admin account management
+    // All SK roles (Chairperson, Secretary, Treasurer, Kagawad) map to 'sk'
+    // Kagawad IS an SK official — they get the SK dashboard with limited RBAC inside
     const mappedRole = userRoleStr.includes('admin')
       ? 'superadmin'
-      : (userRoleStr.includes('sk') && !isKagawad)
+      : userRoleStr.includes('sk')
         ? 'sk'
         : 'citizen'
 

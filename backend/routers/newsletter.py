@@ -75,11 +75,8 @@ def get_newsletter(
     return NewsletterResponse.model_validate(item)
 
 
-import os
-import uuid
 from fastapi import UploadFile, File
-
-UPLOAD_DIR = os.getenv("UPLOAD_DIR", "static/uploads")
+from storage import upload_to_supabase
 
 
 MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5 MB limit
@@ -104,7 +101,7 @@ def validate_and_get_image_ext(content: bytes) -> str:
         )
 
 
-@router.post("/upload-image", summary="Upload news display image (JPG, PNG, WEBP)")
+@router.post("/upload-image", summary="Upload news display image to Supabase Storage (JPG, PNG, WEBP)")
 async def upload_news_image(
     file: UploadFile = File(..., description="News image file"),
     current_user: User = Depends(require_superadmin),
@@ -112,15 +109,15 @@ async def upload_news_image(
     content = await file.read()
     ext = validate_and_get_image_ext(content)
 
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
-    filename = f"news_{uuid.uuid4().hex[:12]}.{ext}"
-    filepath = os.path.join(UPLOAD_DIR, filename)
+    try:
+        public_url = upload_to_supabase(content, ext, folder="news")
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Image upload failed: {exc}",
+        )
 
-    with open(filepath, "wb") as f:
-        f.write(content)
-
-    image_url = f"/static/uploads/{filename}"
-    return {"imageURL": image_url}
+    return {"imageURL": public_url}
 
 
 @router.post("", response_model=NewsletterResponse, status_code=status.HTTP_201_CREATED,
