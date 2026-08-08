@@ -9,9 +9,8 @@ import SingleNewsCarousel from '../components/SingleNewsCarousel'
 import { fetchProjectsApi, fetchBarangayReportApi, fetchNewsApi, fetchSuggestionsApi, postSuggestionApi, voteSuggestionApi, updateSuggestionApi, deleteSuggestionApi, normalizeProjectStatus } from '../services/api'
 import type { SuggestionItem } from '../services/api'
 import Portal from '../components/Portal'
-import html2canvas from 'html2canvas'
 import ConfirmDialog from '../components/ConfirmDialog'
-import jsPDF from 'jspdf'
+import ReportModal from '../components/ReportModal'
 
 function formatPeso(amount: number) {
   return `₱${Math.round(amount || 0).toLocaleString('en-PH')}`
@@ -168,45 +167,6 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
   const [selectedProject, setSelectedProject] = useState<ReportProject | null>(null)
   const [showTxnModal, setShowTxnModal] = useState(false)
   const [showReportModal, setShowReportModal] = useState(false)
-  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false)
-
-  // Print dialog — opens browser print preview
-  const handlePrintReport = () => {
-    window.print()
-  }
-
-  // Direct client-side PDF export without opening print dialog
-  const handleDownloadPDF = async () => {
-    const element = document.getElementById('sk-report-printable')
-    if (!element) return
-    try {
-      setIsDownloadingPdf(true)
-      const canvas = await html2canvas(element, { scale: 2, useCORS: true, logging: false })
-      const imgData = canvas.toDataURL('image/png')
-      const pdf = new jsPDF('p', 'mm', 'a4')
-      const imgWidth = 210
-      const imgHeight = (canvas.height * imgWidth) / canvas.width
-      let heightLeft = imgHeight
-      let position = 0
-
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
-      heightLeft -= 297
-
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight
-        pdf.addPage()
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
-        heightLeft -= 297
-      }
-
-      pdf.save(`SK-Report-${barangay.replace(/\s+/g, '_')}-${new Date().toISOString().slice(0, 10)}.pdf`)
-    } catch (err) {
-      console.error('Error generating PDF:', err)
-    } finally {
-      setIsDownloadingPdf(false)
-    }
-  }
-
   const reportGeneratedAt = new Date().toLocaleString('en-PH', {
     dateStyle: 'long',
     timeStyle: 'short',
@@ -1128,169 +1088,14 @@ export default function CitizenHome({ user }: CitizenHomeProps) {
           <BarangayTransactionsModal barangay={barangay} onClose={() => setShowTxnModal(false)} />
         )}
 
-        {/* ── View Report Modal — A4 print preview ── */}
-        {showReportModal && (
-          <Portal>
-            <div
-              onClick={e => { if (e.target === e.currentTarget) setShowReportModal(false) }}
-              style={{
-                position: 'fixed', inset: 0, zIndex: 9998,
-                background: 'rgba(10, 5, 8, 0.6)',
-                backdropFilter: 'blur(4px)',
-                display: 'flex', flexDirection: 'column', alignItems: 'center',
-                padding: '2rem 1rem', overflowY: 'auto',
-              }}
-            >
-              {/* Toolbar */}
-              <div
-                className="no-print report-toolbar"
-                style={{
-                  width: 'min(210mm, 100%)', display: 'flex', alignItems: 'center',
-                  justifyContent: 'space-between', marginBottom: '1rem', gap: '0.75rem', flexWrap: 'wrap',
-                }}
-              >
-                <div style={{ color: '#fff', fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.9rem' }}>
-                  Report Preview — Barangay {barangay}
-                </div>
-                <div className="report-toolbar-actions" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  <button className="btn btn-sm report-download-btn report-toolbar-btn" onClick={handleDownloadPDF} disabled={isDownloadingPdf} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}>
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
-                    {isDownloadingPdf ? 'Generating PDF...' : 'Download (Save as PDF)'}
-                  </button>
-                  <button className="btn btn-sm report-print-btn report-toolbar-btn" onClick={handlePrintReport} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}>
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3"><polyline points="6 9 6 2 18 2 18 9" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><rect x="6" y="14" width="12" height="8" /></svg>
-                    Print
-                  </button>
-                  <button className="btn btn-sm report-close-btn report-toolbar-btn" onClick={() => setShowReportModal(false)}>
-                    Close
-                  </button>
-                </div>
-              </div>
-
-              {/* ── A4 Page ── */}
-              <div
-                id="sk-report-printable"
-                style={{
-                  width: '210mm',
-                  minHeight: '297mm',
-                  background: '#ffffff',
-                  padding: '16mm 15mm',
-                  boxShadow: '0 24px 70px rgba(0,0,0,0.35)',
-                  color: '#1a1a1a',
-                  fontFamily: 'var(--font-body)',
-                  boxSizing: 'border-box',
-                }}
-              >
-                {/* Letterhead */}
-                <div style={{
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
-                  borderBottom: '4px solid #760031', paddingBottom: '20px', marginBottom: '28px',
-                }}>
-                  <div>
-                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: '26px', color: '#760031', letterSpacing: '-0.02em' }}>
-                      eSKala
-                    </div>
-                    <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
-                      Sangguniang Kabataan Management System · Santa Rosa City, Laguna
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '16px', color: '#111' }}>
-                      SK Project &amp; Budget Report
-                    </div>
-                    <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
-                      Generated: {reportGeneratedAt}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Report subject */}
-                <div style={{ marginBottom: '26px' }}>
-                  <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '20px', color: '#111' }}>
-                    Barangay {barangay}
-                  </div>
-                </div>
-
-                {/* Executive summary paragraph */}
-                <div style={{ marginBottom: '26px', fontSize: '12px', lineHeight: 1.9, color: '#333' }}>
-                  This report presents the current financial standing and project portfolio of the
-                  Sangguniang Kabataan of Barangay {barangay} for the covered period. As of {reportGeneratedAt},
-                  the barangay has utilized <strong>{usagePct}%</strong> of its allocated annual budget of{' '}
-                  <strong>{formatPeso(budget)}</strong> across <strong>{localProjects.length}</strong> recorded
-                  {localProjects.length === 1 ? ' project' : ' projects'}, with <strong>{formatPeso(remain)}</strong> remaining
-                  available for future youth development initiatives.
-                </div>
-
-                {/* Financial summary */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px', marginBottom: '26px' }}>
-                  {[
-                    { label: 'Annual Budget', val: formatPeso(budget), color: '#760031' },
-                    { label: 'Amount Disbursed', val: formatPeso(spent), color: '#b45309' },
-                    { label: 'Remaining', val: formatPeso(remain), color: '#166534' },
-                  ].map(item => (
-                    <div key={item.label} style={{ border: '1px solid #e5e0da', borderRadius: '8px', padding: '16px 16px' }}>
-                      <div style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>{item.label}</div>
-                      <div style={{ fontFamily: 'var(--font-display)', fontWeight: 900, fontSize: '20px', color: item.color, marginTop: '6px' }}>{item.val}</div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Utilization bar */}
-                <div style={{ marginBottom: '30px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '12px', fontWeight: 700, color: '#444' }}>Budget Utilization</span>
-                    <span style={{ fontSize: '12px', fontWeight: 800, color: '#760031' }}>{usagePct}%</span>
-                  </div>
-                  <div style={{ height: '12px', background: '#f0ece5', borderRadius: '6px', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${usagePct}%`, background: 'linear-gradient(90deg, #760031, #9a0040)' }} />
-                  </div>
-                </div>
-
-                {/* Projects table */}
-                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '14px', color: '#111', marginBottom: '12px' }}>
-                  Project List ({localProjects.length})
-                </div>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11.5px' }}>
-                  <thead>
-                    <tr style={{ background: '#faf4eb' }}>
-                      {['Title', 'Category', 'Status', 'Budget', 'Spent'].map(h => (
-                        <th key={h} style={{ textAlign: 'left', padding: '10px 10px', borderBottom: '2px solid #760031', color: '#760031', fontWeight: 700, textTransform: 'uppercase', fontSize: '9.5px', letterSpacing: '0.05em' }}>
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {localProjects.length > 0 ? localProjects.map((p: any) => (
-                      <tr key={p.id} style={{ borderBottom: '1px solid #eee' }}>
-                        <td style={{ padding: '10px 10px', fontWeight: 600 }}>{p.title}</td>
-                        <td style={{ padding: '10px 10px', color: '#555' }}>{p.category}</td>
-                        <td style={{ padding: '10px 10px', textTransform: 'capitalize', color: '#555' }}>{p.status}</td>
-                        <td style={{ padding: '10px 10px' }}>{formatPeso(p.proposedBudget)}</td>
-                        <td style={{ padding: '10px 10px', color: '#b45309' }}>{formatPeso(p.spent)}</td>
-                      </tr>
-                    )) : (
-                      <tr>
-                        <td colSpan={5} style={{ padding: '20px 10px', textAlign: 'center', color: '#999' }}>
-                          No projects recorded for this barangay.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-
-                {/* Footer */}
-                <div style={{
-                  marginTop: '40px', paddingTop: '14px', borderTop: '1px solid #eee',
-                  display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#999',
-                }}>
-                  <span>eSKala · Sangguniang Kabataan Management System</span>
-                  <span>Barangay {barangay} — Confidential, for internal SK use</span>
-                </div>
-              </div>
-            </div>
-          </Portal>
-        )}
+        {/* ── View Report Modal — Multi-page A4 preview ── */}
+        <ReportModal
+          isOpen={showReportModal}
+          onClose={() => setShowReportModal(false)}
+          barangayName={barangay}
+          summary={summary}
+          projects={localProjects}
+        />
 
       </div>
     </section>

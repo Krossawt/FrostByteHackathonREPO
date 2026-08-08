@@ -4322,49 +4322,54 @@ tbody tr:last-child td {
   border-color: #b91c1c;
 }
 
-/* Print isolation — only the printable A4 page prints */
+/* Print isolation — only the printable A4 page sheets print */
 @media print {
-  body * {
-    visibility: hidden;
+  body > *:not(.report-modal-portal-root) {
+    display: none !important;
   }
 
-  #sk-report-printable,
-  #sk-report-printable * {
-    visibility: visible;
-  }
-
-  #sk-report-printable {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 210mm;
-    min-height: 297mm;
-    box-shadow: none !important;
-    margin: 0;
+  .report-modal-portal-root {
+    display: block !important;
+    position: static !important;
+    overflow: visible !important;
+    height: auto !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    backdrop-filter: none !important;
   }
 
   .no-print {
     display: none !important;
   }
 
+  .sk-report-page-sheet {
+    display: flex !important;
+    position: static !important;
+    width: 210mm !important;
+    height: 297mm !important;
+    min-height: 297mm !important;
+    box-shadow: none !important;
+    margin: 0 auto !important;
+    padding: 16mm 15mm !important;
+    page-break-after: always !important;
+    break-after: page !important;
+    box-sizing: border-box !important;
+    background: #ffffff !important;
+  }
+
   @page {
-    size: A4;
+    size: A4 portrait;
     margin: 0;
   }
 }
 
-/* Responsive scaling for the on-screen A4 preview*/
+/* Responsive container styling for on-screen preview */
 @media screen and (max-width: 900px) {
-  #sk-report-printable {
-    transform: scale(0.75);
-    transform-origin: top center;
-  }
-}
-
-@media screen and (max-width: 650px) {
-  #sk-report-printable {
-    transform: scale(0.5);
-    transform-origin: top center;
+  .sk-report-page-sheet {
+    max-width: 100% !important;
+    min-height: auto !important;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2) !important;
   }
 }
 
