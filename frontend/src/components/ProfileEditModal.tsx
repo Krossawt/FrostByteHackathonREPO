@@ -295,7 +295,7 @@ export default function ProfileEditModal({ user, onClose, onDiscard, onSave, onD
                                     </span>
                                 </div>
                                 <span style={{ fontSize: '0.74rem', color: 'var(--muted)', marginTop: '0.35rem', display: 'block', fontStyle: 'italic' }}>
-                                    ℹ️ Barangay residence is verified upon registration and cannot be changed online. Contact CYDO Admin for official relocation.
+                                    🔒 Barangay is locked to your registered residence. To request a change, see below.
                                 </span>
                             </div>
                         </div>
@@ -399,6 +399,32 @@ export default function ProfileEditModal({ user, onClose, onDiscard, onSave, onD
                                         </div>
                                     </div>
                                 )}
+                            </div>
+                        </div>
+
+                        {/* Barangay Change Notice — very bottom */}
+                        <div style={{
+                            marginTop: '1rem',
+                            padding: '0.85rem 1.1rem',
+                            borderRadius: '12px',
+                            background: 'rgba(118, 0, 49, 0.04)',
+                            border: '1px solid rgba(118, 0, 49, 0.15)',
+                            display: 'flex',
+                            gap: '0.6rem',
+                            alignItems: 'flex-start',
+                        }}>
+                            <span style={{ fontSize: '1rem', flexShrink: 0, marginTop: '1px' }}>📬</span>
+                            <div style={{ fontSize: '0.78rem', color: '#5c0026', lineHeight: 1.55 }}>
+                                <strong style={{ display: 'block', marginBottom: '0.2rem', fontWeight: 800 }}>Need to update your registered barangay?</strong>
+                                Barangay transfers must be verified by the City Youth Development Office (CYDO).
+                                Send an email to{' '}
+                                <a
+                                    href="mailto:cydo@santarosacity.gov.ph?subject=Barangay%20Transfer%20Request%20-%20eSKala&body=Full%20Name%3A%20%0ARegistered%20Email%3A%20%0ACurrent%20Barangay%3A%20%0ANew%20Barangay%3A%20%0AReason%3A%20"
+                                    style={{ color: '#760031', fontWeight: 800, textDecoration: 'underline' }}
+                                >
+                                    cydo@santarosacity.gov.ph
+                                </a>
+                                {' '}with your <strong>full name</strong>, <strong>registered email</strong>, <strong>current barangay</strong>, <strong>new barangay</strong>, and <strong>reason for transfer</strong>. Processing may take 3–5 business days.
                             </div>
                         </div>
                     </form>

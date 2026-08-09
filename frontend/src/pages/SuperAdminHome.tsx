@@ -4,7 +4,7 @@ import ProjectDetailModal from '../components/ProjectDetailModal'
 import ConfirmDialog from '../components/ConfirmDialog'
 import type { ReportProject } from '../types'
 import Portal from '../components/Portal'
-import { fetchProjectsApi, fetchExecutiveSummaryApi, fetchAuditLogsApi, fetchNewsApi, postApprovedAbyipApi, createNewsletterApi, normalizeProjectStatus } from '../services/api'
+import { fetchProjectsApi, fetchExecutiveSummaryApi, fetchAuditLogsApi, fetchNewsApi, uploadAbyipApi, fetchBudgetReportsApi, createNewsletterApi, normalizeProjectStatus, getFileUrl } from '../services/api'
 import { formatCurrency } from '../utils/formatCurrency'
 import ReportModal from '../components/ReportModal'
 
@@ -104,6 +104,13 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
   // Feedback banner (glass-style, portal-rendered — success = green, info = maroon)
   const [feedback, setFeedback] = useState<Feedback | null>(null)
 
+  // Existing ABYIP records keyed by "barangay|year" so we can detect duplicates
+  const [existingAbyipMap, setExistingAbyipMap] = useState<Record<string, any>>({})
+  const currentFY = new Date().getFullYear()
+  const nextFYDate = `January 1, ${currentFY + 1}`
+  // True if the selected barangay already has an ABYIP for the current fiscal year
+  const selectedBrgyAbyip = selectedBarangay ? existingAbyipMap[`${selectedBarangay}|${currentFY}`] : null
+
   // View Report modal (city-wide, or scoped to the selected barangay)
   const [showReportModal, setShowReportModal] = useState(false)
   const reportGeneratedAt = new Date().toLocaleString('en-PH', {
@@ -151,12 +158,13 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
   useEffect(() => {
     async function loadLiveData() {
       try {
-        const [sumRes, projRes, logsRes, newsRes] = await Promise.all([
+        const [sumRes, projRes, logsRes, newsRes, budgetRes] = await Promise.all([
           fetchExecutiveSummaryApi().catch(() => null),
           // public_only=false so Super Admin sees ALL projects, not only Posted
           fetchProjectsApi({ public_only: false }).catch(() => []),
           fetchAuditLogsApi().catch(() => []),
           fetchNewsApi().catch(() => []),
+          fetchBudgetReportsApi({ year: new Date().getFullYear() }).catch(() => []),
         ])
 
         if (sumRes) {
@@ -205,6 +213,13 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
             date: n.publishedAt ? new Date(n.publishedAt).toLocaleDateString() : 'Today',
           })))
         }
+
+        // Build lookup map for existing ABYIP records
+        if (Array.isArray(budgetRes)) {
+          const map: Record<string, any> = {}
+          budgetRes.forEach((r: any) => { map[`${r.budgetBarangay}|${r.budgetYear}`] = r })
+          setExistingAbyipMap(map)
+        }
       } catch (err) {
         console.warn('API fetch warning:', err)
       }
@@ -238,18 +253,26 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
     setErrorMessage('')
 
     const budgetVal = parseFloat(approvedBudget)
+    const budgetYearNum = parseInt(annualYear) || new Date().getFullYear()
 
     try {
-      await postApprovedAbyipApi({
-        budgetBarangay: selectedBarangay,
-        budgetYear: parseInt(annualYear) || 2026,
+      // Upload file to Supabase S3 via backend
+      const newReport = await uploadAbyipApi({
+        barangay: selectedBarangay,
+        budgetYear: budgetYearNum,
         budgetValue: budgetVal,
-        budgetFileURL: `/static/uploads/${selectedFile.name}`
+        file: selectedFile,
       })
+
+      // Update the existingAbyipMap immediately so View ABYIP button appears
+      setExistingAbyipMap((prev) => ({
+        ...prev,
+        [`${selectedBarangay}|${budgetYearNum}`]: newReport,
+      }))
 
       await createNewsletterApi({
         title: `ABYIP Approved for Barangay ${selectedBarangay}`,
-        summary: `Barangay ${selectedBarangay} receives ₱${budgetVal.toLocaleString()} as their annual budget for the fiscal year ${parseInt(annualYear) || 2026}.`,
+        summary: `Barangay ${selectedBarangay} receives ₱${budgetVal.toLocaleString()} as their annual budget for the fiscal year ${budgetYearNum}.`,
         category: 'ABYIP',
         projectLocation: selectedBarangay,
       }).catch((newsErr: any) => {
@@ -265,11 +288,11 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
       )
 
       setIsSubmitting(false)
-      setSuccessMessage(`ABYIP (FY ${annualYear}) for Barangay ${selectedBarangay} — ₱${budgetVal.toLocaleString()} has been successfully posted to live database! A newsletter announcement has been generated.`)
-      setFeedback({ type: 'success', message: 'Post Approved ABYIP successfully' })
+      setSuccessMessage(`ABYIP (FY ${budgetYearNum}) for Barangay ${selectedBarangay} — ₱${budgetVal.toLocaleString()} has been successfully posted and the document is stored in S3! A newsletter announcement has been generated.`)
+      setFeedback({ type: 'success', message: 'ABYIP uploaded and stored successfully' })
     } catch (err: any) {
       setIsSubmitting(false)
-      setErrorMessage(err.message || 'Failed to post approved ABYIP to backend')
+      setErrorMessage(err.message || 'Failed to upload ABYIP')
     }
   }
 
@@ -452,14 +475,37 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
 
               {/* Post Approved ABYIP button ONLY when a specific barangay is selected */}
               {selectedBarangay && (
-                <button
-                  className="btn btn-gold btn-sm"
-                  onClick={openBudgetModal}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14" /></svg>
-                  Post Approved ABYIP
-                </button>
+                selectedBrgyAbyip ? (
+                  // ABYIP already uploaded this FY — show View button + reset date
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.25rem' }}>
+                    <a
+                      href={getFileUrl(selectedBrgyAbyip.budgetFileURL)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="btn btn-sm"
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+                        background: 'linear-gradient(135deg,#166534,#15803d)', color: '#fff',
+                        border: 'none', textDecoration: 'none',
+                      }}
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                      View ABYIP
+                    </a>
+                    <span style={{ fontSize: '0.68rem', color: '#64748b', fontStyle: 'italic', textAlign: 'right' }}>
+                      Next upload: {nextFYDate}
+                    </span>
+                  </div>
+                ) : (
+                  <button
+                    className="btn btn-gold btn-sm"
+                    onClick={openBudgetModal}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14" /></svg>
+                    Post Approved ABYIP
+                  </button>
+                )
               )}
             </div>
           </div>
@@ -842,7 +888,7 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
                               <input
                                 type="file"
                                 style={{ display: 'none' }}
-                                accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+                                accept=".pdf,.png,.jpg,.jpeg,.webp"
                                 onChange={e => {
                                   if (e.target.files && e.target.files[0]) {
                                     setSelectedFile(e.target.files[0])
@@ -853,7 +899,7 @@ export default function SuperAdminHome({ selectedBarangay, setSelectedBarangay }
                               <div>
                                 <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '0.85rem', color: 'var(--maroon)' }}>Click to upload ABYIP document</span> or drag and drop
                               </div>
-                              <span style={{ fontSize: '0.72rem', color: 'var(--muted)' }}>PDF, DOCX, XLSX, or Image — up to 10MB</span>
+                              <span style={{ fontSize: '0.72rem', color: 'var(--muted)' }}>PDF, PNG, JPG, or WEBP — up to 10MB (required)</span>
                             </label>
                           )}
                         </div>

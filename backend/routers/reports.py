@@ -30,66 +30,97 @@ BARANGAYS = [
 @router.get("/summary", response_model=CityConsolidatedReport, include_in_schema=False)
 def get_consolidated_report(db: Session = Depends(get_db)):
     CACHE_KEY = "reports:consolidated"
-    CACHE_TTL = 60  # seconds
+    CACHE_TTL = 300  # 5-minute TTL — heavy query, data changes infrequently
 
     cached = cache.get(CACHE_KEY)
     if cached is not None:
         return cached
 
-    barangay_summaries = []
-    total_budget_sum = db.query(func.coalesce(func.sum(AnnualBudgetReport.budgetValue), 0.0)).scalar()
-    total_budget = float(total_budget_sum or 0.0)
+    from sqlalchemy import case, text
+
+    # ── 1. Fetch latest budget per barangay in ONE query ────────────────────────────────
+    from sqlalchemy import distinct
+    # Get max budgetYear per barangay, then join value
+    latest_year_subq = (
+        db.query(
+            AnnualBudgetReport.budgetBarangay,
+            func.max(AnnualBudgetReport.budgetYear).label("maxYear"),
+        )
+        .group_by(AnnualBudgetReport.budgetBarangay)
+        .subquery()
+    )
+    budget_rows = (
+        db.query(
+            AnnualBudgetReport.budgetBarangay,
+            AnnualBudgetReport.budgetValue,
+        )
+        .join(
+            latest_year_subq,
+            (AnnualBudgetReport.budgetBarangay == latest_year_subq.c.budgetBarangay)
+            & (AnnualBudgetReport.budgetYear == latest_year_subq.c.maxYear),
+        )
+        .all()
+    )
+    budget_by_brgy: dict = {r.budgetBarangay: float(r.budgetValue) for r in budget_rows}
+    total_budget = sum(budget_by_brgy.values())
+
+    # ── 2. Fetch all projects in ONE query — only the 3 columns we need ────────────────
+    proj_rows = (
+        db.query(
+            Project.projectLocation,
+            Project.projectStatus,
+            Project.projectBreakdown,
+        )
+        .filter(Project.isDeleted == False)
+        .all()
+    )
+
+    # Aggregate in Python — zero extra DB round trips
+    from collections import defaultdict
+    brgy_data: dict = defaultdict(lambda: {"spent": 0.0, "ongoing": 0, "completed": 0, "upcoming": 0, "total": 0})
     total_spent = 0.0
     total_projects = 0
     ongoing_count = 0
     completed_count = 0
     upcoming_count = 0
 
-    for barangay in BARANGAYS:
-        # Get latest budget report for this barangay
-        budget_row = (
-            db.query(AnnualBudgetReport)
-            .filter(AnnualBudgetReport.budgetBarangay == barangay)
-            .order_by(AnnualBudgetReport.budgetYear.desc())
-            .first()
-        )
-        annual_budget = float(budget_row.budgetValue) if budget_row else 0.0
+    for row in proj_rows:
+        loc = (row.projectLocation or "").strip()
+        st = str(getattr(row.projectStatus, "value", row.projectStatus) or "").lower()
+        brk = float(row.projectBreakdown or 0)
+        d = brgy_data[loc]
+        d["spent"] += brk
+        d["total"] += 1
+        total_spent += brk
+        total_projects += 1
+        if st in {"in progress", "ongoing"}:
+            d["ongoing"] += 1; ongoing_count += 1
+        elif st in {"completed", "posted"}:
+            d["completed"] += 1; completed_count += 1
+        else:
+            d["upcoming"] += 1; upcoming_count += 1
 
-        # Get projects for this barangay (case-insensitive & whitespace trimmed)
-        all_projects = (
-            db.query(Project)
-            .filter(func.lower(func.trim(Project.projectLocation)) == barangay.lower(), Project.isDeleted == False)
-            .all()
-        )
-
-        # Compute spending from project breakdown or proposed budget spent
-        spent = sum(float(p.projectBreakdown or 0) for p in all_projects)
-
-        barangay_ongoing = sum(1 for p in all_projects if str(getattr(p.projectStatus, 'value', p.projectStatus) or "").lower() in ["in progress", "ongoing"])
-        barangay_completed = sum(1 for p in all_projects if str(getattr(p.projectStatus, 'value', p.projectStatus) or "").lower() in ["completed", "posted"])
-        barangay_upcoming = sum(1 for p in all_projects if str(getattr(p.projectStatus, 'value', p.projectStatus) or "").lower() in ["incoming", "upcoming", "drafted", "finance update", "for approval"])
-
-        barangay_summaries.append(BarangaySummary(
-            barangay=barangay,
-            annualBudget=annual_budget,
-            spent=spent,
-            remaining=max(annual_budget - spent, 0.0),
-            projectCount=len(all_projects),
-            ongoingCount=barangay_ongoing,
-            completedCount=barangay_completed,
-        ))
-
-        total_spent += spent
-        total_projects += len(all_projects)
-        ongoing_count += barangay_ongoing
-        completed_count += barangay_completed
-        upcoming_count += barangay_upcoming
-
-    sk_officials_count = db.query(User).filter(
+    # ── 3. SK officials count ───────────────────────────────────────────────────────────────────────
+    sk_officials_count = db.query(func.count(User.userID)).filter(
         User.userIsSK == True,
         User.userIsDeleted == False,
         User.userIsActive == True,
-    ).count()
+    ).scalar() or 0
+
+    # ── 4. Build barangay summaries ───────────────────────────────────────────────────────────────────
+    barangay_summaries = []
+    for barangay in BARANGAYS:
+        annual_budget = budget_by_brgy.get(barangay, 0.0)
+        d = brgy_data.get(barangay, {"spent": 0.0, "ongoing": 0, "completed": 0, "upcoming": 0, "total": 0})
+        barangay_summaries.append(BarangaySummary(
+            barangay=barangay,
+            annualBudget=annual_budget,
+            spent=d["spent"],
+            remaining=max(annual_budget - d["spent"], 0.0),
+            projectCount=d["total"],
+            ongoingCount=d["ongoing"],
+            completedCount=d["completed"],
+        ))
 
     result = CityConsolidatedReport(
         totalBudget=total_budget,
@@ -110,7 +141,7 @@ def get_consolidated_report(db: Session = Depends(get_db)):
 def get_barangay_report(barangay_name: str, db: Session = Depends(get_db)):
     # Normalise key: lowercase, stripped so "Balibago" and "balibago" share one entry
     CACHE_KEY = f"reports:barangay:{barangay_name.strip().lower()}"
-    CACHE_TTL = 30  # seconds
+    CACHE_TTL = 60  # seconds
 
     cached = cache.get(CACHE_KEY)
     if cached is not None:
@@ -204,7 +235,7 @@ def list_sk_officials(
 ):
     # Cache key includes barangay so filtered and unfiltered results are separate entries
     CACHE_KEY = f"reports:sk-officials:{(barangay or '').strip().lower()}"
-    CACHE_TTL = 120  # seconds — SK list rarely changes
+    CACHE_TTL = 600  # 10-minute TTL — SK roster changes only when Super Admin edits it
 
     cached = cache.get(CACHE_KEY)
     if cached is not None:
@@ -228,7 +259,7 @@ def list_sk_officials(
             summary="List SK officials for a specific barangay (public)")
 def get_barangay_officials(barangay_name: str, db: Session = Depends(get_db)):
     CACHE_KEY = f"reports:sk-officials-brgy:{barangay_name.strip().lower()}"
-    CACHE_TTL = 120  # seconds
+    CACHE_TTL = 600  # 10-minute TTL — rarely changes
 
     cached = cache.get(CACHE_KEY)
     if cached is not None:

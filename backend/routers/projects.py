@@ -57,7 +57,7 @@ def list_projects(
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_optional_user),
 ):
-    query = db.query(Project).options(joinedload(Project.purchase_orders)).filter(Project.isDeleted == False)
+    query = db.query(Project).filter(Project.isDeleted == False)
 
     # Optional status filter
     if status_param and status_param.strip() and status_param.strip().lower() != "all":

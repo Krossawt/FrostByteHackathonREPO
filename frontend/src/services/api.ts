@@ -24,6 +24,16 @@ export function setStoredToken(token: string | null, _remember = true): void {
   }
 }
 
+export function getFileUrl(url?: string | null): string {
+  if (!url || url === '#') return '#'
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url
+  }
+  const backendBase = API_BASE_URL.replace(/\/api\/v1\/?$/, '')
+  const cleanPath = url.startsWith('/') ? url : `/${url}`
+  return `${backendBase}${cleanPath}`
+}
+
 const IS_DEV = (import.meta as any).env?.DEV === true
 
 import { sanitizeText } from '../utils/sanitize'
@@ -45,6 +55,11 @@ function deepSanitizePayload(obj: any): any {
   return obj
 }
 
+// ── In-flight GET request deduplication ────────────────────────────────────
+// Prevents multiple concurrent calls to the same GET URL from each making a
+// separate network request. The second caller reuses the first's Promise.
+const _inflight = new Map<string, Promise<any>>()
+
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = getStoredToken()
   const method = options.method || 'GET'
@@ -59,12 +74,31 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     headers['Authorization'] = `Bearer ${token}`
   }
 
+  // Deduplicate in-flight GET requests
+  if (method === 'GET') {
+    const key = fullUrl
+    if (_inflight.has(key)) {
+      return _inflight.get(key) as Promise<T>
+    }
+    const promise = _doRequest<T>(fullUrl, { ...options, headers })
+    _inflight.set(key, promise)
+    promise.finally(() => _inflight.delete(key))
+    return promise
+  }
+
+  return _doRequest<T>(fullUrl, { ...options, headers })
+}
+
+async function _doRequest<T>(fullUrl: string, options: RequestInit & { headers: Record<string, string> }): Promise<T> {
+  const method = options.method || 'GET'
+  const hdrs = options.headers
+  const logEndpoint = fullUrl.replace(API_BASE_URL, '')
   // Automatic client-side payload sanitization for JSON requests
-  if (options.body && typeof options.body === 'string' && headers['Content-Type']?.includes('application/json')) {
+  if (options.body && typeof options.body === 'string' && hdrs['Content-Type']?.includes('application/json')) {
     try {
       const parsed = JSON.parse(options.body)
       const sanitized = deepSanitizePayload(parsed)
-      options.body = JSON.stringify(sanitized)
+      options = { ...options, body: JSON.stringify(sanitized) }
     } catch {
       // Keep original body if parsing fails
     }
@@ -72,7 +106,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 
   if (IS_DEV) {
     console.log(
-      `%c[API REQUEST] %c${method} %c${endpoint}`,
+      `%c[API REQUEST] %c${method} %c${logEndpoint}`,
       'background: #760031; color: #fff; font-weight: bold; padding: 2px 6px; border-radius: 3px;',
       'color: #b45309; font-weight: bold;',
       'color: #1d4ed8;',
@@ -80,10 +114,11 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     )
   }
 
+
   try {
     const response = await fetch(fullUrl, {
       ...options,
-      headers,
+      headers: hdrs,
     })
 
     if (!response.ok) {
@@ -101,7 +136,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
       }
 
       console.error(
-        `%c[API ERROR ${response.status}] %c${method} ${endpoint}`,
+        `%c[API ERROR ${response.status}] %c${method} ${logEndpoint}`,
         'background: #b91c1c; color: #fff; font-weight: bold; padding: 2px 6px; border-radius: 3px;',
         'color: #991b1b; font-weight: bold;',
         errorDetail
@@ -121,7 +156,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
         const data = JSON.parse(text)
         if (IS_DEV) {
           console.log(
-            `%c[API SUCCESS] %c${method} ${endpoint}`,
+            `%c[API SUCCESS] %c${method} ${logEndpoint}`,
             'background: #166534; color: #fff; font-weight: bold; padding: 2px 6px; border-radius: 3px;',
             'color: #15803d;',
             data
@@ -135,7 +170,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     // Guard against HTML error pages (e.g., Render sleeping/503 returns <!DOCTYPE html>)
     if (text.trimStart().startsWith('<')) {
       console.error(
-        `%c[API PARSE ERROR] %c${method} ${endpoint}`,
+        `%c[API PARSE ERROR] %c${method} ${logEndpoint}`,
         'background: #92400e; color: #fff; font-weight: bold; padding: 2px 6px; border-radius: 3px;',
         'color: #78350f; font-weight: bold;',
         'Server returned HTML instead of JSON — backend may be sleeping or URL is wrong.',
@@ -148,7 +183,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
       data = JSON.parse(text)
     } catch (parseErr) {
       console.error(
-        `%c[API PARSE ERROR] %c${method} ${endpoint}`,
+        `%c[API PARSE ERROR] %c${method} ${logEndpoint}`,
         'background: #92400e; color: #fff; font-weight: bold; padding: 2px 6px; border-radius: 3px;',
         'color: #78350f; font-weight: bold;',
         'Invalid JSON response from server:',
@@ -158,7 +193,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     }
     if (IS_DEV) {
       console.log(
-        `%c[API SUCCESS] %c${method} ${endpoint}`,
+        `%c[API SUCCESS] %c${method} ${logEndpoint}`,
         'background: #166534; color: #fff; font-weight: bold; padding: 2px 6px; border-radius: 3px;',
         'color: #15803d;',
         data
@@ -315,16 +350,50 @@ export function isProjectOngoing(p: any): boolean {
 
 // ─── ANNUAL BUDGET REPORTS (ABYIP) ──────────────────────────────────────────
 
-export async function postApprovedAbyipApi(payload: {
-  budgetBarangay: string
+/**
+ * Upload an ABYIP document to Supabase S3 via the backend.
+ * Sends multipart/form-data with the file + budget metadata.
+ * Returns the created budget report record with a real public URL.
+ */
+export async function uploadAbyipApi(payload: {
+  barangay: string
   budgetYear: number
   budgetValue: number
-  budgetFileURL?: string
+  file: File
 }): Promise<any> {
-  return request('/budget-reports', {
+  const token = getStoredToken()
+  const formData = new FormData()
+  formData.append('barangay', payload.barangay)
+  formData.append('budget_year', String(payload.budgetYear))
+  formData.append('budget_value', String(payload.budgetValue))
+  formData.append('file', payload.file)
+
+  const response = await fetch(`${API_BASE_URL}/budget-reports/upload`, {
     method: 'POST',
-    body: JSON.stringify(payload),
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
   })
+
+  if (!response.ok) {
+    let errorDetail = `HTTP ${response.status}: ${response.statusText}`
+    try {
+      const text = await response.text()
+      if (text) {
+        const errJson = JSON.parse(text)
+        if (errJson.detail) errorDetail = typeof errJson.detail === 'string' ? errJson.detail : JSON.stringify(errJson.detail)
+      }
+    } catch { /* ignore */ }
+    throw new Error(errorDetail)
+  }
+  return response.json()
+}
+
+export async function fetchBudgetReportsApi(params?: { barangay?: string; year?: number }): Promise<any[]> {
+  const q = new URLSearchParams()
+  if (params?.barangay) q.set('barangay', params.barangay)
+  if (params?.year) q.set('year', String(params.year))
+  const qs = q.toString() ? `?${q.toString()}` : ''
+  return request<any[]>(`/budget-reports${qs}`)
 }
 
 // ─── REPORTS / DASHBOARD SUMMARY ─────────────────────────────────────────────

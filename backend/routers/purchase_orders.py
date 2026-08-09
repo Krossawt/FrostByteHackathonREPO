@@ -170,18 +170,21 @@ async def upload_receipt(
     content = await file.read()
     ext = validate_and_get_receipt_ext(content)
 
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
-    filename = f"receipt_{order_id}_{uuid.uuid4().hex[:8]}.{ext}"
-    filepath = os.path.join(UPLOAD_DIR, filename)
+    try:
+        from storage import upload_to_supabase
+        receipt_url = upload_to_supabase(content, ext, folder="receipts")
+    except Exception:
+        os.makedirs(UPLOAD_DIR, exist_ok=True)
+        filename = f"receipt_{order_id}_{uuid.uuid4().hex[:8]}.{ext}"
+        filepath = os.path.join(UPLOAD_DIR, filename)
+        with open(filepath, "wb") as f:
+            f.write(content)
+        receipt_url = f"/static/uploads/{filename}"
 
-    with open(filepath, "wb") as f:
-        f.write(content)
-
-    ocr_extracted_amount = float(order.orderTotalPrice or order.orderPrice)
+    ocr_extracted_amount = float(order.orderTotalPrice or order.orderPrice or 0.0)
     variance = random.uniform(-0.02, 0.02)
     ocr_extracted_amount = round(ocr_extracted_amount * (1 + variance), 2)
 
-    receipt_url = f"/static/uploads/{filename}"
 
     order.receiptImageURL = receipt_url
     order.ocrExtractedAmount = ocr_extracted_amount

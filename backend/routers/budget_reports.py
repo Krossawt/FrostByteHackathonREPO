@@ -8,7 +8,6 @@ PATCH /api/v1/budget-reports/{id}/override
 
 import os
 import uuid
-import random
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File, Form
 from sqlalchemy import func
@@ -42,6 +41,22 @@ def create_budget_report(
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                             detail=f"'{payload.budgetBarangay}' is not a valid Santa Rosa City barangay")
 
+    # ── Once-per-fiscal-year guard ──────────────────────────────────────────────
+    existing = db.query(AnnualBudgetReport).filter(
+        AnnualBudgetReport.budgetBarangay == payload.budgetBarangay,
+        AnnualBudgetReport.budgetYear == payload.budgetYear,
+    ).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"An ABYIP for Barangay {payload.budgetBarangay} "
+                f"(FY {payload.budgetYear}) has already been uploaded. "
+                f"A new upload will be available on January 1, {payload.budgetYear + 1}."
+            ),
+        )
+    # ───────────────────────────────────────────────────────────────────────────
+
     report = AnnualBudgetReport(
         budgetBarangay=payload.budgetBarangay,
         budgetUploadedBy=current_user.userID,
@@ -58,8 +73,9 @@ def create_budget_report(
     log_action(db, current_user, "Posted Approved ABYIP", "annual_budget_reports", str(report.budgetID),
                f"Approved ABYIP posted for {payload.budgetBarangay} FY{payload.budgetYear} — ₱{payload.budgetValue:,.2f}")
 
-    # New budget report changes consolidated totals — drop the reports cache
+    # New budget report changes consolidated totals — drop both caches
     cache.invalidate_prefix("reports:")
+    cache.invalidate_prefix("budget-reports:")
 
     return BudgetReportResponse.model_validate(report)
 
@@ -71,6 +87,14 @@ def list_budget_reports(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_authenticated),
 ):
+    # Cache unfiltered and year-only-filtered requests (most frequent calls)
+    cache_key = f"budget-reports:{(barangay or '').strip().lower()}:{year or 'all'}"
+    use_cache = not barangay or barangay.strip() in {'', 'All', 'all', 'Santa Rosa City'}
+    if use_cache:
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
+
     query = db.query(AnnualBudgetReport)
     if barangay and barangay.strip() and barangay.strip() not in {"Santa Rosa City", "All", "all"}:
         query = query.filter(func.lower(func.trim(AnnualBudgetReport.budgetBarangay)) == barangay.strip().lower())
@@ -78,7 +102,12 @@ def list_budget_reports(
         query = query.filter(AnnualBudgetReport.budgetYear == year)
 
     reports = query.order_by(AnnualBudgetReport.budgetYear.desc(), AnnualBudgetReport.budgetBarangay).all()
-    return [BudgetReportResponse.model_validate(r) for r in reports]
+    result = [BudgetReportResponse.model_validate(r) for r in reports]
+
+    if use_cache:
+        cache.set(cache_key, result, 60)  # 60-second TTL
+
+    return result
 
 
 @router.get("/{report_id}", response_model=BudgetReportResponse, summary="Get budget report detail")
@@ -118,10 +147,12 @@ def validate_and_get_budget_file_ext(content: bytes) -> str:
 
 
 @router.post("/upload", response_model=BudgetReportResponse, status_code=status.HTTP_201_CREATED,
-             summary="Upload Annual Budget Report — OCR auto-extracts budget year and value")
+             summary="Upload Annual Budget Report — stores file in Supabase S3")
 async def upload_budget_report(
     barangay: str = Form(..., description="Barangay name"),
-    file: UploadFile = File(..., description="Budget report scan (PDF, PNG, JPG)"),
+    budget_year: int = Form(..., description="Fiscal year (e.g. 2025)"),
+    budget_value: float = Form(..., gt=0, description="Approved ABYIP budget amount in PHP"),
+    file: UploadFile = File(..., description="ABYIP document (PDF, PNG, JPG, WEBP)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_sk_officer),
 ):
@@ -129,36 +160,47 @@ async def upload_budget_report(
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                             detail=f"'{barangay}' is not a valid Santa Rosa City barangay")
 
+    # ── Once-per-fiscal-year guard ──────────────────────────────────────────────
+    existing = db.query(AnnualBudgetReport).filter(
+        AnnualBudgetReport.budgetBarangay == barangay,
+        AnnualBudgetReport.budgetYear == budget_year,
+    ).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"An ABYIP for Barangay {barangay} (FY {budget_year}) has already been uploaded. "
+                f"A new upload will be available on January 1, {budget_year + 1}."
+            ),
+        )
+    # ───────────────────────────────────────────────────────────────────────────
+
     content = await file.read()
     ext = validate_and_get_budget_file_ext(content)
 
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
-    filename = f"budget_{barangay.replace(' ', '_')}_{uuid.uuid4().hex[:8]}.{ext}"
-    filepath = os.path.join(UPLOAD_DIR, filename)
-
-    with open(filepath, "wb") as f:
-        f.write(content)
-
-    # ─── OCR STUB ──────────────────────────────────────────────────────────────
-    # TODO: Replace with Google Cloud Vision / AWS Textract call.
-    # Should extract: budget fiscal year and total budget value from the document.
-    from datetime import datetime as dt
-    current_year = dt.now().year
-    ocr_budget_year = current_year
-    # Simulate a realistic SK annual budget for Santa Rosa barangay (₱500K–₱1.5M range)
-    ocr_budget_value = round(random.uniform(500_000, 1_500_000), 2)
+    # ── Upload to Supabase S3 ────────────────────────────────────────────────────
+    try:
+        from storage import upload_to_supabase
+        file_url = upload_to_supabase(content, ext, folder="abyip")
+    except Exception:
+        # Fallback: save locally if S3 is not configured (dev environment)
+        import os as _os
+        _os.makedirs(UPLOAD_DIR, exist_ok=True)
+        filename = f"budget_{barangay.replace(' ', '_')}_{uuid.uuid4().hex[:8]}.{ext}"
+        filepath = _os.path.join(UPLOAD_DIR, filename)
+        with open(filepath, "wb") as f_local:
+            f_local.write(content)
+        file_url = f"/static/uploads/{filename}"
     # ───────────────────────────────────────────────────────────────────────────
-
-    file_url = f"/static/uploads/{filename}"
 
     report = AnnualBudgetReport(
         budgetBarangay=barangay,
         budgetUploadedBy=current_user.userID,
-        budgetYear=ocr_budget_year,
-        budgetValue=ocr_budget_value,
+        budgetYear=budget_year,
+        budgetValue=budget_value,
         budgetFileURL=file_url,
-        isOCRScanned=True,
-        isManuallyOverridden=False,
+        isOCRScanned=False,
+        isManuallyOverridden=True,
     )
     db.add(report)
     db.commit()
@@ -178,8 +220,9 @@ async def upload_budget_report(
     db.add(entry)
     db.commit()
 
-    # Uploaded budget affects consolidated totals — drop the reports cache
+    # Uploaded budget affects consolidated totals — drop both caches
     cache.invalidate_prefix("reports:")
+    cache.invalidate_prefix("budget-reports:")
 
     return BudgetReportResponse.model_validate(report)
 

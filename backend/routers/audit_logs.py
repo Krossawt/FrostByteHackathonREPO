@@ -14,6 +14,7 @@ from database import get_db
 from models import User, AuditLog
 from schemas import AuditLogResponse
 from auth import require_authenticated, require_superadmin
+from cache import cache
 
 router = APIRouter(prefix="/api/v1/audit-logs", tags=["Audit Trail"])
 
@@ -29,6 +30,12 @@ def list_audit_logs(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_authenticated),
 ):
+    use_cache = not module and not actor_id and not barangay and not action_type and skip == 0 and limit == 50
+    if use_cache:
+        cached = cache.get(f"audit-logs:default:{limit}")
+        if cached is not None:
+            return cached
+
     query = db.query(AuditLog)
 
     if module:
@@ -41,7 +48,12 @@ def list_audit_logs(
         query = query.filter(AuditLog.actionType.ilike(f"%{action_type}%"))
 
     logs = query.order_by(AuditLog.timestamp.desc()).offset(skip).limit(limit).all()
-    return [AuditLogResponse.model_validate(log) for log in logs]
+    result = [AuditLogResponse.model_validate(log) for log in logs]
+
+    if use_cache:
+        cache.set(f"audit-logs:default:{limit}", result, 15)  # 15-second TTL
+
+    return result
 
 
 @router.get("/export", summary="Super Admin: Export audit logs as PDF (DILG/COA compliance)")
