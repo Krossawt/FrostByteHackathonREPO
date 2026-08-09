@@ -110,12 +110,18 @@ async def upload_news_image(
     ext = validate_and_get_image_ext(content)
 
     try:
+        from storage import upload_to_supabase
         public_url = upload_to_supabase(content, ext, folder="news")
-    except RuntimeError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"Image upload failed: {exc}",
-        )
+    except Exception:
+        import uuid as _uuid
+        import os as _os
+        UPLOAD_DIR = _os.path.join(_os.path.dirname(_os.path.dirname(__file__)), "static", "uploads")
+        _os.makedirs(UPLOAD_DIR, exist_ok=True)
+        filename = f"news_{_uuid.uuid4().hex[:8]}.{ext}"
+        filepath = _os.path.join(UPLOAD_DIR, filename)
+        with open(filepath, "wb") as f_local:
+            f_local.write(content)
+        public_url = f"/static/uploads/{filename}"
 
     return {"imageURL": public_url}
 
