@@ -7,7 +7,7 @@ import ProjectDetailModal from '../components/ProjectDetailModal'
 import BarangayTransactionsModal from '../components/BarangayTransactionsModal'
 import NewsTicker from '../components/NewsTicker'
 import type { ReportProject, NewsItem } from '../types'
-import { fetchExecutiveSummaryApi, fetchNewsApi, fetchProjectsApi, fetchSKOfficialsApi, normalizeProjectStatus } from '../services/api'
+import { fetchExecutiveSummaryApi, fetchNewsApi, fetchProjectsApi, fetchSKOfficialsApi, normalizeProjectStatus, resolveImageUrl } from '../services/api'
 import { formatCurrency } from '../utils/formatCurrency'
 
 
@@ -698,7 +698,8 @@ export default function Landing() {
                   style={{ transform: `translateX(calc(-${newsIdx * (320 + 20)}px))` }}
                 >
                   {(newsList.length > 2 ? [...newsList, ...newsList] : newsList).map((item: any, i: number) => {
-                    const imgSrc = item.image || item.imageURL || item.image_url || 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=700&q=80'
+                    const rawImg = item.image || item.imageURL || item.image_url
+                    const imgSrc = rawImg ? resolveImageUrl(rawImg) : 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=700&q=80'
 
                     return (
                       <div key={`${item.id}-${i}`} className="news-carousel-item">

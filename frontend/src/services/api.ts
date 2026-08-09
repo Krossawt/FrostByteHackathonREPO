@@ -656,13 +656,18 @@ export async function voteCommentApi(commentId: number): Promise<any> {
 
 export function resolveImageUrl(rawUrl?: string): string {
   if (!rawUrl) return ''
-  if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://') || rawUrl.startsWith('data:')) {
+  if (rawUrl.startsWith('data:')) return rawUrl
+  if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
+    if (rawUrl.includes('frostbytehackathonrepo.onrender.com') && API_BASE_URL.includes('localhost')) {
+      const backendBase = API_BASE_URL.replace(/\/api\/v1\/?$/, '')
+      const path = rawUrl.replace('https://frostbytehackathonrepo.onrender.com', '')
+      return `${backendBase}${path}`
+    }
     return rawUrl
   }
-  const apiOrigin = (import.meta as any).env?.VITE_API_URL
-    ? (import.meta as any).env.VITE_API_URL.replace(/\/api\/v1\/?$/, '')
-    : 'https://frostbytehackathonrepo.onrender.com'
-  return `${apiOrigin}${rawUrl.startsWith('/') ? '' : '/'}${rawUrl}`
+  const backendBase = API_BASE_URL.replace(/\/api\/v1\/?$/, '')
+  const cleanPath = rawUrl.startsWith('/') ? rawUrl : `/${rawUrl}`
+  return `${backendBase}${cleanPath}`
 }
 
 export async function fetchNewsApi(): Promise<NewsItem[]> {
